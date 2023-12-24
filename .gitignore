@@ -33,4 +33,4 @@ build/
 .vscode/
 docker/
 files/
-src/main/resource/
+src/main/resources/application.properties
