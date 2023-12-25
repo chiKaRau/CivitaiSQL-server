@@ -32,7 +32,7 @@ public class Civitai_Controller {
 
         String modelID = (String) requestBody.get("modelID");
 
-        Optional<List<String>> tagsOptional = civitai_Service.findTagsByModelID(modelID);
+        Optional<List<String>> tagsOptional = civitai_Service.findModelTagsByModelID(modelID);
         if (tagsOptional.isPresent()) {
             List<String> tags = tagsOptional.get();
 

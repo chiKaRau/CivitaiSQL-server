@@ -1,7 +1,13 @@
 package com.civitai.server.services.impl;
 
+import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +34,10 @@ import com.civitai.server.repositories.civitaiSQL.Models_Images_Table_Repository
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
 import com.civitai.server.services.CivitaiSQL_Service;
+import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.utils.JsonUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.transaction.Transactional;
 
@@ -45,6 +54,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Urls_Table_Repository models_Urls_Table_Repository;
         private final Models_Details_Table_Repository models_Details_Table_Repository;
         private final Models_Images_Table_Repository models_Images_Table_Repository;
+        private final Civitai_Service civitai_Service;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Service_Impl.class);
@@ -54,12 +64,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Descriptions_Table_Repository models_Descriptions_Table_Repository,
                         Models_Urls_Table_Repository models_Urls_Table_Repository,
                         Models_Details_Table_Repository models_Details_Table_Repository,
-                        Models_Images_Table_Repository models_Images_Table_Repository) {
+                        Models_Images_Table_Repository models_Images_Table_Repository,
+                        Civitai_Service civitai_Service) {
                 this.models_Table_Repository = models_Table_Repository;
                 this.models_Descriptions_Table_Repository = models_Descriptions_Table_Repository;
                 this.models_Urls_Table_Repository = models_Urls_Table_Repository;
                 this.models_Details_Table_Repository = models_Details_Table_Repository;
                 this.models_Images_Table_Repository = models_Images_Table_Repository;
+                this.civitai_Service = civitai_Service;
         }
 
         @Override
@@ -190,9 +202,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         public Optional<Models_Table_Entity> find_one_from_models_table(Integer id) {
                 try {
-                        Optional<Models_Table_Entity> modelsOptional = models_Table_Repository.findById(id);
+                        Optional<Models_Table_Entity> entityOptional = models_Table_Repository.findById(id);
 
-                        return modelsOptional.isPresent() ? modelsOptional : Optional.empty();
+                        return entityOptional.isPresent() ? entityOptional : Optional.empty();
 
                 } catch (DataAccessException e) {
                         // Log and handle database-related exceptions
@@ -208,10 +220,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         public Optional<List<Tables_DTO>> find_all_from_all_tables() {
                 try {
-                        Iterable<Models_Table_Entity> models = models_Table_Repository.findAll();
+                        Iterable<Models_Table_Entity> entities = models_Table_Repository.findAll();
 
-                        if (models != null) {
-                                List<Tables_DTO> entities = StreamSupport.stream(models.spliterator(), false)
+                        if (entities != null) {
+                                List<Tables_DTO> entitiesList = StreamSupport.stream(entities.spliterator(), false)
                                                 .map(model -> {
                                                         Tables_DTO tables_DTO = new Tables_DTO();
                                                         tables_DTO.setModels_Table_Entitiy(model);
@@ -234,7 +246,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                         return tables_DTO;
                                                 }).collect((Collectors.toList()));
 
-                                return Optional.of(entities);
+                                return Optional.of(entitiesList);
                         } else {
                                 return Optional.empty();
                         }
@@ -254,9 +266,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         public Optional<Tables_DTO> find_one_tables_DTO_from_all_tables(Integer id) {
                 try {
-                        Optional<Models_Table_Entity> modelsOptional = models_Table_Repository.findById(id);
-                        if (modelsOptional.isPresent()) {
-                                Models_Table_Entity model = modelsOptional.get();
+                        Optional<Models_Table_Entity> entityOptional = models_Table_Repository.findById(id);
+                        if (entityOptional.isPresent()) {
+                                Models_Table_Entity model = entityOptional.get();
 
                                 Tables_DTO tables_DTO = new Tables_DTO();
                                 tables_DTO.setModels_Table_Entitiy(model);
@@ -290,53 +302,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
-        @SuppressWarnings("unchecked")
         @Override
         public Optional<Models_DTO> find_one_models_DTO_from_all_tables(Integer id) {
                 try {
-                        Optional<Models_Table_Entity> modelsOptional = models_Table_Repository.findById(id);
-                        if (modelsOptional.isPresent()) {
-                                Models_Table_Entity model = modelsOptional.get();
+                        Optional<Models_Table_Entity> entityOptional = models_Table_Repository.findById(id);
+                        if (entityOptional.isPresent()) {
+                                Models_Table_Entity entity = entityOptional.get();
 
-                                Tables_DTO tables_DTO = new Tables_DTO();
-                                tables_DTO.setModels_Table_Entitiy(model);
-                                tables_DTO.setModels_Descriptions_Table_Entity(
-                                                models_Descriptions_Table_Repository
-                                                                .findById(model.getId())
-                                                                .orElse(null));
-                                tables_DTO.setModels_Urls_Table_Entity(
-                                                models_Urls_Table_Repository.findById(model.getId())
-                                                                .orElse(null));
-                                tables_DTO.setModels_Details_Table_Entity(
-                                                models_Details_Table_Repository.findById(model.getId())
-                                                                .orElse(null));
-                                tables_DTO.setModels_Images_Table_Entity(
-                                                models_Images_Table_Repository.findById(model.getId())
-                                                                .orElse(null));
-
-                                Models_DTO models_DTO = new Models_DTO();
-                                models_DTO.setName(tables_DTO.getModels_Table_Entitiy().getName());
-                                models_DTO.setTags(JsonUtils.convertStringToObject(
-                                                tables_DTO.getModels_Table_Entitiy().getTags(), List.class));
-                                models_DTO.setCategory(tables_DTO.getModels_Table_Entitiy().getCategory());
-                                models_DTO.setVersionNumber(tables_DTO.getModels_Table_Entitiy().getVersionNumber());
-                                models_DTO.setModelNumber(tables_DTO.getModels_Table_Entitiy().getModelNumber());
-                                models_DTO.setTriggerWords(JsonUtils.convertStringToObject(
-                                                tables_DTO.getModels_Table_Entitiy().getTriggerWords(), List.class));
-                                models_DTO.setUrl(tables_DTO.getModels_Urls_Table_Entity().getUrl());
-                                models_DTO.setDescription(
-                                                tables_DTO.getModels_Descriptions_Table_Entity().getDescription());
-                                models_DTO.setType(tables_DTO.getModels_Details_Table_Entity().getType());
-                                models_DTO.setStats(tables_DTO.getModels_Details_Table_Entity().getStats());
-                                models_DTO.setUploaded(tables_DTO.getModels_Details_Table_Entity().getUploaded());
-                                models_DTO.setBaseModel(tables_DTO.getModels_Details_Table_Entity().getBaseModel());
-                                models_DTO.setHash(tables_DTO.getModels_Details_Table_Entity().getHash());
-                                models_DTO.setUsageTips(tables_DTO.getModels_Details_Table_Entity().getUsageTips());
-                                models_DTO.setCreatorName(tables_DTO.getModels_Details_Table_Entity().getCreatorName());
-                                models_DTO.setNsfw(tables_DTO.getModels_Table_Entitiy().getNsfw());
-                                models_DTO.setImageUrls(JsonUtils.convertStringToObject(
-                                                tables_DTO.getModels_Images_Table_Entity().getImageUrls(), List.class));
-                                models_DTO.setFlag(tables_DTO.getModels_Table_Entitiy().getFlag());
+                                Models_DTO models_DTO = convertToDTO(entity);
 
                                 return Optional.of(models_DTO);
                         } else {
@@ -356,56 +329,237 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         }
 
-        @SuppressWarnings("unchecked")
         @Override
         public Optional<Models_DTO> find_one_models_DTO_from_all_tables_by_url(String url) {
 
-                Models_Urls_Table_Entity model = models_Urls_Table_Repository.findByUrl(url);
-                if (model != null) {
-                        Tables_DTO tables_DTO = new Tables_DTO();
-                        tables_DTO.setModels_Table_Entitiy(
-                                        models_Table_Repository.findById(model.getId()).orElse(null));
-                        tables_DTO.setModels_Descriptions_Table_Entity(
-                                        models_Descriptions_Table_Repository
-                                                        .findById(model.getId())
-                                                        .orElse(null));
-                        tables_DTO.setModels_Urls_Table_Entity(model);
-                        tables_DTO.setModels_Details_Table_Entity(
-                                        models_Details_Table_Repository.findById(model.getId())
-                                                        .orElse(null));
-                        tables_DTO.setModels_Images_Table_Entity(
-                                        models_Images_Table_Repository.findById(model.getId())
-                                                        .orElse(null));
-                        Models_DTO models_DTO = new Models_DTO();
-                        models_DTO.setName(tables_DTO.getModels_Table_Entitiy().getName());
-                        models_DTO.setTags(JsonUtils.convertStringToObject(
-                                        tables_DTO.getModels_Table_Entitiy().getTags(), List.class));
-                        models_DTO.setCategory(tables_DTO.getModels_Table_Entitiy().getCategory());
-                        models_DTO.setVersionNumber(tables_DTO.getModels_Table_Entitiy().getVersionNumber());
-                        models_DTO.setModelNumber(tables_DTO.getModels_Table_Entitiy().getModelNumber());
-                        models_DTO.setTriggerWords(JsonUtils.convertStringToObject(
-                                        tables_DTO.getModels_Table_Entitiy().getTriggerWords(), List.class));
-                        models_DTO.setUrl(tables_DTO.getModels_Urls_Table_Entity().getUrl());
-                        models_DTO.setDescription(
-                                        tables_DTO.getModels_Descriptions_Table_Entity().getDescription());
-                        models_DTO.setType(tables_DTO.getModels_Details_Table_Entity().getType());
-                        models_DTO.setStats(tables_DTO.getModels_Details_Table_Entity().getStats());
-                        models_DTO.setUploaded(tables_DTO.getModels_Details_Table_Entity().getUploaded());
-                        models_DTO.setBaseModel(tables_DTO.getModels_Details_Table_Entity().getBaseModel());
-                        models_DTO.setHash(tables_DTO.getModels_Details_Table_Entity().getHash());
-                        models_DTO.setUsageTips(tables_DTO.getModels_Details_Table_Entity().getUsageTips());
-                        models_DTO.setCreatorName(tables_DTO.getModels_Details_Table_Entity().getCreatorName());
-                        models_DTO.setNsfw(tables_DTO.getModels_Table_Entitiy().getNsfw());
-                        models_DTO.setImageUrls(JsonUtils.convertStringToObject(
-                                        tables_DTO.getModels_Images_Table_Entity().getImageUrls(), List.class));
-                        models_DTO.setFlag(tables_DTO.getModels_Table_Entitiy().getFlag());
+                Models_Urls_Table_Entity entity = models_Urls_Table_Repository.findByUrl(url);
+                if (entity != null) {
+
+                        Models_DTO models_DTO = convertToDTO(
+                                        models_Table_Repository.findById(entity.getId()).orElse(null));
 
                         return Optional.of(models_DTO);
                 } else {
                         return Optional.empty();
 
                 }
+        }
 
+        @Override
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_url(String url) {
+
+                String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+
+                List<Models_Table_Entity> modelsList = models_Table_Repository.findByModelNumber(modelID);
+
+                if (modelsList != null && !modelsList.isEmpty()) {
+                        // Use stream and map to convert each entity to DTO
+                        List<Models_DTO> modelsDTOList = modelsList.stream()
+                                        .map(this::convertToDTO)
+                                        .collect(Collectors.toList());
+
+                        return Optional.of(modelsDTOList);
+                } else {
+                        return Optional.empty();
+                }
+
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Optional<Models_DTO> create_models_DTO_by_Url(String url, String category) {
+                try {
+
+                        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+
+                        Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(modelID);
+
+                        String name = null, versionNumber = null, description = null, type = null, stats = null,
+                                        hash = null, usageTips = null, creatorName = null,
+                                        baseModel = null;
+
+                        List<Map<String, Object>> images = new ArrayList<>();
+                        List<String> tags = new ArrayList<>(), triggerWords = new ArrayList<>();
+
+                        Boolean nsfw = false, flag = false;
+
+                        LocalDate uploaded = null;
+
+                        if (modelOptional.isPresent()) {
+                                Map<String, Object> model = modelOptional.get();
+
+                                //Retriving the version list 
+                                Optional<List<Map<String, Object>>> modelVersionList = Optional
+                                                .ofNullable(model)
+                                                .map(map -> (List<Map<String, Object>>) map.get("modelVersions"))
+                                                .filter(list -> !list.isEmpty());
+
+                                //For Model Name
+                                name = Optional.ofNullable((String) model.get("type"))
+                                                .orElse(null);
+
+                                //For Version Number
+                                URI uri = new URI(url);
+                                String query = uri.getQuery();
+                                if (query != null && query.contains("modelVersionId")) {
+                                        String[] queryParams = query.split("&");
+                                        for (String param : queryParams) {
+                                                if (param.startsWith("modelVersionId=")) {
+                                                        versionNumber = param.substring("modelVersionId=".length());
+                                                }
+                                        }
+                                } else {
+                                        versionNumber = modelVersionList.map(list -> list.get(0).get("id"))
+                                                        .map(Object::toString)
+                                                        .orElse(null);
+                                }
+
+                                //Retriving appropriate model from the version list
+                                final String final_versionId = versionNumber;
+                                List<Map<String, Object>> matchingVersionModel = Optional
+                                                .ofNullable(modelVersionList.orElse(Collections.emptyList()))
+                                                .orElse(Collections.emptyList())
+                                                .stream()
+                                                .filter(element -> {
+                                                        Object idObject = element.get("id");
+                                                        return final_versionId != null && final_versionId
+                                                                        .equals(String.valueOf(idObject));
+                                                })
+                                                .collect(Collectors.toList());
+
+                                //For NSFW
+                                nsfw = Optional.ofNullable((Boolean) model.get("nsfw"))
+                                                .orElse(null);
+
+                                //For Tags
+                                tags = Optional.ofNullable((List<String>) model.get("tags"))
+                                                .orElse(null);
+
+                                //For Trigger Words
+                                triggerWords = matchingVersionModel.stream()
+                                                .map(map -> (List<String>) map.get("trainedWords"))
+                                                .findFirst().orElse(null);
+
+                                //For Description
+                                description = Optional.ofNullable((String) model.get("description"))
+                                                .orElse(null);
+
+                                //For Type
+                                type = Optional.ofNullable((String) model.get("type"))
+                                                .orElse(null);
+
+                                //For Stats
+                                stats = matchingVersionModel.stream()
+                                                .map(map -> (Map<String, Object>) map.get("stats"))
+                                                .filter(data -> data != null)
+                                                .findFirst()
+                                                .map(data -> {
+                                                        try {
+                                                                return new ObjectMapper().writeValueAsString(data);
+                                                        } catch (JsonProcessingException e) {
+                                                                throw new RuntimeException(e);
+                                                        }
+                                                })
+                                                .orElse(null);
+
+                                //For Uploaded Date
+
+                                String uploadedString = matchingVersionModel.stream()
+                                                .map(map -> (String) map.get("createdAt"))
+                                                .findFirst().orElse(null);
+
+                                uploaded = LocalDate.parse(
+                                                Instant.parse(uploadedString).atOffset(ZoneOffset.UTC)
+                                                                .toLocalDateTime()
+                                                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                                                DateTimeFormatter.ISO_LOCAL_DATE);
+
+                                //For Base Model
+                                baseModel = matchingVersionModel.stream()
+                                                .map(map -> (String) map.get("baseModel"))
+                                                .findFirst().orElse(null);
+
+                                //For Hash
+                                hash = matchingVersionModel.stream()
+                                                .map(map -> (List<Map<String, Object>>) map.get("files"))
+                                                .filter(files -> files != null)
+                                                .flatMap(List::stream)
+                                                .map(file -> (Map<String, Object>) file.get("hashes"))
+                                                .filter(hashes -> hashes != null)
+                                                .map(hashes -> {
+                                                        try {
+                                                                // Convert the hashes map to a JSON string
+                                                                return new ObjectMapper().writeValueAsString(hashes);
+                                                        } catch (JsonProcessingException e) {
+                                                                throw new RuntimeException(e);
+                                                        }
+                                                })
+                                                .collect(Collectors.joining(","));
+
+                                if (hash.length() > 1000) {
+                                        hash = "hash too long; please check";
+                                        flag = true;
+                                }
+
+                                //For Creator Name
+                                creatorName = Optional.ofNullable((Map<String, Object>) model.get("creator"))
+                                                .map(creator -> (String) creator.get("username"))
+                                                .orElse(null);
+
+                                //For Images Urls
+
+                                List<String> imagesArray = matchingVersionModel.stream()
+                                                .map(map -> (List<String>) map.get("images"))
+                                                .findFirst().orElse(null);
+
+                                // Iterate over each element in the 'images' list
+                                for (Object element : imagesArray) {
+                                        Map<String, Object> myHashObject = new HashMap<>();
+
+                                        // Replace 'images' with 'element' to access the properties of each object
+                                        myHashObject.put("url", (String) ((Map<String, Object>) element).get("url"));
+                                        myHashObject.put("nsfw", (String) ((Map<String, Object>) element).get("nsfw"));
+                                        myHashObject.put("width", (int) ((Map<String, Object>) element).get("width"));
+                                        myHashObject.put("height", (int) ((Map<String, Object>) element).get("height"));
+
+                                        // Add the map to the list
+                                        images.add(myHashObject);
+                                }
+
+                                //Create a Models_DTO
+                                Models_DTO dto = new Models_DTO();
+                                dto.setUrl(url);
+                                dto.setName(name);
+                                dto.setModelNumber(modelID);
+                                dto.setVersionNumber(versionNumber);
+                                dto.setCategory(category);
+                                dto.setNsfw(nsfw);
+                                dto.setFlag(flag);
+                                dto.setTags(tags);
+                                dto.setTriggerWords(triggerWords);
+                                dto.setDescription(description);
+                                dto.setType(type);
+                                dto.setStats(stats);
+                                dto.setUploaded(uploaded);
+                                dto.setBaseModel(baseModel);
+                                dto.setHash(hash);
+                                dto.setUsageTips(usageTips);
+                                dto.setCreatorName(creatorName);
+                                dto.setImageUrls(images);
+
+                                return Optional.of(dto);
+                        } else {
+                                return Optional.empty();
+                        }
+
+                } catch (Exception e) {
+                        // Log the exception for internal debugging
+                        log.error("Error while createing a record into all table", e);
+                        // Throw a custom exception for critical errors
+                        throw new CustomException("An unexpected error occurred", e);
+                        // Alternatively, return a fallback response for less critical errors
+                        // return Collections.emptyList();
+                }
         }
 
         @Override
@@ -469,6 +623,51 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 } catch (Exception e) {
                         // Log the exception for internal debugging
                         log.error("Error while createing a record into all table", e);
+                        // Throw a custom exception for critical errors
+                        throw new CustomException("An unexpected error occurred", e);
+                        // Alternatively, return a fallback response for less critical errors
+                        // return Collections.emptyList();
+                }
+        }
+
+        @Override
+        @Transactional
+        public void update_record_to_all_tables_by_id(Models_DTO dto, Integer id) {
+                try {
+
+                        updateModelsTable(dto, id);
+                        updateModelsUrlsTable(dto, id);
+                        updateModelsDescriptionTable(dto, id);
+                        updateModelsDetailsTable(dto, id);
+                        updateModelsImagesTable(dto, id);
+
+                } catch (Exception e) {
+                        // Log the exception for internal debugging
+                        log.error("Error while createing a record into all table", e);
+                        // Throw a custom exception for critical errors
+                        throw new CustomException("An unexpected error occurred", e);
+                        // Alternatively, return a fallback response for less critical errors
+                        // return Collections.emptyList();
+                }
+        }
+
+        @Override
+        @Transactional
+        public void delete_record_to_all_table_by_id(Integer id) {
+                try {
+
+                        // Delete records from tables with no foreign key constraints
+                        models_Urls_Table_Repository.deleteById(id);
+                        models_Descriptions_Table_Repository.deleteById(id);
+                        models_Images_Table_Repository.deleteById(id);
+                        models_Details_Table_Repository.deleteById(id);
+
+                        // Delete the record from the main table (Models_Table) last
+                        models_Table_Repository.deleteById(id);
+                        
+                } catch (Exception e) {
+                        // Log the exception for internal debugging
+                        log.error("Error while deleting a record into all table", e);
                         // Throw a custom exception for critical errors
                         throw new CustomException("An unexpected error occurred", e);
                         // Alternatively, return a fallback response for less critical errors
@@ -560,6 +759,122 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         // Alternatively, return a fallback response for less critical errors
                         // return Collections.emptyList();
                 }
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Models_DTO convertToDTO(Models_Table_Entity entity) {
+                // Method to convert Models_Table_Entity to Models_DTO
+                Tables_DTO tables_DTO = new Tables_DTO();
+                tables_DTO.setModels_Table_Entitiy(entity);
+                tables_DTO.setModels_Descriptions_Table_Entity(
+                                models_Descriptions_Table_Repository
+                                                .findById(entity.getId())
+                                                .orElse(null));
+                tables_DTO.setModels_Urls_Table_Entity(
+                                models_Urls_Table_Repository.findById(entity.getId()).orElse(null));
+                tables_DTO.setModels_Details_Table_Entity(
+                                models_Details_Table_Repository.findById(entity.getId())
+                                                .orElse(null));
+                tables_DTO.setModels_Images_Table_Entity(
+                                models_Images_Table_Repository.findById(entity.getId())
+                                                .orElse(null));
+
+                Models_DTO models_DTO = new Models_DTO();
+                models_DTO.setName(tables_DTO.getModels_Table_Entitiy().getName());
+                models_DTO.setTags(JsonUtils.convertStringToObject(
+                                tables_DTO.getModels_Table_Entitiy().getTags(), List.class));
+                models_DTO.setCategory(tables_DTO.getModels_Table_Entitiy().getCategory());
+                models_DTO.setVersionNumber(tables_DTO.getModels_Table_Entitiy().getVersionNumber());
+                models_DTO.setModelNumber(tables_DTO.getModels_Table_Entitiy().getModelNumber());
+                models_DTO.setTriggerWords(JsonUtils.convertStringToObject(
+                                tables_DTO.getModels_Table_Entitiy().getTriggerWords(), List.class));
+                models_DTO.setUrl(tables_DTO.getModels_Urls_Table_Entity().getUrl());
+                models_DTO.setDescription(
+                                tables_DTO.getModels_Descriptions_Table_Entity().getDescription());
+                models_DTO.setType(tables_DTO.getModels_Details_Table_Entity().getType());
+                models_DTO.setStats(tables_DTO.getModels_Details_Table_Entity().getStats());
+                models_DTO.setUploaded(tables_DTO.getModels_Details_Table_Entity().getUploaded());
+                models_DTO.setBaseModel(tables_DTO.getModels_Details_Table_Entity().getBaseModel());
+                models_DTO.setHash(tables_DTO.getModels_Details_Table_Entity().getHash());
+                models_DTO.setUsageTips(tables_DTO.getModels_Details_Table_Entity().getUsageTips());
+                models_DTO.setCreatorName(tables_DTO.getModels_Details_Table_Entity().getCreatorName());
+                models_DTO.setNsfw(tables_DTO.getModels_Table_Entitiy().getNsfw());
+                models_DTO.setImageUrls(JsonUtils.convertStringToObject(
+                                tables_DTO.getModels_Images_Table_Entity().getImageUrls(), List.class));
+                models_DTO.setFlag(tables_DTO.getModels_Table_Entitiy().getFlag());
+
+                return models_DTO;
+        }
+
+        private void updateModelsTable(Models_DTO dto, Integer id) {
+                Optional<Models_Table_Entity> entityOptional = models_Table_Repository
+                                .findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Table_Entity entity = entityOptional.get();
+                        entity.setName(dto.getName());
+                        entity.setTags(JsonUtils.convertObjectToString(dto.getTags()));
+                        entity.setCategory(dto.getCategory());
+                        entity.setVersionNumber(dto.getVersionNumber());
+                        entity.setModelNumber(dto.getModelNumber());
+                        entity.setTriggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()));
+                        entity.setNsfw(dto.getNsfw());
+                        entity.setFlag(dto.getFlag());
+                        models_Table_Repository.save(entity);
+                }
+        }
+
+        private void updateModelsUrlsTable(Models_DTO dto, Integer id) {
+                Optional<Models_Urls_Table_Entity> entityOptional = models_Urls_Table_Repository
+                                .findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Urls_Table_Entity entity = entityOptional.get();
+                        entity.setUrl(dto.getUrl());
+                        models_Urls_Table_Repository.save(entity);
+                }
+        }
+
+        private void updateModelsDescriptionTable(Models_DTO dto, Integer id) {
+
+                Optional<Models_Descriptions_Table_Entity> entityOptional = models_Descriptions_Table_Repository
+                                .findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Descriptions_Table_Entity entity = entityOptional
+                                        .get();
+                        entity.setDescription(dto.getDescription());
+                        models_Descriptions_Table_Repository.save(entity);
+
+                }
+        }
+
+        private void updateModelsDetailsTable(Models_DTO dto, Integer id) {
+
+                Optional<Models_Details_Table_Entity> entityOptional = models_Details_Table_Repository
+                                .findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Details_Table_Entity entity = entityOptional
+                                        .get();
+                        entity.setType(dto.getType());
+                        entity.setStats(dto.getStats());
+                        entity.setUploaded(dto.getUploaded());
+                        entity.setBaseModel(dto.getBaseModel());
+                        entity.setHash(dto.getHash());
+                        entity.setUsageTips(dto.getUsageTips());
+                        entity.setCreatorName(dto.getCreatorName());
+                        models_Details_Table_Repository.save(entity);
+                }
+        }
+
+        private void updateModelsImagesTable(Models_DTO dto, Integer id) {
+                Optional<Models_Images_Table_Entity> entityOptional = models_Images_Table_Repository
+                                .findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Images_Table_Entity entity = entityOptional
+                                        .get();
+                        entity.setImageUrls(JsonUtils.convertObjectToString(dto.getImageUrls()));
+                        models_Images_Table_Repository.save(entity);
+                }
+
         }
 
 }

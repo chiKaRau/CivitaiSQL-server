@@ -25,10 +25,19 @@ public interface CivitaiSQL_Service {
 
     Optional<Models_DTO> find_one_models_DTO_from_all_tables_by_url(String url);
 
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_url(String url);
+
     Optional<Map<String, List<Models_DTO>>> find_lastest_three_models_DTO_in_each_category_from_all_table();
+
+    Optional<Models_DTO> create_models_DTO_by_Url(String url, String category);
 
     // Add a record to all tables
     void create_record_to_all_tables(Models_DTO dto);
+
+    // Update a record to all tables
+    void update_record_to_all_tables_by_id(Models_DTO dto, Integer id);
+
+    void delete_record_to_all_table_by_id(Integer id);
 
     // Add a dummy record to all table
     void create_dummy_record_to_all_tables();
@@ -38,5 +47,8 @@ public interface CivitaiSQL_Service {
 
     // Delete every row from all tables
     void delete_every_record_from_all_tables();
+
+    // Utils
+    Models_DTO convertToDTO(Models_Table_Entity entity);
 
 }

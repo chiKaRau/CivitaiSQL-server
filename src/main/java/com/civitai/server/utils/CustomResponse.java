@@ -20,7 +20,12 @@ public class CustomResponse<T> {
         return new CustomResponse<>(true, message, data);
     }
 
+    public static <T> CustomResponse<T> success(String message) {
+        return new CustomResponse<>(true, message, null);
+    }
+
     public static <T> CustomResponse<T> failure(String message) {
         return new CustomResponse<>(false, message, null);
     }
+
 }

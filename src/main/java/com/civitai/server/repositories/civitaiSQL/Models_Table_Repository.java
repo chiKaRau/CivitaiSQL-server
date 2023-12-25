@@ -24,4 +24,6 @@ public interface Models_Table_Repository extends JpaRepository<Models_Table_Enti
     @Query("SELECT category FROM Models_Table_Entity t GROUP BY category ORDER BY category ASC")
     List<String> findAllCategories();
 
+    List<Models_Table_Entity> findByModelNumber(String modelID);
+
 }

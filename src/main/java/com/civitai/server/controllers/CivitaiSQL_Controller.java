@@ -1,6 +1,5 @@
 package com.civitai.server.controllers;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,7 +147,7 @@ public class CivitaiSQL_Controller {
 
             return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
         } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("Model not found"));
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
         }
     }
 
@@ -165,16 +164,91 @@ public class CivitaiSQL_Controller {
 
             return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
         } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("Model not found"));
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
+        }
+    }
+
+    @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-url")
+    public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOFromAllTableByUrl(
+            @RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+        Optional<List<Models_DTO>> entityOptional = civitaiSQL_Service
+                .find_List_of_models_DTO_from_all_tables_by_url(url);
+
+        if (entityOptional.isPresent()) {
+            List<Models_DTO> entity = entityOptional.get();
+
+            Map<String, List<Models_DTO>> data = new HashMap<>();
+            data.put("models", entity);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
         }
     }
 
     @PostMapping("/create-record-to-all-tables")
-    public ResponseEntity<String> createRecordToAllTables(@RequestBody Models_DTO dto) {
-        civitaiSQL_Service.create_record_to_all_tables(dto);
-        return ResponseEntity
-                .created(URI.create("/create-record-to-all-tables"))
-                .body("Model created successfully");
+    public ResponseEntity<CustomResponse<String>> createRecordToAllTables(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String category = (String) requestBody.get("category");
+        String url = (String) requestBody.get("url");
+
+        Optional<Models_DTO> entityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
+
+        if (entityOptional.isPresent()) {
+            Models_DTO models_DTO = entityOptional.get();
+
+            System.out.println(models_DTO);
+
+            civitaiSQL_Service.create_record_to_all_tables(models_DTO);
+            return ResponseEntity.ok().body(CustomResponse.success("Model created successfully"));
+        } else {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.failure("Failed to create the model record in the database"));
+        }
+
+    }
+
+    @PostMapping("/update-record-to-all-tables-by")
+    public ResponseEntity<CustomResponse<String>> updateRecordToAllTables(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String category = (String) requestBody.get("category");
+        String url = (String) requestBody.get("url");
+        Integer id = (Integer) requestBody.get("id");
+
+        Optional<Models_DTO> newUpdateEntityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
+
+        Optional<Models_Table_Entity> mySQLEntityOptional = civitaiSQL_Service.find_one_from_models_table(id);
+
+        if (newUpdateEntityOptional.isPresent() && mySQLEntityOptional.isPresent()) {
+            Models_DTO models_DTO = newUpdateEntityOptional.get();
+
+            civitaiSQL_Service.update_record_to_all_tables_by_id(models_DTO, id);
+            return ResponseEntity.ok().body(CustomResponse.success("Model Updated successfully"));
+        } else {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.failure("Model not found in the database"));
+        }
+    }
+
+    @PostMapping("/delete-record-to-all-tables")
+    public ResponseEntity<CustomResponse<String>> deleteRecordToAllTables(
+            @RequestBody Map<String, Object> requestBody) {
+
+        Integer id = (Integer) requestBody.get("id");
+
+        Optional<Models_Table_Entity> entityOptional = civitaiSQL_Service.find_one_from_models_table(id);
+
+        if (entityOptional.isPresent()) {
+
+            civitaiSQL_Service.delete_record_to_all_table_by_id(id);
+            return ResponseEntity.ok().body(CustomResponse.success("Model Deleted successfully"));
+        } else {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.failure("Model not found in the database"));
+        }
 
     }
 }
