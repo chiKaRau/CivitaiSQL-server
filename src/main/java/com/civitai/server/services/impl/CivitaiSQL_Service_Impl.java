@@ -125,7 +125,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                                                 .findLastThreeAddedRecordsID(category,
                                                                                                 PageRequest.of(0, 3))
                                                                                 .stream()
-                                                                                .map(id -> find_one_models_DTO_from_all_tables(
+                                                                                .map(id -> find_one_models_DTO_from_all_tables_by_id(
                                                                                                 id))
                                                                                 .filter(Optional::isPresent)
                                                                                 .map(Optional::get)
@@ -303,7 +303,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         @Override
-        public Optional<Models_DTO> find_one_models_DTO_from_all_tables(Integer id) {
+        public Optional<Models_DTO> find_one_models_DTO_from_all_tables_by_id(Integer id) {
                 try {
                         Optional<Models_Table_Entity> entityOptional = models_Table_Repository.findById(id);
                         if (entityOptional.isPresent()) {
@@ -346,15 +346,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         @Override
-        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_url(String url) {
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_modelID(String modelID) {
 
-                String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+                List<Models_Table_Entity> entityList = models_Table_Repository.findByModelNumber(modelID);
 
-                List<Models_Table_Entity> modelsList = models_Table_Repository.findByModelNumber(modelID);
-
-                if (modelsList != null && !modelsList.isEmpty()) {
+                if (entityList != null && !entityList.isEmpty()) {
                         // Use stream and map to convert each entity to DTO
-                        List<Models_DTO> modelsDTOList = modelsList.stream()
+                        List<Models_DTO> modelsDTOList = entityList.stream()
                                         .map(this::convertToDTO)
                                         .collect(Collectors.toList());
 
@@ -366,202 +364,77 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
-        public Optional<Models_DTO> create_models_DTO_by_Url(String url, String category) {
-                try {
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_url(String name) {
+                List<Models_Urls_Table_Entity> entityList = models_Urls_Table_Repository.findAlikeUrl(name);
 
-                        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+                if (entityList != null && !entityList.isEmpty()) {
+                        // Use stream and map to convert each entity to DTO
+                        List<Models_DTO> modelsDTOList = entityList.stream()
+                                        .map(element -> {
+                                                Optional<Models_Table_Entity> entityOptional = models_Table_Repository
+                                                                .findById(element.getId());
 
-                        Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(modelID);
+                                                return entityOptional.isPresent() ? convertToDTO(entityOptional.get())
+                                                                : null;
 
-                        String name = null, versionNumber = null, description = null, type = null, stats = null,
-                                        hash = null, usageTips = null, creatorName = null,
-                                        baseModel = null;
+                                        })
+                                        .collect(Collectors.toList());
 
-                        List<Map<String, Object>> images = new ArrayList<>();
-                        List<String> tags = new ArrayList<>(), triggerWords = new ArrayList<>();
-
-                        Boolean nsfw = false, flag = false;
-
-                        LocalDate uploaded = null;
-
-                        if (modelOptional.isPresent()) {
-                                Map<String, Object> model = modelOptional.get();
-
-                                //Retriving the version list 
-                                Optional<List<Map<String, Object>>> modelVersionList = Optional
-                                                .ofNullable(model)
-                                                .map(map -> (List<Map<String, Object>>) map.get("modelVersions"))
-                                                .filter(list -> !list.isEmpty());
-
-                                //For Model Name
-                                name = Optional.ofNullable((String) model.get("type"))
-                                                .orElse(null);
-
-                                //For Version Number
-                                URI uri = new URI(url);
-                                String query = uri.getQuery();
-                                if (query != null && query.contains("modelVersionId")) {
-                                        String[] queryParams = query.split("&");
-                                        for (String param : queryParams) {
-                                                if (param.startsWith("modelVersionId=")) {
-                                                        versionNumber = param.substring("modelVersionId=".length());
-                                                }
-                                        }
-                                } else {
-                                        versionNumber = modelVersionList.map(list -> list.get(0).get("id"))
-                                                        .map(Object::toString)
-                                                        .orElse(null);
-                                }
-
-                                //Retriving appropriate model from the version list
-                                final String final_versionId = versionNumber;
-                                List<Map<String, Object>> matchingVersionModel = Optional
-                                                .ofNullable(modelVersionList.orElse(Collections.emptyList()))
-                                                .orElse(Collections.emptyList())
-                                                .stream()
-                                                .filter(element -> {
-                                                        Object idObject = element.get("id");
-                                                        return final_versionId != null && final_versionId
-                                                                        .equals(String.valueOf(idObject));
-                                                })
-                                                .collect(Collectors.toList());
-
-                                //For NSFW
-                                nsfw = Optional.ofNullable((Boolean) model.get("nsfw"))
-                                                .orElse(null);
-
-                                //For Tags
-                                tags = Optional.ofNullable((List<String>) model.get("tags"))
-                                                .orElse(null);
-
-                                //For Trigger Words
-                                triggerWords = matchingVersionModel.stream()
-                                                .map(map -> (List<String>) map.get("trainedWords"))
-                                                .findFirst().orElse(null);
-
-                                //For Description
-                                description = Optional.ofNullable((String) model.get("description"))
-                                                .orElse(null);
-
-                                //For Type
-                                type = Optional.ofNullable((String) model.get("type"))
-                                                .orElse(null);
-
-                                //For Stats
-                                stats = matchingVersionModel.stream()
-                                                .map(map -> (Map<String, Object>) map.get("stats"))
-                                                .filter(data -> data != null)
-                                                .findFirst()
-                                                .map(data -> {
-                                                        try {
-                                                                return new ObjectMapper().writeValueAsString(data);
-                                                        } catch (JsonProcessingException e) {
-                                                                throw new RuntimeException(e);
-                                                        }
-                                                })
-                                                .orElse(null);
-
-                                //For Uploaded Date
-
-                                String uploadedString = matchingVersionModel.stream()
-                                                .map(map -> (String) map.get("createdAt"))
-                                                .findFirst().orElse(null);
-
-                                uploaded = LocalDate.parse(
-                                                Instant.parse(uploadedString).atOffset(ZoneOffset.UTC)
-                                                                .toLocalDateTime()
-                                                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
-                                                DateTimeFormatter.ISO_LOCAL_DATE);
-
-                                //For Base Model
-                                baseModel = matchingVersionModel.stream()
-                                                .map(map -> (String) map.get("baseModel"))
-                                                .findFirst().orElse(null);
-
-                                //For Hash
-                                hash = matchingVersionModel.stream()
-                                                .map(map -> (List<Map<String, Object>>) map.get("files"))
-                                                .filter(files -> files != null)
-                                                .flatMap(List::stream)
-                                                .map(file -> (Map<String, Object>) file.get("hashes"))
-                                                .filter(hashes -> hashes != null)
-                                                .map(hashes -> {
-                                                        try {
-                                                                // Convert the hashes map to a JSON string
-                                                                return new ObjectMapper().writeValueAsString(hashes);
-                                                        } catch (JsonProcessingException e) {
-                                                                throw new RuntimeException(e);
-                                                        }
-                                                })
-                                                .collect(Collectors.joining(","));
-
-                                if (hash.length() > 1000) {
-                                        hash = "hash too long; please check";
-                                        flag = true;
-                                }
-
-                                //For Creator Name
-                                creatorName = Optional.ofNullable((Map<String, Object>) model.get("creator"))
-                                                .map(creator -> (String) creator.get("username"))
-                                                .orElse(null);
-
-                                //For Images Urls
-
-                                List<String> imagesArray = matchingVersionModel.stream()
-                                                .map(map -> (List<String>) map.get("images"))
-                                                .findFirst().orElse(null);
-
-                                // Iterate over each element in the 'images' list
-                                for (Object element : imagesArray) {
-                                        Map<String, Object> myHashObject = new HashMap<>();
-
-                                        // Replace 'images' with 'element' to access the properties of each object
-                                        myHashObject.put("url", (String) ((Map<String, Object>) element).get("url"));
-                                        myHashObject.put("nsfw", (String) ((Map<String, Object>) element).get("nsfw"));
-                                        myHashObject.put("width", (int) ((Map<String, Object>) element).get("width"));
-                                        myHashObject.put("height", (int) ((Map<String, Object>) element).get("height"));
-
-                                        // Add the map to the list
-                                        images.add(myHashObject);
-                                }
-
-                                //Create a Models_DTO
-                                Models_DTO dto = new Models_DTO();
-                                dto.setUrl(url);
-                                dto.setName(name);
-                                dto.setModelNumber(modelID);
-                                dto.setVersionNumber(versionNumber);
-                                dto.setCategory(category);
-                                dto.setNsfw(nsfw);
-                                dto.setFlag(flag);
-                                dto.setTags(tags);
-                                dto.setTriggerWords(triggerWords);
-                                dto.setDescription(description);
-                                dto.setType(type);
-                                dto.setStats(stats);
-                                dto.setUploaded(uploaded);
-                                dto.setBaseModel(baseModel);
-                                dto.setHash(hash);
-                                dto.setUsageTips(usageTips);
-                                dto.setCreatorName(creatorName);
-                                dto.setImageUrls(images);
-
-                                return Optional.of(dto);
-                        } else {
-                                return Optional.empty();
-                        }
-
-                } catch (Exception e) {
-                        // Log the exception for internal debugging
-                        log.error("Error while createing a record into all table", e);
-                        // Throw a custom exception for critical errors
-                        throw new CustomException("An unexpected error occurred", e);
-                        // Alternatively, return a fallback response for less critical errors
-                        // return Collections.emptyList();
+                        return Optional.of(modelsDTOList);
+                } else {
+                        return Optional.empty();
                 }
         }
 
+        @Override
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tags(String name) {
+                List<Models_Table_Entity> entityList = models_Table_Repository.findAlikeTags(name);
+
+                if (entityList != null && !entityList.isEmpty()) {
+                        // Use stream and map to convert each entity to DTO
+                        List<Models_DTO> modelsDTOList = entityList.stream()
+                                        .map(this::convertToDTO)
+                                        .collect(Collectors.toList());
+
+                        return Optional.of(modelsDTOList);
+                } else {
+                        return Optional.empty();
+                }
+        }
+
+        @Override
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_triggerWords(String name) {
+                List<Models_Table_Entity> entityList = models_Table_Repository.findAlikeTriggerWords(name);
+
+                if (entityList != null && !entityList.isEmpty()) {
+                        // Use stream and map to convert each entity to DTO
+                        List<Models_DTO> modelsDTOList = entityList.stream()
+                                        .map(this::convertToDTO)
+                                        .collect(Collectors.toList());
+
+                        return Optional.of(modelsDTOList);
+                } else {
+                        return Optional.empty();
+                }
+        }
+
+        @Override
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_name(String name) {
+                List<Models_Table_Entity> entityList = models_Table_Repository.findAlikeName(name);
+
+                if (entityList != null && !entityList.isEmpty()) {
+                        // Use stream and map to convert each entity to DTO
+                        List<Models_DTO> modelsDTOList = entityList.stream()
+                                        .map(this::convertToDTO)
+                                        .collect(Collectors.toList());
+
+                        return Optional.of(modelsDTOList);
+                } else {
+                        return Optional.empty();
+                }
+        }
+
+        //Transcation Actions
         @Override
         @Transactional
         public void create_record_to_all_tables(Models_DTO dto) {
@@ -620,6 +493,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         models_Descriptions_Table_Repository.save(models_Descriptions_Table_Entities);
                         models_Details_Table_Repository.save(models_Details_Table_Entities);
                         models_Images_Table_Repository.save(models_Images_Table_Entities);
+
                 } catch (Exception e) {
                         // Log the exception for internal debugging
                         log.error("Error while createing a record into all table", e);
@@ -664,7 +538,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         // Delete the record from the main table (Models_Table) last
                         models_Table_Repository.deleteById(id);
-                        
+
                 } catch (Exception e) {
                         // Log the exception for internal debugging
                         log.error("Error while deleting a record into all table", e);
@@ -761,6 +635,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        //Utils
         @SuppressWarnings("unchecked")
         @Override
         public Models_DTO convertToDTO(Models_Table_Entity entity) {
@@ -781,6 +656,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 .orElse(null));
 
                 Models_DTO models_DTO = new Models_DTO();
+                models_DTO.setId(tables_DTO.getModels_Table_Entitiy().getId());
                 models_DTO.setName(tables_DTO.getModels_Table_Entitiy().getName());
                 models_DTO.setTags(JsonUtils.convertStringToObject(
                                 tables_DTO.getModels_Table_Entitiy().getTags(), List.class));
@@ -805,6 +681,204 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 models_DTO.setFlag(tables_DTO.getModels_Table_Entitiy().getFlag());
 
                 return models_DTO;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Optional<Models_DTO> create_models_DTO_by_Url(String url, String category) {
+                try {
+
+                        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+
+                        Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(modelID);
+
+                        String name = null, versionNumber = null, description = null, type = null, stats = null,
+                                        hash = null, usageTips = null, creatorName = null,
+                                        baseModel = null;
+
+                        List<Map<String, Object>> images = new ArrayList<>();
+                        List<String> tags = new ArrayList<>(), triggerWords = new ArrayList<>();
+
+                        Boolean nsfw = false, flag = false;
+
+                        LocalDate uploaded = null;
+
+                        if (modelOptional.isPresent()) {
+                                Map<String, Object> model = modelOptional.get();
+
+                                //Retriving the version list 
+                                Optional<List<Map<String, Object>>> modelVersionList = Optional
+                                                .ofNullable(model)
+                                                .map(map -> (List<Map<String, Object>>) map.get("modelVersions"))
+                                                .filter(list -> !list.isEmpty());
+
+                                //For Version Number
+                                URI uri = new URI(url);
+                                String query = uri.getQuery();
+                                if (query != null && query.contains("modelVersionId")) {
+                                        String[] queryParams = query.split("&");
+                                        for (String param : queryParams) {
+                                                if (param.startsWith("modelVersionId=")) {
+                                                        versionNumber = param.substring("modelVersionId=".length());
+                                                }
+                                        }
+                                } else {
+                                        versionNumber = modelVersionList.map(list -> list.get(0).get("id"))
+                                                        .map(Object::toString)
+                                                        .orElse(null);
+                                }
+
+                                //Retriving appropriate model from the version list
+                                final String final_versionId = versionNumber;
+                                List<Map<String, Object>> matchingVersionModel = Optional
+                                                .ofNullable(modelVersionList.orElse(Collections.emptyList()))
+                                                .orElse(Collections.emptyList())
+                                                .stream()
+                                                .filter(element -> {
+                                                        Object idObject = element.get("id");
+                                                        return final_versionId != null && final_versionId
+                                                                        .equals(String.valueOf(idObject));
+                                                })
+                                                .collect(Collectors.toList());
+
+                                //For NSFW
+                                nsfw = Optional.ofNullable((Boolean) model.get("nsfw"))
+                                                .orElse(null);
+
+                                //For Tags
+                                tags = Optional.ofNullable((List<String>) model.get("tags"))
+                                                .orElse(null);
+
+                                //For Trigger Words
+                                triggerWords = matchingVersionModel.stream()
+                                                .map(map -> (List<String>) map.get("trainedWords"))
+                                                .findFirst().orElse(null);
+
+                                //For Description
+                                description = Optional.ofNullable((String) model.get("description"))
+                                                .orElse(null);
+
+                                //For Type
+                                type = Optional.ofNullable((String) model.get("type"))
+                                                .orElse(null);
+
+                                //For Stats
+                                stats = matchingVersionModel.stream()
+                                                .map(map -> (Map<String, Object>) map.get("stats"))
+                                                .filter(data -> data != null)
+                                                .findFirst()
+                                                .map(data -> {
+                                                        try {
+                                                                return new ObjectMapper().writeValueAsString(data);
+                                                        } catch (JsonProcessingException e) {
+                                                                throw new RuntimeException(e);
+                                                        }
+                                                })
+                                                .orElse(null);
+
+                                //For Uploaded Date
+
+                                String uploadedString = matchingVersionModel.stream()
+                                                .map(map -> (String) map.get("createdAt"))
+                                                .findFirst().orElse(null);
+
+                                uploaded = LocalDate.parse(
+                                                Instant.parse(uploadedString).atOffset(ZoneOffset.UTC)
+                                                                .toLocalDateTime()
+                                                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                                                DateTimeFormatter.ISO_LOCAL_DATE);
+
+                                //For Model Name
+                                name = matchingVersionModel.stream()
+                                                .map(map -> (String) map.get("name"))
+                                                .findFirst().orElse(null);
+
+                                //For Base Model
+                                baseModel = matchingVersionModel.stream()
+                                                .map(map -> (String) map.get("baseModel"))
+                                                .findFirst().orElse(null);
+
+                                //For Hash
+                                hash = matchingVersionModel.stream()
+                                                .map(map -> (List<Map<String, Object>>) map.get("files"))
+                                                .filter(files -> files != null)
+                                                .flatMap(List::stream)
+                                                .map(file -> (Map<String, Object>) file.get("hashes"))
+                                                .filter(hashes -> hashes != null)
+                                                .map(hashes -> {
+                                                        try {
+                                                                // Convert the hashes map to a JSON string
+                                                                return new ObjectMapper().writeValueAsString(hashes);
+                                                        } catch (JsonProcessingException e) {
+                                                                throw new RuntimeException(e);
+                                                        }
+                                                })
+                                                .collect(Collectors.joining(","));
+
+                                if (hash.length() > 1000) {
+                                        hash = "hash too long; please check";
+                                        flag = true;
+                                }
+
+                                //For Creator Name
+                                creatorName = Optional.ofNullable((Map<String, Object>) model.get("creator"))
+                                                .map(creator -> (String) creator.get("username"))
+                                                .orElse(null);
+
+                                //For Images Urls
+
+                                List<String> imagesArray = matchingVersionModel.stream()
+                                                .map(map -> (List<String>) map.get("images"))
+                                                .findFirst().orElse(null);
+
+                                // Iterate over each element in the 'images' list
+                                for (Object element : imagesArray) {
+                                        Map<String, Object> myHashObject = new HashMap<>();
+
+                                        // Replace 'images' with 'element' to access the properties of each object
+                                        myHashObject.put("url", (String) ((Map<String, Object>) element).get("url"));
+                                        myHashObject.put("nsfw", (String) ((Map<String, Object>) element).get("nsfw"));
+                                        myHashObject.put("width", (int) ((Map<String, Object>) element).get("width"));
+                                        myHashObject.put("height", (int) ((Map<String, Object>) element).get("height"));
+
+                                        // Add the map to the list
+                                        images.add(myHashObject);
+                                }
+
+                                //Create a Models_DTO
+                                Models_DTO dto = new Models_DTO();
+                                dto.setUrl(url);
+                                dto.setName(name);
+                                dto.setModelNumber(modelID);
+                                dto.setVersionNumber(versionNumber);
+                                dto.setCategory(category);
+                                dto.setNsfw(nsfw);
+                                dto.setFlag(flag);
+                                dto.setTags(tags);
+                                dto.setTriggerWords(triggerWords);
+                                dto.setDescription(description);
+                                dto.setType(type);
+                                dto.setStats(stats);
+                                dto.setUploaded(uploaded);
+                                dto.setBaseModel(baseModel);
+                                dto.setHash(hash);
+                                dto.setUsageTips(usageTips);
+                                dto.setCreatorName(creatorName);
+                                dto.setImageUrls(images);
+
+                                return Optional.of(dto);
+                        } else {
+                                return Optional.empty();
+                        }
+
+                } catch (Exception e) {
+                        // Log the exception for internal debugging
+                        log.error("Error while createing a record into all table", e);
+                        // Throw a custom exception for critical errors
+                        throw new CustomException("An unexpected error occurred", e);
+                        // Alternatively, return a fallback response for less critical errors
+                        // return Collections.emptyList();
+                }
         }
 
         private void updateModelsTable(Models_DTO dto, Integer id) {

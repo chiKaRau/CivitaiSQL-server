@@ -1,9 +1,13 @@
 package com.civitai.server.controllers;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +17,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.toCollection;
 
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
@@ -46,10 +53,10 @@ public class CivitaiSQL_Controller {
         if (entityOptional.isPresent()) {
             List<Models_Table_Entity> entity = entityOptional.get();
 
-            Map<String, List<Models_Table_Entity>> data = new HashMap<>();
-            data.put("models", entity);
+            Map<String, List<Models_Table_Entity>> payload = new HashMap<>();
+            payload.put("modelsList", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found"));
         }
@@ -62,10 +69,10 @@ public class CivitaiSQL_Controller {
         if (entityOptional.isPresent()) {
             Models_Table_Entity entity = entityOptional.get();
 
-            Map<String, Models_Table_Entity> data = new HashMap<>();
-            data.put("model", entity);
+            Map<String, Models_Table_Entity> payload = new HashMap<>();
+            payload.put("model", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.notFound().build();
         }
@@ -78,10 +85,10 @@ public class CivitaiSQL_Controller {
         if (entityOptional.isPresent()) {
             List<Tables_DTO> entity = entityOptional.get();
 
-            Map<String, List<Tables_DTO>> data = new HashMap<>();
-            data.put("models", entity);
+            Map<String, List<Tables_DTO>> payload = new HashMap<>();
+            payload.put("modelsList", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found"));
         }
@@ -94,10 +101,10 @@ public class CivitaiSQL_Controller {
         if (entityOptional.isPresent()) {
             Tables_DTO entity = entityOptional.get();
 
-            Map<String, Tables_DTO> data = new HashMap<>();
-            data.put("model", entity);
+            Map<String, Tables_DTO> payload = new HashMap<>();
+            payload.put("model", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.notFound().build();
         }
@@ -106,46 +113,46 @@ public class CivitaiSQL_Controller {
     @GetMapping(path = "/all-tables-models-dto/{id}")
     public ResponseEntity<CustomResponse<Map<String, Models_DTO>>> findOneModelsDTOFromAllTable(
             @PathVariable("id") Integer id) {
-        Optional<Models_DTO> entityOptional = civitaiSQL_Service.find_one_models_DTO_from_all_tables(id);
+        Optional<Models_DTO> entityOptional = civitaiSQL_Service.find_one_models_DTO_from_all_tables_by_id(id);
         if (entityOptional.isPresent()) {
             Models_DTO entity = entityOptional.get();
 
-            Map<String, Models_DTO> data = new HashMap<>();
-            data.put("model", entity);
+            Map<String, Models_DTO> payload = new HashMap<>();
+            payload.put("model", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.notFound().build();
         }
     }
 
-    @GetMapping(path = "/get-category-list")
+    @GetMapping(path = "/get-categories-list")
     public ResponseEntity<CustomResponse<Map<String, List<String>>>> getCategoryList() {
         Optional<List<String>> categoriesOptional = civitaiSQL_Service.find_all_categories();
         if (categoriesOptional.isPresent()) {
             List<String> categories = categoriesOptional.get();
 
-            Map<String, List<String>> data = new HashMap<>();
-            data.put("category_list", categories);
+            Map<String, List<String>> payload = new HashMap<>();
+            payload.put("categoriesList", categories);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Category list retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Category list retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found"));
         }
     }
 
-    @GetMapping(path = "/find-latest-three-all-tables-models-dto")
-    public ResponseEntity<CustomResponse<Map<String, Map<String, List<Models_DTO>>>>> findLatestModelsDTOFromAllTable() {
+    @GetMapping(path = "/find-latest-three-models-dto-from-all-tables")
+    public ResponseEntity<CustomResponse<Map<String, Map<String, List<Models_DTO>>>>> findLatestThreeModelsDTOfromAllTables() {
 
         Optional<Map<String, List<Models_DTO>>> entityOptional = civitaiSQL_Service
                 .find_lastest_three_models_DTO_in_each_category_from_all_table();
         if (entityOptional.isPresent()) {
             Map<String, List<Models_DTO>> entity = entityOptional.get();
 
-            Map<String, Map<String, List<Models_DTO>>> data = new HashMap<>();
-            data.put("models", entity);
+            Map<String, Map<String, List<Models_DTO>>> payload = new HashMap<>();
+            payload.put("modelsList", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
         }
@@ -159,31 +166,94 @@ public class CivitaiSQL_Controller {
         if (entityOptional.isPresent()) {
             Models_DTO entity = entityOptional.get();
 
-            Map<String, Models_DTO> data = new HashMap<>();
-            data.put("model", entity);
+            Map<String, Models_DTO> payload = new HashMap<>();
+            payload.put("model", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
         }
     }
 
-    @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-url")
+    @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-modelID")
     public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOFromAllTableByUrl(
             @RequestBody Map<String, Object> requestBody) {
         String url = (String) requestBody.get("url");
+
+        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+
         Optional<List<Models_DTO>> entityOptional = civitaiSQL_Service
-                .find_List_of_models_DTO_from_all_tables_by_url(url);
+                .find_List_of_models_DTO_from_all_tables_by_modelID(modelID);
 
         if (entityOptional.isPresent()) {
             List<Models_DTO> entity = entityOptional.get();
 
-            Map<String, List<Models_DTO>> data = new HashMap<>();
-            data.put("models", entity);
+            Map<String, List<Models_DTO>> payload = new HashMap<>();
+            payload.put("modelsList", entity);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", data));
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
+        }
+    }
+
+    @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-name")
+    public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOfromAllTableByName(
+            @RequestBody Map<String, Object> requestBody) {
+        String name = ((String) requestBody.get("name")).toLowerCase();
+
+        List<Models_DTO> combinedList = new ArrayList<>();
+
+        Optional<List<Models_DTO>> nameEntityOptional = civitaiSQL_Service
+                .find_List_of_models_DTO_from_all_tables_by_alike_name(name);
+        if (nameEntityOptional.isPresent()) {
+            List<Models_DTO> entityList = nameEntityOptional.get();
+            combinedList.addAll(entityList);
+            //System.out.println("name: " + entityList.size());
+        }
+
+        Optional<List<Models_DTO>> tagsEntityOptional = civitaiSQL_Service
+                .find_List_of_models_DTO_from_all_tables_by_alike_tags(name);
+        if (tagsEntityOptional.isPresent()) {
+            List<Models_DTO> entityList = tagsEntityOptional.get();
+            combinedList.addAll(entityList);
+            //System.out.println("tags: " + entityList.size());
+        }
+
+        Optional<List<Models_DTO>> triggerWordsEntityOptional = civitaiSQL_Service
+                .find_List_of_models_DTO_from_all_tables_by_alike_triggerWords(name);
+        if (triggerWordsEntityOptional.isPresent()) {
+            List<Models_DTO> entityList = triggerWordsEntityOptional.get();
+            combinedList.addAll(entityList);
+            //System.out.println("triggerWords: " + entityList.size());
+        }
+
+        Optional<List<Models_DTO>> urlEntityOptional = civitaiSQL_Service
+                .find_List_of_models_DTO_from_all_tables_by_alike_url(name);
+        if (urlEntityOptional.isPresent()) {
+            List<Models_DTO> entityList = urlEntityOptional.get();
+            combinedList.addAll(entityList);
+            //System.out.println("url: " + entityList.size());
+        }
+
+        List<Models_DTO> distinctList = combinedList.stream()
+                .collect(Collectors.toMap(
+                        Models_DTO::getId, // Assuming Models_DTO has getId() method
+                        Function.identity(),
+                        (existing, replacement) -> existing // Merge function, keep the existing element
+                ))
+                .values()
+                .stream()
+                .collect(Collectors.toList());
+
+        if (!distinctList.isEmpty()) {
+
+            Map<String, List<Models_DTO>> payload = new HashMap<>();
+            payload.put("modelsList", distinctList);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
         }
     }
 
@@ -194,14 +264,15 @@ public class CivitaiSQL_Controller {
         String category = (String) requestBody.get("category");
         String url = (String) requestBody.get("url");
 
+        //Fetch the Civitai Model Data then create a new Models_DTO
         Optional<Models_DTO> entityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
 
         if (entityOptional.isPresent()) {
             Models_DTO models_DTO = entityOptional.get();
-
-            System.out.println(models_DTO);
-
             civitaiSQL_Service.create_record_to_all_tables(models_DTO);
+
+            System.out.println(models_DTO.getName() + " has been added into the database.");
+
             return ResponseEntity.ok().body(CustomResponse.success("Model created successfully"));
         } else {
             return ResponseEntity.ok()
@@ -210,7 +281,7 @@ public class CivitaiSQL_Controller {
 
     }
 
-    @PostMapping("/update-record-to-all-tables-by")
+    @PostMapping("/update-record-to-all-tables")
     public ResponseEntity<CustomResponse<String>> updateRecordToAllTables(
             @RequestBody Map<String, Object> requestBody) {
 
@@ -218,14 +289,19 @@ public class CivitaiSQL_Controller {
         String url = (String) requestBody.get("url");
         Integer id = (Integer) requestBody.get("id");
 
+        //Fetch the Civitai Model Data then create a new Models_DTO
         Optional<Models_DTO> newUpdateEntityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
 
+        //Find if the model exists in the database
         Optional<Models_Table_Entity> mySQLEntityOptional = civitaiSQL_Service.find_one_from_models_table(id);
 
         if (newUpdateEntityOptional.isPresent() && mySQLEntityOptional.isPresent()) {
             Models_DTO models_DTO = newUpdateEntityOptional.get();
 
             civitaiSQL_Service.update_record_to_all_tables_by_id(models_DTO, id);
+
+            System.out.println(models_DTO.getName() + " has been updated.");
+
             return ResponseEntity.ok().body(CustomResponse.success("Model Updated successfully"));
         } else {
             return ResponseEntity.ok()
@@ -239,16 +315,20 @@ public class CivitaiSQL_Controller {
 
         Integer id = (Integer) requestBody.get("id");
 
+        //Find if the model exists in the database
         Optional<Models_Table_Entity> entityOptional = civitaiSQL_Service.find_one_from_models_table(id);
 
         if (entityOptional.isPresent()) {
 
             civitaiSQL_Service.delete_record_to_all_table_by_id(id);
+
+            System.out.println(entityOptional.get().getName() + " has been deleted.");
+
             return ResponseEntity.ok().body(CustomResponse.success("Model Deleted successfully"));
         } else {
             return ResponseEntity.ok()
                     .body(CustomResponse.failure("Model not found in the database"));
         }
-
     }
+
 }

@@ -21,16 +21,23 @@ public interface CivitaiSQL_Service {
 
     Optional<Tables_DTO> find_one_tables_DTO_from_all_tables(Integer id);
 
-    Optional<Models_DTO> find_one_models_DTO_from_all_tables(Integer id);
+    Optional<Models_DTO> find_one_models_DTO_from_all_tables_by_id(Integer id);
 
     Optional<Models_DTO> find_one_models_DTO_from_all_tables_by_url(String url);
 
-    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_url(String url);
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_modelID(String modelID);
+
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_url(String name);
+
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tags(String name);
+
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_triggerWords(String name);
+
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_name(String name);
 
     Optional<Map<String, List<Models_DTO>>> find_lastest_three_models_DTO_in_each_category_from_all_table();
 
-    Optional<Models_DTO> create_models_DTO_by_Url(String url, String category);
-
+    //Transcation Actions
     // Add a record to all tables
     void create_record_to_all_tables(Models_DTO dto);
 
@@ -50,5 +57,7 @@ public interface CivitaiSQL_Service {
 
     // Utils
     Models_DTO convertToDTO(Models_Table_Entity entity);
+
+    Optional<Models_DTO> create_models_DTO_by_Url(String url, String category);
 
 }

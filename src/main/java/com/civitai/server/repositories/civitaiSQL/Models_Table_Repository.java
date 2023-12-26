@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
@@ -25,5 +26,14 @@ public interface Models_Table_Repository extends JpaRepository<Models_Table_Enti
     List<String> findAllCategories();
 
     List<Models_Table_Entity> findByModelNumber(String modelID);
+
+    @Query("SELECT t FROM Models_Table_Entity t WHERE t.name LIKE %?1%")
+    List<Models_Table_Entity> findAlikeName(String name);
+
+    @Query("SELECT t FROM Models_Table_Entity t WHERE JSON_SEARCH(t.tags, 'all', CONCAT('%', ?1, '%'), NULL, '$') IS NOT NULL")
+    List<Models_Table_Entity> findAlikeTags(String name);
+
+    @Query("SELECT t FROM Models_Table_Entity t WHERE JSON_SEARCH(t.triggerWords, 'all', CONCAT('%', ?1, '%'), NULL, '$') IS NOT NULL")
+    List<Models_Table_Entity> findAlikeTriggerWords(String name);
 
 }

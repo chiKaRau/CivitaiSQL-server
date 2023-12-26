@@ -31,6 +31,8 @@ public class File_Controller {
         return ResponseEntity.ok().build();
     }
 
+    //TODO
+    //This one only check the base url, prob need to modify client to create a list of cartlist for update
     @PostMapping("/check-cart-list")
     public ResponseEntity<?> checkCartList(@RequestBody Map<String, Object> requestBody) {
         String url = (String) requestBody.get("loraURL");

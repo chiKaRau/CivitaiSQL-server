@@ -9,6 +9,8 @@ import lombok.Data;
 @Data
 public class Models_DTO {
 
+    private int id;
+
     private String name;
 
     private List<String> tags;

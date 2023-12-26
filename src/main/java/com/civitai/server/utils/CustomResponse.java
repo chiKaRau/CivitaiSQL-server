@@ -6,18 +6,18 @@ import lombok.Data;
 public class CustomResponse<T> {
     private boolean success;
     private String message;
-    private T data;
+    private T payload;
 
     // Constructors, getters, and setters
 
-    public CustomResponse(boolean success, String message, T data) {
+    public CustomResponse(boolean success, String message, T payload) {
         this.success = success;
         this.message = message;
-        this.data = data;
+        this.payload = payload;
     }
 
-    public static <T> CustomResponse<T> success(String message, T data) {
-        return new CustomResponse<>(true, message, data);
+    public static <T> CustomResponse<T> success(String message, T payload) {
+        return new CustomResponse<>(true, message, payload);
     }
 
     public static <T> CustomResponse<T> success(String message) {
