@@ -124,7 +124,6 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    //TODO return payload
     @Override
     public List<String> get_folders_list() {
 
@@ -135,7 +134,11 @@ public class File_Service_Impl implements File_Service {
                     new TypeReference<List<String>>() {
                     });
 
-            // System.out.println(dataList);
+            // Check if dataList is null or empty
+            if (dataList == null || dataList.isEmpty()) {
+                return Collections.emptyList(); // Return an empty list
+            }
+
             return dataList;
         } catch (IOException e) {
             // Log and handle other types of exceptions
@@ -168,7 +171,6 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    //TODO return payload
     @Override
     public Boolean check_cart_list(String url) {
         try {
@@ -177,12 +179,22 @@ public class File_Service_Impl implements File_Service {
             // Read the content of cart_list.json
             String data = new String(Files.readAllBytes(Path.of(cartListFile)));
 
+            if (data.isEmpty()) {
+                // Handle empty file or invalid JSON
+                throw new CustomException("Empty file or invalid JSON");
+            }
+
             // Parse the JSON data into an array
             String[] cartList = new ObjectMapper().readValue(data, String[].class);
 
+            if (cartList == null) {
+                // Handle null result after deserialization
+                throw new CustomException("Failed to deserialize JSON array");
+            }
+
             // Check if the URL is already in the array
             for (String cartedUrl : cartList) {
-                if (cartedUrl.equals(url)) {
+                if (cartedUrl != null && cartedUrl.equals(url)) {
                     return true;
                 }
             }
