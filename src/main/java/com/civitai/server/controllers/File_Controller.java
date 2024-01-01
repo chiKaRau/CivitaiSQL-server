@@ -1,5 +1,6 @@
 package com.civitai.server.controllers;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,8 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import com.civitai.server.services.File_Service;
+import com.civitai.server.utils.CustomResponse;
 
 @RestController
 @RequestMapping("/api")
@@ -20,35 +21,55 @@ public class File_Controller {
     private File_Service fileService;
 
     @GetMapping("/open-download-directory")
-    public ResponseEntity<Void> openDownloadDirectory() {
+    public ResponseEntity<CustomResponse<String>> openDownloadDirectory() {
         fileService.open_download_directory();
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok().body(CustomResponse.success("Success open directory."));
     }
 
     @GetMapping("/clear-cart-list")
-    public ResponseEntity<Void> clearCartList() {
+    public ResponseEntity<CustomResponse<String>> clearCartList() {
         fileService.empty_cart_list();
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok().body(CustomResponse.success("Success clear cartlist"));
     }
 
-    //TODO
-    //This one only check the base url, prob need to modify client to create a list of cartlist for update
     @PostMapping("/check-cart-list")
-    public ResponseEntity<?> checkCartList(@RequestBody Map<String, Object> requestBody) {
-        String url = (String) requestBody.get("loraURL");
+    public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkCartList(
+            @RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
         Boolean isCarted = fileService.check_cart_list(url);
-        return ResponseEntity.ok(isCarted);
+
+        if (isCarted != null) {
+            Map<String, Boolean> payload = new HashMap<>();
+            payload.put("isCarted", isCarted);
+
+            return ResponseEntity.ok().body(CustomResponse.success("FoldersList retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+        }
     }
 
-    @GetMapping("/list-autocomplete")
-    public ResponseEntity<List<String>> listAutoComplete() {
-        List<String> folders_list = fileService.get_folder_list();
-        return ResponseEntity.ok(folders_list);
+    @GetMapping("/get_folders_list")
+    public ResponseEntity<CustomResponse<Map<String, List<String>>>> getFoldersList() {
+        List<String> foldersList = fileService.get_folders_list();
+
+        if (!foldersList.isEmpty()) {
+            Map<String, List<String>> payload = new HashMap<>();
+            payload.put("foldersList", foldersList);
+
+            return ResponseEntity.ok().body(CustomResponse.success("FoldersList retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+        }
     }
 
     @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server")
-    public ResponseEntity<Void> downloadFileServer(@RequestBody Map<String, Object> requestBody) {
+    public ResponseEntity<CustomResponse<String>> downloadFileServer(@RequestBody Map<String, Object> requestBody) {
         /*{
         "modelID": "123",
         "loraFileName": "example.txt",
@@ -60,25 +81,37 @@ public class File_Controller {
         ],
         "loraURL": "https://example.com/lora"
         } */
+        String url = (String) requestBody.get("url");
+        String name = ((String) requestBody.get("name")).split("\\.")[0];
         String modelID = (String) requestBody.get("modelID");
-        String loraFileName = ((String) requestBody.get("loraFileName")).split("\\.")[0];
         String versionID = (String) requestBody.get("versionID");
         String downloadFilePath = (String) requestBody.get("downloadFilePath");
-        List<Map<String, Object>> name_and_downloadUrl_Array = (List<Map<String, Object>>) requestBody
-                .get("name_and_downloadUrl_Array");
-        String loraURL = (String) requestBody.get("loraURL");
-        fileService.download_file_by_server(loraFileName, modelID, versionID, downloadFilePath,
-                name_and_downloadUrl_Array, loraURL);
-        return ResponseEntity.ok().build();
+        List<Map<String, Object>> filesList = (List<Map<String, Object>>) requestBody.get("filesList");
+
+        // Validate null or empty
+        if (url == null || url == "" || name == null || name == "" ||
+                modelID == null || modelID == "" || versionID == null || versionID == "" ||
+                downloadFilePath == null || downloadFilePath == "" || filesList == null || filesList.isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        fileService.download_file_by_server(name, modelID, versionID, downloadFilePath, filesList, url);
+        return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
     @PostMapping("/download-file-browser")
-    public ResponseEntity<Void> downloadFileBrowser(@RequestBody Map<String, Object> requestBody) {
+    public ResponseEntity<CustomResponse<String>> downloadFileBrowser(@RequestBody Map<String, Object> requestBody) {
         String downloadFilePath = (String) requestBody.get("downloadFilePath");
-        String loraURL = (String) requestBody.get("loraURL");
+        String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "" || downloadFilePath == null || downloadFilePath == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
         fileService.update_folder_list(downloadFilePath);
-        fileService.update_cart_list(loraURL);
-        return ResponseEntity.ok().build();
+        fileService.update_cart_list(url);
+        return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
     //TODO

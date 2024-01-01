@@ -68,7 +68,7 @@ public class File_Service_Impl implements File_Service {
 
                 System.out.println("cart_list.json has been created as an empty file.");
             } else {
-                System.out.println("Output file already exists: " + cartListFile + ". Doing nothing.");
+                System.out.println("cart_list.json is already exists: " + cartListFile + ". Doing nothing.");
             }
         } catch (IOException e) {
             // Log and handle other types of exceptions
@@ -81,6 +81,14 @@ public class File_Service_Impl implements File_Service {
         try {
             String inputFile = "files/data/folder_list.txt";
             String outputFile = "files/data/folder_list.json";
+
+            // Check if input file exists, and create an empty file if it doesn't
+            if (!Files.exists(Paths.get(inputFile))) {
+                Files.createFile(Paths.get(inputFile));
+                System.out.println("Empty input file created: " + inputFile);
+            } else {
+                System.out.println("folder_list.txt is already exists: " + inputFile + ". Doing nothing.");
+            }
 
             if (!Files.exists(Paths.get(outputFile))) {
                 List<String> lines = Files.readAllLines(Paths.get(inputFile), StandardCharsets.UTF_8);
@@ -106,7 +114,7 @@ public class File_Service_Impl implements File_Service {
 
                 System.out.println("Data successfully converted and written to: " + outputFile);
             } else {
-                System.out.println("Output file already exists: " + outputFile + ". Doing nothing.");
+                System.out.println("folder_list.json is already exists: " + outputFile + ". Doing nothing.");
             }
 
         } catch (IOException e) {
@@ -116,8 +124,9 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    //TODO return payload
     @Override
-    public List<String> get_folder_list() {
+    public List<String> get_folders_list() {
 
         try {
             ObjectMapper objectMapper = new ObjectMapper();
@@ -159,6 +168,7 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    //TODO return payload
     @Override
     public Boolean check_cart_list(String url) {
         try {
@@ -304,16 +314,16 @@ public class File_Service_Impl implements File_Service {
     }
 
     @Override
-    public void download_file_by_server(String loraFileName, String modelID, String versionID, String downloadFilePath,
-            List<Map<String, Object>> name_and_downloadUrl_Array, String loraURL) {
+    public void download_file_by_server(String name, String modelID, String versionID, String downloadFilePath,
+            List<Map<String, Object>> filesList, String url) {
         try {
-            String downloadPath = "/" + modelID + "_" + versionID + "_" + loraFileName.split("\\.")[0]
+            String downloadPath = "/" + modelID + "_" + versionID + "_" + name.split("\\.")[0]
                     + downloadFilePath;
 
             // Check if the downloadPath inside the folder_list.json,
             // if not, append it
             update_folder_list(downloadFilePath);
-            update_cart_list(loraURL);
+            update_cart_list(url);
 
             // Create the 'download' directory within the 'files' directory
             Path downloadDirectory = Paths.get("files", "download");
@@ -329,15 +339,15 @@ public class File_Service_Impl implements File_Service {
             }
 
             // Download files
-            for (Map<String, Object> data : name_and_downloadUrl_Array) {
+            for (Map<String, Object> data : filesList) {
                 String fileName = modelID + "_" + versionID + "_" + data.get("name");
-                URL url = new URL((String) data.get("downloadUrl"));
+                URL downloadUrl = new URL((String) data.get("downloadUrl"));
                 Path filePath = currentPath.resolve(fileName);
 
-                URLConnection connection = url.openConnection();
+                URLConnection connection = downloadUrl.openConnection();
                 long totalSize = connection.getContentLengthLong();
 
-                try (InputStream inputStream = url.openStream();
+                try (InputStream inputStream = downloadUrl.openStream();
                         FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
 
                     // Download the file
@@ -357,11 +367,11 @@ public class File_Service_Impl implements File_Service {
             }
 
             // Log download completion
-            System.out.println("Download completed for: " + loraFileName);
+            System.out.println("Download completed for: " + name);
 
             // Create ZIP archive
-            Path zipFilePath = Paths.get("files/download/", modelID + "_" + versionID + "_" + loraFileName);
-            Path zipFile = Paths.get("files/download/", modelID + "_" + versionID + "_" + loraFileName + ".zip");
+            Path zipFilePath = Paths.get("files/download/", modelID + "_" + versionID + "_" + name);
+            Path zipFile = Paths.get("files/download/", modelID + "_" + versionID + "_" + name + ".zip");
 
             try (
                     ZipOutputStream zos = new ZipOutputStream(
@@ -403,7 +413,7 @@ public class File_Service_Impl implements File_Service {
 
                                 // Update the progress bar in the console
                                 ProgressBarUtils.updateProgressBar(bytesRead, totalSize,
-                                        modelID + "_" + versionID + "_" + loraFileName + ".zip");
+                                        modelID + "_" + versionID + "_" + name + ".zip");
 
                             }
 
@@ -448,11 +458,11 @@ public class File_Service_Impl implements File_Service {
             long zipFileSize = Files.size(zipFile);
             if ((zipFileSize / 1024) < 15) {
                 Files.delete(zipFile);
-                throw new Exception("Zip file size is less than 15kb, may need browser download.");
+                throw new Exception(zipFile + " size is less than 15kb, may need browser download.");
             }
 
             // Log zip completion
-            System.out.println("\nZip process completed for: " + "\u001B[1m" + loraFileName + ".zip" + "\u001B[0m");
+            System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m");
 
         } catch (Exception e) {
             // Log and handle other types of exceptions
@@ -460,5 +470,4 @@ public class File_Service_Impl implements File_Service {
             throw new CustomException("An unexpected error occurred", e);
         }
     }
-
 }

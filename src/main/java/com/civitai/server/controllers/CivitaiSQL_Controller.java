@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -17,10 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import static java.util.stream.Collectors.collectingAndThen;
-import static java.util.stream.Collectors.toCollection;
-
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
@@ -47,6 +42,12 @@ public class CivitaiSQL_Controller {
     }
 
     //Single Table
+    @GetMapping(path = "/verify-connecting-database")
+    public ResponseEntity<CustomResponse<Map<String, List<Models_Table_Entity>>>> verifyConnectingDatabase() {
+        return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful"));
+    }
+
+    //Single Table
     @GetMapping(path = "/find-all-models-table-entities")
     public ResponseEntity<CustomResponse<Map<String, List<Models_Table_Entity>>>> findAllFromModelsTable() {
         Optional<List<Models_Table_Entity>> entityOptional = civitaiSQL_Service.find_all_from_models_table();
@@ -65,6 +66,12 @@ public class CivitaiSQL_Controller {
     @GetMapping("/models-table-entity/{id}")
     public ResponseEntity<CustomResponse<Map<String, Models_Table_Entity>>> findOneFromModelsTable(
             @PathVariable("id") Integer id) {
+
+        // Validate null or empty
+        if (id == null) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
         Optional<Models_Table_Entity> entityOptional = civitaiSQL_Service.find_one_from_models_table(id);
         if (entityOptional.isPresent()) {
             Models_Table_Entity entity = entityOptional.get();
@@ -97,6 +104,12 @@ public class CivitaiSQL_Controller {
     @GetMapping(path = "/all-tables-tables-dto/{id}")
     public ResponseEntity<CustomResponse<Map<String, Tables_DTO>>> findOneTablesDTOFromAllTable(
             @PathVariable("id") Integer id) {
+
+        // Validate null or empty
+        if (id == null) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
         Optional<Tables_DTO> entityOptional = civitaiSQL_Service.find_one_tables_DTO_from_all_tables(id);
         if (entityOptional.isPresent()) {
             Tables_DTO entity = entityOptional.get();
@@ -113,6 +126,12 @@ public class CivitaiSQL_Controller {
     @GetMapping(path = "/all-tables-models-dto/{id}")
     public ResponseEntity<CustomResponse<Map<String, Models_DTO>>> findOneModelsDTOFromAllTable(
             @PathVariable("id") Integer id) {
+
+        // Validate null or empty
+        if (id == null) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
         Optional<Models_DTO> entityOptional = civitaiSQL_Service.find_one_models_DTO_from_all_tables_by_id(id);
         if (entityOptional.isPresent()) {
             Models_DTO entity = entityOptional.get();
@@ -162,6 +181,12 @@ public class CivitaiSQL_Controller {
     public ResponseEntity<CustomResponse<Map<String, Models_DTO>>> findOneModelsDTOFromAllTableByUrl(
             @RequestBody Map<String, Object> requestBody) {
         String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
         Optional<Models_DTO> entityOptional = civitaiSQL_Service.find_one_models_DTO_from_all_tables_by_url(url);
         if (entityOptional.isPresent()) {
             Models_DTO entity = entityOptional.get();
@@ -176,11 +201,14 @@ public class CivitaiSQL_Controller {
     }
 
     @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-modelID")
-    public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOFromAllTableByUrl(
+    public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOFromAllTableByModelID(
             @RequestBody Map<String, Object> requestBody) {
-        String url = (String) requestBody.get("url");
+        String modelID = (String) requestBody.get("modelID");
 
-        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+        // Validate null or empty
+        if (modelID == null || modelID == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
 
         Optional<List<Models_DTO>> entityOptional = civitaiSQL_Service
                 .find_List_of_models_DTO_from_all_tables_by_modelID(modelID);
@@ -201,6 +229,11 @@ public class CivitaiSQL_Controller {
     public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOfromAllTableByName(
             @RequestBody Map<String, Object> requestBody) {
         String name = ((String) requestBody.get("name")).toLowerCase();
+
+        // Validate null or empty
+        if (name == null || name == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
 
         List<Models_DTO> combinedList = new ArrayList<>();
 
@@ -264,6 +297,11 @@ public class CivitaiSQL_Controller {
         String category = (String) requestBody.get("category");
         String url = (String) requestBody.get("url");
 
+        // Validate null or empty
+        if (category == null || category.isEmpty() || url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
         //Fetch the Civitai Model Data then create a new Models_DTO
         Optional<Models_DTO> entityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
 
@@ -288,6 +326,11 @@ public class CivitaiSQL_Controller {
         String category = (String) requestBody.get("category");
         String url = (String) requestBody.get("url");
         Integer id = (Integer) requestBody.get("id");
+
+        // Validate null or empty
+        if (category == null || category.isEmpty() || url == null || url == "" || id == null) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
 
         //Fetch the Civitai Model Data then create a new Models_DTO
         Optional<Models_DTO> newUpdateEntityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
@@ -314,6 +357,11 @@ public class CivitaiSQL_Controller {
             @RequestBody Map<String, Object> requestBody) {
 
         Integer id = (Integer) requestBody.get("id");
+
+        // Validate null or empty
+        if (id == null) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
 
         //Find if the model exists in the database
         Optional<Models_Table_Entity> entityOptional = civitaiSQL_Service.find_one_from_models_table(id);

@@ -790,8 +790,16 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                                 //For Model Name
                                 name = matchingVersionModel.stream()
-                                                .map(map -> (String) map.get("name"))
-                                                .findFirst().orElse(null);
+                                                .map(map -> (List<Map<String, Object>>) map.get("files"))
+                                                .filter(files -> files != null)
+                                                .flatMap(List::stream)
+                                                .map(fileMap -> (String) fileMap.get("name"))
+                                                .filter(modelName -> modelName != null)
+                                                .findFirst()
+                                                .map(modelName -> modelName.contains(".")
+                                                                ? modelName.substring(0, modelName.indexOf('.'))
+                                                                : modelName)
+                                                .orElse(null);
 
                                 //For Base Model
                                 baseModel = matchingVersionModel.stream()

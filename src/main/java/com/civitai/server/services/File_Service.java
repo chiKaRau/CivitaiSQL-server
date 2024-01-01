@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public interface File_Service {
-    public List<String> get_folder_list();
+    public List<String> get_folders_list();
 
     public void update_folder_list(String downloadFilePath);
 

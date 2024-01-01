@@ -81,4 +81,11 @@ public class Civitai_Service_Impl implements Civitai_Service {
         }
     }
 
+    //TODO
+    //Each Civitai Model has serveral versions; each version contains files[] 
+    //which represent the number of files for not only .safetensor, but also pt, training data....
+    //Client side has that code, just build a method (retriveFiles...) by that code
+    //then when hit to the download-by-server controller api
+    //call the retriveFiles methods which retrieve a list which contains name and downloadUrl
+
 }

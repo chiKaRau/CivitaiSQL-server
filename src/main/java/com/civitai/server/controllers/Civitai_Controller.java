@@ -26,6 +26,31 @@ public class Civitai_Controller {
         this.civitai_Service = civitai_Service;
     }
 
+    //TODO
+    //Docker mySQL is mounting at ongoing folder,
+    //Reorganzie folder and find new place for mounting
+    @PostMapping("/find-civitaiModel-info-by-modelID")
+    public ResponseEntity<CustomResponse<Map<String, Map<String, Object>>>> findCivitaiModelInfo(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelID = (String) requestBody.get("modelID");
+
+        Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(modelID);
+
+        if (modelOptional.isPresent()) {
+            Map<String, Object> model = modelOptional.get();
+
+            Map<String, Map<String, Object>> payload = new HashMap<>();
+            payload.put("model", model);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Civitai Info retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Civitai"));
+        }
+    }
+
+    //TODO add payload
     @PostMapping("/get-tags-list")
     public ResponseEntity<CustomResponse<Map<String, List<String>>>> getTagsList(
             @RequestBody Map<String, Object> requestBody) {
