@@ -114,6 +114,4 @@ public class File_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
-    //TODO
-    //multi model download
 }
