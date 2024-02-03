@@ -34,3 +34,4 @@ build/
 docker/
 files/
 src/main/resources/application.properties
+src/main/resources/civitaiConfig.java
