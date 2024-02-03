@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception ex) {
-        log.error("Global error", ex);
+        log.debug("Global error", ex);
 
         ErrorResponse errorResponse = new ErrorResponse(
                 LocalDateTime.now(),
@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorResponse> handleDataAccessException(DataAccessException ex) {
-        log.error("Database error", ex);
+        log.debug("Database error", ex);
         ErrorResponse errorResponse = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
@@ -44,7 +44,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException ex) {
-        log.error("Internal error", ex);
+        log.debug("Internal error", ex);
 
         ErrorResponse errorResponse = new ErrorResponse(
                 LocalDateTime.now(),

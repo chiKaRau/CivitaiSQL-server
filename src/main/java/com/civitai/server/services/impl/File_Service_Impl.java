@@ -33,6 +33,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.civitai.server.exception.CustomException;
 import com.civitai.server.services.File_Service;
+import com.civitai.server.utils.ConfigUtils;
+import com.civitai.server.utils.FileUtils;
 import com.civitai.server.utils.ProgressBarUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -236,16 +238,19 @@ public class File_Service_Impl implements File_Service {
                 // Do nothing if download path already existed.
                 System.out.println(downloadFilePath + "/ already exists in the array.");
             } else {
-                // Otherwise, Update folder_list.json
-                jsonData.add(downloadFilePath + "/");
-                Files.write(filePath, objectMapper.writeValueAsString(jsonData).getBytes(StandardCharsets.UTF_8),
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-                // Update folder_list.txt
-                Files.write(Path.of("files/data/folder_list.txt"), ("." + downloadFilePath + "\n").getBytes(),
-                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                //prevent "/update/"
+                if (!downloadFilePath.contains("/update/")) {
+                    // Otherwise, Update folder_list.json
+                    jsonData.add(downloadFilePath + "/");
+                    Files.write(filePath, objectMapper.writeValueAsString(jsonData).getBytes(StandardCharsets.UTF_8),
+                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-                System.out.println(downloadFilePath + " has added to the array and files updated.");
+                    // Update folder_list.txt
+                    Files.write(Path.of("files/data/folder_list.txt"), ("." + downloadFilePath + "\n").getBytes(),
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    System.out.println(downloadFilePath + " has added to the array and files updated.");
+                }
             }
 
         } catch (IOException e) {
@@ -328,6 +333,16 @@ public class File_Service_Impl implements File_Service {
     @Override
     public void download_file_by_server(String name, String modelID, String versionID, String downloadFilePath,
             List<Map<String, Object>> filesList, String url) {
+
+        String modelName = modelID + "_" + versionID + "_" + name.split("\\.")[0];
+        Path modelDirectory = Paths.get("files/download/", modelName);
+
+        // Load the configuration file
+        ConfigUtils.loadConfig("civitaiConfig.json");
+
+        // Get a specific configuration value
+        String civitaiApiKey = ConfigUtils.getConfigValue("apiKey");
+
         try {
             String downloadPath = "/" + modelID + "_" + versionID + "_" + name.split("\\.")[0]
                     + downloadFilePath;
@@ -353,7 +368,7 @@ public class File_Service_Impl implements File_Service {
             // Download files
             for (Map<String, Object> data : filesList) {
                 String fileName = modelID + "_" + versionID + "_" + data.get("name");
-                URL downloadUrl = new URL((String) data.get("downloadUrl"));
+                URL downloadUrl = new URL((String) data.get("downloadUrl") + "?token=" + civitaiApiKey);
                 Path filePath = currentPath.resolve(fileName);
 
                 URLConnection connection = downloadUrl.openConnection();
@@ -477,9 +492,15 @@ public class File_Service_Impl implements File_Service {
             System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m");
 
         } catch (Exception e) {
+
             // Log and handle other types of exceptions
-            log.error("Unexpected error while downloading file", e);
+            System.out.println("Error Model Name: " + modelName);
+
+            FileUtils.deleteDirectory(modelDirectory);
+
+            //log.error("Unexpected error while downloading file", e);
             throw new CustomException("An unexpected error occurred", e);
+
         }
     }
 }
