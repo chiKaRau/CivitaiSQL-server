@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.utils.CustomResponse;
 
@@ -200,6 +201,26 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    @PostMapping(path = "/check-if-url-exist-in-database")
+    public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkIfUrlExistInDatabase(
+            @RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+        Boolean isSaved = civitaiSQL_Service.find_one_from_models_urls_table(url);
+        if (isSaved != null) {
+            Map<String, Boolean> payload = new HashMap<>();
+            payload.put("isSaved", isSaved);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
+        }
+    }
+
     @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-modelID")
     public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOFromAllTableByModelID(
             @RequestBody Map<String, Object> requestBody) {
@@ -283,6 +304,34 @@ public class CivitaiSQL_Controller {
 
             Map<String, List<Models_DTO>> payload = new HashMap<>();
             payload.put("modelsList", distinctList);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+        }
+    }
+
+    @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-tagsList")
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOfromAllTableByTagsList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        List<String> tagsList = (List<String>) requestBody.get("tagsList");
+
+        // Validate null or empty
+        if (tagsList == null || tagsList.isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        Optional<List<Models_DTO>> tagsListEntityOptional = civitaiSQL_Service
+                .find_List_of_models_DTO_from_all_tables_by_alike_tagsList(tagsList);
+
+        if (tagsListEntityOptional.isPresent()) {
+
+            List<Models_DTO> entityList = tagsListEntityOptional.get();
+
+            Map<String, List<Models_DTO>> payload = new HashMap<>();
+            payload.put("modelsList", entityList);
 
             return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {

@@ -4,15 +4,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import javax.swing.text.html.Option;
+
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 
 public interface CivitaiSQL_Service {
     // Single Tables only //
     Optional<List<Models_Table_Entity>> find_all_from_models_table();
 
     Optional<Models_Table_Entity> find_one_from_models_table(Integer id);
+
+    Boolean find_one_from_models_urls_table(String url);
 
     Optional<List<String>> find_all_categories();
 
@@ -35,6 +40,8 @@ public interface CivitaiSQL_Service {
 
     Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_name(String name);
 
+    Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tagsList(List<String> tagsList);
+    
     Optional<Map<String, List<Models_DTO>>> find_lastest_three_models_DTO_in_each_category_from_all_table();
 
     //Transcation Actions

@@ -19,4 +19,9 @@ public class Models_Urls_Table_Entity {
 
     @Column(name = "url")
     private String url;
+
+    @OneToOne
+    @JoinColumn(name = "models_table_id") // This column in the Models_Urls_Table_Entity table references the id of Models_Table_Entity
+    private Models_Table_Entity modelsTableEntity;
+
 }

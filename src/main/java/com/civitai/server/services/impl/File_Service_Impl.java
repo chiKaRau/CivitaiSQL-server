@@ -368,7 +368,22 @@ public class File_Service_Impl implements File_Service {
             // Download files
             for (Map<String, Object> data : filesList) {
                 String fileName = modelID + "_" + versionID + "_" + data.get("name");
-                URL downloadUrl = new URL((String) data.get("downloadUrl") + "?token=" + civitaiApiKey);
+
+                String prepareUrl = (String) data.get("downloadUrl");
+
+                System.out.println(prepareUrl);
+
+                // Check if the URL does NOT contain either 'type' or 'format'
+                if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
+                    prepareUrl = prepareUrl + "?token=" + civitaiApiKey;
+                }
+
+                if(prepareUrl.contains("Training")) {
+                    continue;
+                }
+
+                URL downloadUrl = new URL(prepareUrl);
+
                 Path filePath = currentPath.resolve(fileName);
 
                 URLConnection connection = downloadUrl.openConnection();

@@ -51,6 +51,9 @@ public class Models_Table_Entity {
     @Column(name = "updated_at")
     private Timestamp updatedAt;
 
+    @OneToOne(mappedBy = "modelsTableEntity") //class name instead of table name
+    private Models_Urls_Table_Entity modelsUrlsTable; //this will be use in Models_Table_Specification join attribute name
+
     @PrePersist
     protected void onCreate() {
         createdAt = new Timestamp(System.currentTimeMillis());

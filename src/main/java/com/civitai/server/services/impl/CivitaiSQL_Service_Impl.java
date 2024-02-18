@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import com.civitai.server.exception.CustomDatabaseException;
@@ -32,9 +33,11 @@ import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repo
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Images_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository_Specification;
 import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
+import com.civitai.server.specification.civitaiSQL.Models_Table_Specification;
 import com.civitai.server.utils.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,6 +57,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Urls_Table_Repository models_Urls_Table_Repository;
         private final Models_Details_Table_Repository models_Details_Table_Repository;
         private final Models_Images_Table_Repository models_Images_Table_Repository;
+        private final Models_Table_Repository_Specification models_Table_Repository_Specification;
         private final Civitai_Service civitai_Service;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -65,12 +69,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Urls_Table_Repository models_Urls_Table_Repository,
                         Models_Details_Table_Repository models_Details_Table_Repository,
                         Models_Images_Table_Repository models_Images_Table_Repository,
+                        Models_Table_Repository_Specification models_Table_Repository_Specification,
                         Civitai_Service civitai_Service) {
                 this.models_Table_Repository = models_Table_Repository;
                 this.models_Descriptions_Table_Repository = models_Descriptions_Table_Repository;
                 this.models_Urls_Table_Repository = models_Urls_Table_Repository;
                 this.models_Details_Table_Repository = models_Details_Table_Repository;
                 this.models_Images_Table_Repository = models_Images_Table_Repository;
+                this.models_Table_Repository_Specification = models_Table_Repository_Specification;
                 this.civitai_Service = civitai_Service;
         }
 
@@ -206,6 +212,26 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         return entityOptional.isPresent() ? entityOptional : Optional.empty();
 
+                } catch (DataAccessException e) {
+                        // Log and handle database-related exceptions
+                        log.error("Database error while finding the record from models_table", e);
+                        throw new CustomDatabaseException("An unexpected database error occurred", e);
+                } catch (Exception e) {
+                        // Log and handle other types of exceptions
+                        log.error("Unexpected error while finding the record from models_table", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
+        @Override
+        public Boolean find_one_from_models_urls_table(String url) {
+                try {
+                        Models_Urls_Table_Entity entity = models_Urls_Table_Repository.findByUrl(url);
+                        if (entity != null) {
+                                return true;
+                        } else {
+                                return false;
+                        }
                 } catch (DataAccessException e) {
                         // Log and handle database-related exceptions
                         log.error("Database error while finding the record from models_table", e);
@@ -424,6 +450,26 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                 if (entityList != null && !entityList.isEmpty()) {
                         // Use stream and map to convert each entity to DTO
+                        List<Models_DTO> modelsDTOList = entityList.stream()
+                                        .map(this::convertToDTO)
+                                        .collect(Collectors.toList());
+
+                        return Optional.of(modelsDTOList);
+                } else {
+                        return Optional.empty();
+                }
+        }
+
+        @Override
+        @SuppressWarnings("null")
+        public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tagsList(
+                        List<String> tagsList) {
+
+                Specification<Models_Table_Entity> spec = Models_Table_Specification.findByTagsList(tagsList);
+
+                List<Models_Table_Entity> entityList = models_Table_Repository_Specification.findAll(spec);
+
+                if (entityList != null && !entityList.isEmpty()) {
                         List<Models_DTO> modelsDTOList = entityList.stream()
                                         .map(this::convertToDTO)
                                         .collect(Collectors.toList());
