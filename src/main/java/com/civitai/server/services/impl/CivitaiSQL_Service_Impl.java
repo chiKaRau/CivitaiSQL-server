@@ -3,6 +3,7 @@ package com.civitai.server.services.impl;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -244,6 +245,40 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         @Override
+        public Long find_quantity_from_models_urls_table(String url) {
+                try {
+                        return models_Urls_Table_Repository.findQuantityByUrl(String.join("/", url.split("/", 6)));
+
+                } catch (DataAccessException e) {
+                        // Log and handle database-related exceptions
+                        log.error("Database error while finding the record from models_table", e);
+                        throw new CustomDatabaseException("An unexpected database error occurred", e);
+                } catch (Exception e) {
+                        // Log and handle other types of exceptions
+                        log.error("Unexpected error while finding the record from models_table", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
+        @Override
+        public Long find_quantity_from_models_table(String url) {
+                try {
+                        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+
+                        return models_Table_Repository.findQuantityByModelID(modelID);
+
+                } catch (DataAccessException e) {
+                        // Log and handle database-related exceptions
+                        log.error("Database error while finding the record from models_table", e);
+                        throw new CustomDatabaseException("An unexpected database error occurred", e);
+                } catch (Exception e) {
+                        // Log and handle other types of exceptions
+                        log.error("Unexpected error while finding the record from models_table", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
+        @Override
         public Optional<List<Tables_DTO>> find_all_from_all_tables() {
                 try {
                         Iterable<Models_Table_Entity> entities = models_Table_Repository.findAll();
@@ -387,6 +422,19 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         return Optional.empty();
                 }
 
+        }
+
+        @Override
+        public Optional<List<String>> find_List_of_Version_Number_from_model_tables_by_Url(String url) {
+                String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+
+                List<String> entityList = models_Table_Repository.findListofVersionNumberByModelNumber(modelID);
+
+                if (entityList != null && !entityList.isEmpty()) {
+                        return Optional.of(entityList);
+                } else {
+                        return Optional.empty();
+                }
         }
 
         @Override
@@ -798,6 +846,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 //For Trigger Words
                                 triggerWords = matchingVersionModel.stream()
                                                 .map(map -> (List<String>) map.get("trainedWords"))
+                                                .filter(obj -> obj instanceof List) // Ensure it's an instance of List
+                                                .map(obj -> (List<String>) obj) // Now we can safely cast
                                                 .findFirst().orElse(null);
 
                                 //For Description
@@ -828,11 +878,12 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 .map(map -> (String) map.get("createdAt"))
                                                 .findFirst().orElse(null);
 
-                                uploaded = LocalDate.parse(
-                                                Instant.parse(uploadedString).atOffset(ZoneOffset.UTC)
-                                                                .toLocalDateTime()
-                                                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
-                                                DateTimeFormatter.ISO_LOCAL_DATE);
+                                if (!uploadedString.endsWith("Z"))
+                                        uploadedString += "Z"; // Ensure UTC format
+
+                                uploaded = Instant.parse(uploadedString)
+                                                .atZone(ZoneId.of("UTC"))
+                                                .toLocalDate();
 
                                 //For Model Name
                                 name = matchingVersionModel.stream()

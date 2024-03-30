@@ -36,4 +36,10 @@ public interface Models_Table_Repository extends JpaRepository<Models_Table_Enti
     @Query("SELECT t FROM Models_Table_Entity t WHERE JSON_SEARCH(t.triggerWords, 'all', CONCAT('%', ?1, '%'), NULL, '$') IS NOT NULL")
     List<Models_Table_Entity> findAlikeTriggerWords(String name);
 
+    @Query("SELECT t.versionNumber FROM Models_Table_Entity t WHERE t.modelNumber = ?1")
+    List<String> findListofVersionNumberByModelNumber(String modelID);
+
+    @Query("SELECT COUNT(*) FROM Models_Table_Entity t WHERE t.modelNumber = ?1")
+    long findQuantityByModelID(String modelID);
+
 }

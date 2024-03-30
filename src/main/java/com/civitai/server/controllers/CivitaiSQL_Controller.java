@@ -1,10 +1,12 @@
 package com.civitai.server.controllers;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -21,6 +23,7 @@ import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.services.CivitaiSQL_Service;
+import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.utils.CustomResponse;
 
 @RestController
@@ -29,10 +32,12 @@ public class CivitaiSQL_Controller {
     // This is where we setup api endpoint or route
 
     private CivitaiSQL_Service civitaiSQL_Service;
+    private Civitai_Service civitai_Service;
 
     @Autowired
-    public CivitaiSQL_Controller(CivitaiSQL_Service civitaiSQL_Service) {
+    public CivitaiSQL_Controller(CivitaiSQL_Service civitaiSQL_Service, Civitai_Service civitai_Service) {
         this.civitaiSQL_Service = civitaiSQL_Service;
+        this.civitai_Service = civitai_Service;
     }
 
     //Testing Api Route 
@@ -218,6 +223,113 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
+        }
+    }
+
+    @PostMapping(path = "/check-quantity-of-url-in-database-by-url")
+    public ResponseEntity<CustomResponse<Map<String, Long>>> checkQuantityOfUrlInDatabaseByUrl(
+            @RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+        Long quantity = civitaiSQL_Service.find_quantity_from_models_urls_table(url);
+
+        Map<String, Long> payload = new HashMap<>();
+        payload.put("quantity", quantity);
+
+        return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+    }
+
+    @PostMapping(path = "/check-quantity-of-url-in-database-by-modelID")
+    public ResponseEntity<CustomResponse<Map<String, Long>>> checkQuantityOfUrlInDatabaseByModelID(
+            @RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+        Long quantity = civitaiSQL_Service.find_quantity_from_models_table(url);
+
+        Map<String, Long> payload = new HashMap<>();
+        payload.put("quantity", quantity);
+
+        return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+    }
+
+    @PostMapping(path = "/check-if-model-update-avaliable")
+    public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkIfUpdateAvaliable(
+            @RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        Optional<List<String>> versionListOptional = civitaiSQL_Service
+                .find_List_of_Version_Number_from_model_tables_by_Url(url);
+
+        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+        Optional<Map<String, Object>> modelOptional = civitai_Service
+                .findModelByModelID(modelID);
+
+        if (versionListOptional.isPresent() && modelOptional.isPresent()) {
+            //GET LATEST FROM DB
+            List<String> entityList = versionListOptional.get();
+            OptionalInt maxOptional = entityList.stream()
+                    .mapToInt(Integer::parseInt)
+                    .max();
+            int maxVersionNumber = maxOptional.getAsInt();
+
+            //GET LATEST FROM CIVITAI
+            Map<String, Object> model = modelOptional.get();
+            String latestVersionNumber = null;
+
+            //Retriving the version list 
+            Optional<List<Map<String, Object>>> modelVersionList = Optional
+                    .ofNullable(model)
+                    .map(map -> (List<Map<String, Object>>) map
+                            .get("modelVersions"))
+                    .filter(list -> !list.isEmpty());
+
+            //For Version Number
+            try {
+                URI uri = new URI(url);
+                String query = uri.getQuery();
+                if (query != null && query.contains("modelVersionId")) {
+                    String[] queryParams = query.split("&");
+                    for (String param : queryParams) {
+                        if (param.startsWith("modelVersionId=")) {
+                            latestVersionNumber = param
+                                    .substring("modelVersionId=".length());
+                        }
+                    }
+                } else {
+                    latestVersionNumber = modelVersionList
+                            .map(list -> list.get(0).get("id"))
+                            .map(Object::toString)
+                            .orElse(null);
+                }
+            } catch (Exception e) {
+                latestVersionNumber = null;
+            }
+
+            Boolean isUpdateAvaliable = false;
+
+            if (Integer.parseInt(latestVersionNumber) > maxVersionNumber) {
+                isUpdateAvaliable = true;
+            }
+
+            Map<String, Boolean> payload = new HashMap<>();
+            payload.put("isUpdateAvaliable", isUpdateAvaliable);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
         }
     }
 

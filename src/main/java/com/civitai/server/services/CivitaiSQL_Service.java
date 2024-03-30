@@ -19,6 +19,10 @@ public interface CivitaiSQL_Service {
 
     Boolean find_one_from_models_urls_table(String url);
 
+    Long find_quantity_from_models_urls_table(String url);
+
+    Long find_quantity_from_models_table(String modelID);
+
     Optional<List<String>> find_all_categories();
 
     // All Tables only //
@@ -41,8 +45,10 @@ public interface CivitaiSQL_Service {
     Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_name(String name);
 
     Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tagsList(List<String> tagsList);
-    
+
     Optional<Map<String, List<Models_DTO>>> find_lastest_three_models_DTO_in_each_category_from_all_table();
+
+    Optional<List<String>> find_List_of_Version_Number_from_model_tables_by_Url(String modelID);
 
     //Transcation Actions
     // Add a record to all tables

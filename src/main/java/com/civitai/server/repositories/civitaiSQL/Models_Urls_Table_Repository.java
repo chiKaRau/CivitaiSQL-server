@@ -19,4 +19,9 @@ public interface Models_Urls_Table_Repository extends JpaRepository<Models_Urls_
 
     @Query("SELECT t FROM Models_Urls_Table_Entity t WHERE t.url LIKE %?1%")
     List<Models_Urls_Table_Entity> findAlikeUrl(String name);
+
+    @Query("SELECT COUNT(*) FROM Models_Urls_Table_Entity WHERE url = ?1")
+    long findQuantityByUrl(String url);
+
+
 }
