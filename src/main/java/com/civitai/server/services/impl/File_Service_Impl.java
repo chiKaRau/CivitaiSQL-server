@@ -53,6 +53,12 @@ public class File_Service_Impl implements File_Service {
 
         // Create a cart_list if have none
         create_cart_list();
+
+        // Create a must_add_list if have none
+        create_must_add_list();
+
+        // Create a error_model_list if have none
+        create_error_model_list();
     }
 
     public void create_cart_list() {
@@ -75,6 +81,57 @@ public class File_Service_Impl implements File_Service {
         } catch (IOException e) {
             // Log and handle other types of exceptions
             log.error("Unexpected error while creating cart list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    public void create_error_model_list() {
+        String errorModelListFile = "files/data/error_model_list.json";
+        try {
+            if (!Files.exists(Paths.get(errorModelListFile))) {
+                // Create an empty list
+                List<String> errorModelList = new ArrayList<>();
+
+                // Convert the empty list to a JSON string
+                String errorModelListJson = new ObjectMapper().writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(errorModelList);
+
+                // Write the JSON string to the file
+                Files.write(Path.of(errorModelListFile), errorModelListJson.getBytes(), StandardOpenOption.CREATE);
+
+                System.out.println("error_model_list.json has been created as an empty file.");
+            } else {
+                System.out
+                        .println("error_model_list.json is already exists: " + errorModelListFile + ". Doing nothing.");
+            }
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while creating error_model_list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    public void create_must_add_list() {
+        String mustAddListFile = "files/data/must_add_list.json";
+        try {
+            if (!Files.exists(Paths.get(mustAddListFile))) {
+                // Create an empty list
+                List<String> mustAddList = new ArrayList<>();
+
+                // Convert the empty list to a JSON string
+                String mustAddListJson = new ObjectMapper().writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(mustAddList);
+
+                // Write the JSON string to the file
+                Files.write(Path.of(mustAddListFile), mustAddListJson.getBytes(), StandardOpenOption.CREATE);
+
+                System.out.println("must_add_list.json has been created as an empty file.");
+            } else {
+                System.out.println("must_add_list.json is already exists: " + mustAddListFile + ". Doing nothing.");
+            }
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while creating mmust_add_list", e);
             throw new CustomException("An unexpected error occurred", e);
         }
     }
@@ -140,6 +197,10 @@ public class File_Service_Impl implements File_Service {
             if (dataList == null || dataList.isEmpty()) {
                 return Collections.emptyList(); // Return an empty list
             }
+
+            dataList = dataList.stream()
+                    .filter(s -> !s.contains("/@scan@/Update/"))
+                    .collect(Collectors.toList());
 
             return dataList;
         } catch (IOException e) {
@@ -297,6 +358,80 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public void update_must_add_list(String url) {
+        try {
+
+            Path filePath = Path.of("files/data/must_add_list.json");
+
+            // Read the content of folder_list.json
+            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+
+            // Parse the JSON data into a list
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<String> mustAddList = objectMapper.readValue(data, List.class);
+
+            // Check if the URL is already in the list
+            if (!mustAddList.contains(url)) {
+                // Add the new URL to the list
+                mustAddList.add(url);
+
+                // Convert the updated list back to a JSON string
+                String updatedMustAddListJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(mustAddList);
+
+                // Write the updated JSON string back to the file
+                Files.write(filePath, updatedMustAddListJson.getBytes(StandardCharsets.UTF_8));
+                System.out.println("Added \"" + url + "\" to must_add_list.json.");
+            } else {
+                // Do nothing if download path already existed.
+                System.out.println("\"" + url + "\" is already in must_add_list.json. No duplicates allowed.");
+            }
+
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while updating cart list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void update_error_model_list(String modelName) {
+        try {
+
+            Path filePath = Path.of("files/data/error_model_list.json");
+
+            // Read the content of folder_list.json
+            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+
+            // Parse the JSON data into a list
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<String> errorModelList = objectMapper.readValue(data, List.class);
+
+            // Check if the URL is already in the list
+            if (!errorModelList.contains(modelName)) {
+                // Add the new URL to the list
+                errorModelList.add(modelName);
+
+                // Convert the updated list back to a JSON string
+                String updatedErrorModelListJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(errorModelList);
+
+                // Write the updated JSON string back to the file
+                Files.write(filePath, updatedErrorModelListJson.getBytes(StandardCharsets.UTF_8));
+                System.out.println("Added \"" + modelName + "\" to error_model_list.json.");
+            } else {
+                // Do nothing if download path already existed.
+                System.out.println("\"" + modelName + "\" is already in error_model_list.json. No duplicates allowed.");
+            }
+
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while updating cart list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
     @Override
     public void open_download_directory() {
         try {
@@ -378,7 +513,11 @@ public class File_Service_Impl implements File_Service {
                     prepareUrl = prepareUrl + "?token=" + civitaiApiKey;
                 }
 
-                if(prepareUrl.contains("Training")) {
+                if (prepareUrl.contains("Training")) {
+                    continue;
+                }
+
+                if (prepareUrl.contains("VAE")) {
                     continue;
                 }
 
@@ -510,6 +649,10 @@ public class File_Service_Impl implements File_Service {
 
             // Log and handle other types of exceptions
             System.out.println("Error Model Name: " + modelName);
+
+            System.out.println(e);
+
+            update_error_model_list(modelName);
 
             FileUtils.deleteDirectory(modelDirectory);
 

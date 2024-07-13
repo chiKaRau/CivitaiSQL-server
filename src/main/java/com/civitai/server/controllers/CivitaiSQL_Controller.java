@@ -277,26 +277,40 @@ public class CivitaiSQL_Controller {
         Optional<Map<String, Object>> modelOptional = civitai_Service
                 .findModelByModelID(modelID);
 
-        if (versionListOptional.isPresent() && modelOptional.isPresent()) {
-            //GET LATEST FROM DB
-            List<String> entityList = versionListOptional.get();
-            OptionalInt maxOptional = entityList.stream()
-                    .mapToInt(Integer::parseInt)
-                    .max();
-            int maxVersionNumber = maxOptional.getAsInt();
+        //GET LATEST FROM CIVITAI
+        Map<String, Object> model = modelOptional.get();
+        String latestVersionNumber = null;
 
-            //GET LATEST FROM CIVITAI
-            Map<String, Object> model = modelOptional.get();
-            String latestVersionNumber = null;
+        //Retriving the version list 
+        Optional<List<Map<String, Object>>> modelVersionList = Optional
+                .ofNullable(model)
+                .map(map -> (List<Map<String, Object>>) map
+                        .get("modelVersions"))
+                .filter(list -> !list.isEmpty());
 
-            //Retriving the version list 
-            Optional<List<Map<String, Object>>> modelVersionList = Optional
-                    .ofNullable(model)
-                    .map(map -> (List<Map<String, Object>>) map
-                            .get("modelVersions"))
-                    .filter(list -> !list.isEmpty());
+        if (modelOptional.isPresent()) {
+
+            //For Early Access
+            Boolean isEarlyAccess = false;
+            try {
+                String earlyAccessDate = modelVersionList
+                        .map(list -> list.get(0))
+                        .filter(firstObject -> firstObject.containsKey("earlyAccessDeadline"))
+                        .map(firstObject -> firstObject.get("earlyAccessDeadline").toString())
+                        .orElse(null);
+
+                if (earlyAccessDate != null) {
+                    isEarlyAccess = true;
+                } else {
+                    isEarlyAccess = false;
+                }
+            } catch (Exception e) {
+                isEarlyAccess = false;
+            }
 
             //For Version Number
+            Boolean isUpdateAvaliable = false;
+
             try {
                 URI uri = new URI(url);
                 String query = uri.getQuery();
@@ -318,18 +332,27 @@ public class CivitaiSQL_Controller {
                 latestVersionNumber = null;
             }
 
-            Boolean isUpdateAvaliable = false;
+            //GET LATEST FROM DB
 
-            if (Integer.parseInt(latestVersionNumber) > maxVersionNumber) {
-                isUpdateAvaliable = true;
+            if (versionListOptional.isPresent() && latestVersionNumber != null) {
+                List<String> entityList = versionListOptional.get();
+                OptionalInt maxOptional = entityList.stream()
+                        .mapToInt(Integer::parseInt)
+                        .max();
+                int maxVersionNumber = maxOptional.getAsInt();
+
+                if (Integer.parseInt(latestVersionNumber) > maxVersionNumber) {
+                    isUpdateAvaliable = true;
+                }
             }
 
             Map<String, Boolean> payload = new HashMap<>();
             payload.put("isUpdateAvaliable", isUpdateAvaliable);
+            payload.put("isEarlyAccess", isEarlyAccess);
 
             return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
         } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+            return ResponseEntity.ok().body(CustomResponse.failure("Failed calling Civitai API"));
         }
     }
 

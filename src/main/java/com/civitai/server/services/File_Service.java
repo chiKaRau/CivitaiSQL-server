@@ -17,6 +17,10 @@ public interface File_Service {
 
     public void update_cart_list(String url);
 
+    public void update_must_add_list(String url);
+
+    public void update_error_model_list(String url);
+
     public void open_download_directory();
 
     public void download_file_by_server(String loraFileName, String modelID, String versionID, String downloadFilePath,
