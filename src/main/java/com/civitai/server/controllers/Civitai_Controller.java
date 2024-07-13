@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +32,29 @@ public class Civitai_Controller {
     //Reorganzie folder and find new place for mounting
     @PostMapping("/find-civitaiModel-info-by-modelID")
     public ResponseEntity<CustomResponse<Map<String, Map<String, Object>>>> findCivitaiModelInfo(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelID = (String) requestBody.get("modelID");
+
+        Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(modelID);
+
+        if (modelOptional.isPresent()) {
+            Map<String, Object> model = modelOptional.get();
+
+            Map<String, Map<String, Object>> payload = new HashMap<>();
+            payload.put("model", model);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Civitai Info retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Civitai"));
+        }
+    }
+
+    //tempermonkey use only
+    @CrossOrigin(origins = "https://civitai.com")
+    @PostMapping("/find-civitaiModel-info-by-modelID-tempermonkey")
+    public ResponseEntity<CustomResponse<Map<String, Map<String, Object>>>> findCivitaiModelInfoForTemperMonkey(
             @RequestBody Map<String, Object> requestBody) {
 
         String modelID = (String) requestBody.get("modelID");

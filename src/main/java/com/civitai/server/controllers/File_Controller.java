@@ -32,6 +32,17 @@ public class File_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("Success clear cartlist"));
     }
 
+    @PostMapping("/append-to-must-add-list")
+    public ResponseEntity<CustomResponse<String>> AppendToMustAddList(@RequestBody Map<String, Object> requestBody) {
+        String url = (String) requestBody.get("url");
+        // Validate null or empty
+        if (url == null || url == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+        fileService.update_must_add_list(url);
+        return ResponseEntity.ok().body(CustomResponse.success("Success append to mustAddList"));
+    }
+
     @PostMapping("/check-cart-list")
     public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkCartList(
             @RequestBody Map<String, Object> requestBody) {

@@ -986,6 +986,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        @Transactional
         private void updateModelsTable(Models_DTO dto, Integer id) {
                 Optional<Models_Table_Entity> entityOptional = models_Table_Repository
                                 .findById(id);
@@ -1003,6 +1004,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        @Transactional
         private void updateModelsUrlsTable(Models_DTO dto, Integer id) {
                 Optional<Models_Urls_Table_Entity> entityOptional = models_Urls_Table_Repository
                                 .findById(id);
@@ -1013,6 +1015,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        @Transactional
         private void updateModelsDescriptionTable(Models_DTO dto, Integer id) {
 
                 Optional<Models_Descriptions_Table_Entity> entityOptional = models_Descriptions_Table_Repository
@@ -1026,6 +1029,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        @Transactional
         private void updateModelsDetailsTable(Models_DTO dto, Integer id) {
 
                 Optional<Models_Details_Table_Entity> entityOptional = models_Details_Table_Repository
@@ -1044,6 +1048,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        @Transactional
         private void updateModelsImagesTable(Models_DTO dto, Integer id) {
                 Optional<Models_Images_Table_Entity> entityOptional = models_Images_Table_Repository
                                 .findById(id);
