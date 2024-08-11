@@ -34,6 +34,7 @@ public class Models_Table_Specification {
             // Assuming 'name', 'tags', and 'triggerWords' are in Models_Table_Entity
             // and you want to perform a case-insensitive search on these fields
             predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), "%" + lowerKeyword + "%"));
+            predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("mainModelName")), "%" + lowerKeyword + "%"));
             predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("tags")), "%" + lowerKeyword + "%"));
             predicates.add(
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("triggerWords")), "%" + lowerKeyword + "%"));

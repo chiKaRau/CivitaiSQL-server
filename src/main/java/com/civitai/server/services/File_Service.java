@@ -25,5 +25,4 @@ public interface File_Service {
 
     public void download_file_by_server(String loraFileName, String modelID, String versionID, String downloadFilePath,
             List<Map<String, Object>> name_and_downloadUrl_Array, String loraURL);
-
 }

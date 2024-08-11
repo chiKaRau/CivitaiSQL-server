@@ -24,8 +24,14 @@ public class Models_Table_Entity {
     @Column(name = "name")
     private String name;
 
+    @Column(name = "main_model_name")
+    private String mainModelName;
+
     @Column(name = "tags", columnDefinition = "JSON")
     private String tags;
+
+    @Column(name = "local_tags", columnDefinition = "JSON")
+    private String localTags;
 
     @Column(name = "category")
     private String category;

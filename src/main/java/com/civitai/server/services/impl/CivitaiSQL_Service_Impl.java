@@ -43,6 +43,7 @@ import com.civitai.server.utils.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 
 @Service
@@ -63,6 +64,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Service_Impl.class);
+
+        @PostConstruct
+        public void civitaiSQL_Service_Startup() {
+                
+        }
 
         // CRUD, CREATE, READ, UPDATE, DELETE
         public CivitaiSQL_Service_Impl(Models_Table_Repository models_Table_Repository,
@@ -536,6 +542,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         // Step 1: Save the Models_Table_Entities entity to generate the ID
                         Models_Table_Entity models_Table_Entities = Models_Table_Entity.builder()
                                         .name(dto.getName())
+                                        .mainModelName(dto.getMain_model_name())
                                         .tags(JsonUtils.convertObjectToString(dto.getTags()))
                                         .category(dto.getCategory())
                                         .versionNumber(dto.getVersionNumber())
@@ -786,7 +793,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(modelID);
 
-                        String name = null, versionNumber = null, description = null, type = null, stats = null,
+                        String name = null, mainModelName = null, versionNumber = null, description = null, type = null,
+                                        stats = null,
                                         hash = null, usageTips = null, creatorName = null,
                                         baseModel = null;
 
@@ -809,6 +817,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 //For Version Number
                                 URI uri = new URI(url);
                                 String query = uri.getQuery();
+
                                 if (query != null && query.contains("modelVersionId")) {
                                         String[] queryParams = query.split("&");
                                         for (String param : queryParams) {
@@ -834,6 +843,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                                         .equals(String.valueOf(idObject));
                                                 })
                                                 .collect(Collectors.toList());
+
+                                //For main model Name
+                                mainModelName = Optional.ofNullable((String) model.get("name"))
+                                                .orElse(null);
 
                                 //For NSFW
                                 nsfw = Optional.ofNullable((Boolean) model.get("nsfw"))
@@ -954,6 +967,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 Models_DTO dto = new Models_DTO();
                                 dto.setUrl(url);
                                 dto.setName(name);
+                                dto.setMain_model_name(mainModelName);
                                 dto.setModelNumber(modelID);
                                 dto.setVersionNumber(versionNumber);
                                 dto.setCategory(category);
@@ -993,6 +1007,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 if (entityOptional.isPresent()) {
                         Models_Table_Entity entity = entityOptional.get();
                         entity.setName(dto.getName());
+                        entity.setMainModelName(dto.getMain_model_name());
                         entity.setTags(JsonUtils.convertObjectToString(dto.getTags()));
                         entity.setCategory(dto.getCategory());
                         entity.setVersionNumber(dto.getVersionNumber());
