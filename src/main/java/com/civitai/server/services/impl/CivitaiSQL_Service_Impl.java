@@ -19,7 +19,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 
 import com.civitai.server.exception.CustomDatabaseException;
 import com.civitai.server.exception.CustomException;
@@ -39,6 +42,7 @@ import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.specification.civitaiSQL.Models_Table_Specification;
+import com.civitai.server.utils.CustomResponse;
 import com.civitai.server.utils.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,7 +71,124 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @PostConstruct
         public void civitaiSQL_Service_Startup() {
-                
+                System.out.println("civitaiSQL_Service_Startup");
+                //updateMainModelName2();
+        }
+
+        public void updateMainModelName2() {
+
+                //this one would find the database dto then call the civitai api 
+                //and update the MainModelName then save it
+
+
+                // Step 1: Get all model_number and ids where mainModelName is null, limited to the first 1000 records
+                List<Object[]> results = models_Table_Repository.findModelNumberAndIdWhereMainModelNameIsNull();
+
+                // Process only the first 1000 records
+                int limit = 10;
+                for (int i = 0; i < results.size() && i < limit; i++) {
+                        Object[] row = results.get(i);
+                        String modelNumber = (String) row[0];
+                        Integer id = (Integer) row[1];
+
+                        try {
+                                // Call the external service and update the model
+                                Optional<Models_DTO> entityOptional = find_one_models_DTO_from_all_tables_by_id(id);
+
+                                Optional<Map<String, Object>> modelOptional = civitai_Service
+                                                .findModelByModelID(modelNumber);
+
+                                if (entityOptional != null && entityOptional.isPresent() && modelOptional != null
+                                                && modelOptional.isPresent()) {
+                                        Models_DTO entity = entityOptional.get();
+                                        Map<String, Object> model = modelOptional.get();
+                                        entity.setMainModelName(Optional.ofNullable((String) model.get("name"))
+                                                        .orElse(null));
+                                        updateModelsTable(entity, id);
+                                        System.out.println(i + "# " + entity.getName() + " has been updated.");
+
+                                }
+                        } catch (HttpClientErrorException e) {
+                                // Handle specific 404 Not Found error
+                                if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                                        System.err.println("Model not found for ID " + modelNumber + ". Skipping...");
+                                } else {
+                                        // Handle other HTTP errors
+                                        System.err.println("HTTP error occurred on models_Table id: " + id);
+                                }
+                                limit++;
+                        } catch (Exception e) {
+                                // Handle any other unexpected errors
+                                System.err.println("An unexpected error occurred: on models_Table id: " + id);
+                                limit++;
+                        }
+
+                        // Step 4: Add a 3-second delay before processing the next record
+                        try {
+                                Thread.sleep(3000); // 3000 milliseconds = 3 seconds
+                        } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt(); // Restore interrupted status
+                                throw new RuntimeException("Thread was interrupted", e);
+                        }
+                }
+
+                System.out.println("updateMainModelName - Complete");
+
+        }
+
+        public void updateMainModelName1() {
+
+                //this one would find the database id then call the civitai api 
+                //then create a new dto
+                //and update the MainModelName only then save it
+
+                // Step 1: Get all model_number and ids where mainModelName is null, limited to the first 1000 records
+                List<Object[]> results = models_Table_Repository.findModelNumberAndIdWhereMainModelNameIsNull();
+
+                // Process only the first 1000 records
+                int limit = 10;
+                for (int i = 0; i < results.size() && i < limit; i++) {
+                        Object[] row = results.get(i);
+                        String modelNumber = (String) row[0];
+                        Integer id = (Integer) row[1];
+                        String category = (String) row[2];
+                        String url = "https://civitai.com/models/" + modelNumber;
+
+                        try {
+                                // Call the external service and update the model
+                                Optional<Models_DTO> newUpdateEntityOptional = create_models_DTO_by_Url(url, category);
+
+                                if (newUpdateEntityOptional != null && newUpdateEntityOptional.isPresent()) {
+                                        Models_DTO models_DTO = newUpdateEntityOptional.get();
+                                        updateModelsTableByField(models_DTO, id, "main_model_name");
+                                        System.out.println(i + "# " + models_DTO.getName() + " has been updated.");
+                                }
+                        } catch (HttpClientErrorException e) {
+                                // Handle specific 404 Not Found error
+                                if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                                        System.err.println("Model not found for ID " + modelNumber + ". Skipping...");
+                                } else {
+                                        // Handle other HTTP errors
+                                        System.err.println("HTTP error occurred on models_Table id: " + id);
+                                }
+                                limit++;
+                        } catch (Exception e) {
+                                // Handle any other unexpected errors
+                                System.err.println("An unexpected error occurred: on models_Table id: " + id);
+                                limit++;
+                        }
+
+                        // Step 4: Add a 3-second delay before processing the next record
+                        try {
+                                Thread.sleep(3000); // 3000 milliseconds = 3 seconds
+                        } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt(); // Restore interrupted status
+                                throw new RuntimeException("Thread was interrupted", e);
+                        }
+                }
+
+                System.out.println("updateMainModelName - Complete");
+
         }
 
         // CRUD, CREATE, READ, UPDATE, DELETE
@@ -542,7 +663,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         // Step 1: Save the Models_Table_Entities entity to generate the ID
                         Models_Table_Entity models_Table_Entities = Models_Table_Entity.builder()
                                         .name(dto.getName())
-                                        .mainModelName(dto.getMain_model_name())
+                                        .mainModelName(dto.getMainModelName())
                                         .tags(JsonUtils.convertObjectToString(dto.getTags()))
                                         .category(dto.getCategory())
                                         .versionNumber(dto.getVersionNumber())
@@ -967,7 +1088,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 Models_DTO dto = new Models_DTO();
                                 dto.setUrl(url);
                                 dto.setName(name);
-                                dto.setMain_model_name(mainModelName);
+                                dto.setMainModelName(mainModelName);
                                 dto.setModelNumber(modelID);
                                 dto.setVersionNumber(versionNumber);
                                 dto.setCategory(category);
@@ -1007,7 +1128,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 if (entityOptional.isPresent()) {
                         Models_Table_Entity entity = entityOptional.get();
                         entity.setName(dto.getName());
-                        entity.setMainModelName(dto.getMain_model_name());
+                        entity.setMainModelName(dto.getMainModelName());
                         entity.setTags(JsonUtils.convertObjectToString(dto.getTags()));
                         entity.setCategory(dto.getCategory());
                         entity.setVersionNumber(dto.getVersionNumber());
@@ -1015,6 +1136,50 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         entity.setTriggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()));
                         entity.setNsfw(dto.getNsfw());
                         entity.setFlag(dto.getFlag());
+                        models_Table_Repository.save(entity);
+                }
+        }
+
+        @Transactional
+        private void updateModelsTableByField(Models_DTO dto, Integer id, String fieldToUpdate) {
+                Optional<Models_Table_Entity> entityOptional = models_Table_Repository.findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Table_Entity entity = entityOptional.get();
+
+                        // Check the fieldToUpdate and update accordingly
+                        switch (fieldToUpdate) {
+                                case "main_model_name":
+                                        entity.setMainModelName(dto.getMainModelName());
+                                        break;
+                                case "name":
+                                        entity.setName(dto.getName());
+                                        break;
+                                case "tags":
+                                        entity.setTags(JsonUtils.convertObjectToString(dto.getTags()));
+                                        break;
+                                case "category":
+                                        entity.setCategory(dto.getCategory());
+                                        break;
+                                case "version_number":
+                                        entity.setVersionNumber(dto.getVersionNumber());
+                                        break;
+                                case "model_number":
+                                        entity.setModelNumber(dto.getModelNumber());
+                                        break;
+                                case "trigger_words":
+                                        entity.setTriggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()));
+                                        break;
+                                case "nsfw":
+                                        entity.setNsfw(dto.getNsfw());
+                                        break;
+                                case "flag":
+                                        entity.setFlag(dto.getFlag());
+                                        break;
+                                default:
+                                        throw new IllegalArgumentException("Unknown field: " + fieldToUpdate);
+                        }
+
+                        // Save only if there's a change
                         models_Table_Repository.save(entity);
                 }
         }

@@ -13,11 +13,11 @@ public class Models_DTO {
 
     private String name;
 
-    private String main_model_name;
+    private String mainModelName;
 
     private List<String> tags;
 
-    private List<String> local_tags;
+    private List<String> localTags;
 
     private String url;
 

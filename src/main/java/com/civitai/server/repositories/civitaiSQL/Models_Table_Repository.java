@@ -19,6 +19,9 @@ public interface Models_Table_Repository extends JpaRepository<Models_Table_Enti
     @Query("SELECT t FROM Models_Table_Entity t ORDER BY t.id DESC")
     Models_Table_Entity findTopByOrderByIdDesc();
 
+    @Query("SELECT m.modelNumber, m.id, m.category FROM Models_Table_Entity m WHERE m.mainModelName IS NULL")
+    List<Object[]> findModelNumberAndIdWhereMainModelNameIsNull();
+
     @Query("SELECT t.id FROM Models_Table_Entity t WHERE t.category=?1 ORDER BY t.createdAt DESC")
     List<Integer> findLastThreeAddedRecordsID(String category, Pageable pageable);
 
