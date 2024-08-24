@@ -48,6 +48,9 @@ public class Models_Table_Entity {
     @Column(name = "nsfw", columnDefinition = "BOOLEAN DEFAULT false")
     private Boolean nsfw;
 
+    @Column(name = "url_accessable", columnDefinition = "BOOLEAN DEFAULT false")
+    private Boolean urlAccessable;
+
     @Column(name = "flag", columnDefinition = "BOOLEAN DEFAULT false")
     private Boolean flag;
 

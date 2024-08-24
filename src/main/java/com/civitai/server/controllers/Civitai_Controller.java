@@ -51,6 +51,27 @@ public class Civitai_Controller {
         }
     }
 
+    @PostMapping("/find-civitaiModel-info-by-versionID")
+    public ResponseEntity<CustomResponse<Map<String, Map<String, Object>>>> findCivitaiVersionInfo(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String versionID = (String) requestBody.get("versionID");
+
+        Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByVersionID(versionID);
+
+        if (modelOptional.isPresent()) {
+            Map<String, Object> model = modelOptional.get();
+
+            Map<String, Map<String, Object>> payload = new HashMap<>();
+            payload.put("model", model);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Civitai Info retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Civitai"));
+        }
+    }
+
     //tempermonkey use only
     @CrossOrigin(origins = "https://civitai.com")
     @PostMapping("/find-civitaiModel-info-by-modelID-tempermonkey")

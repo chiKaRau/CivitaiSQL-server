@@ -1,8 +1,11 @@
 package com.civitai.server.controllers;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,15 +13,26 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.civitai.server.services.CivitaiSQL_Service;
+import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.services.File_Service;
 import com.civitai.server.utils.CustomResponse;
+
+import com.civitai.server.utils.JsonUtils;
 
 @RestController
 @RequestMapping("/api")
 public class File_Controller {
 
-    @Autowired
     private File_Service fileService;
+    private Civitai_Service civitai_Service;
+
+    @Autowired
+    public File_Controller(File_Service fileService, Civitai_Service civitai_Service) {
+        this.fileService = fileService;
+        this.civitai_Service = civitai_Service;
+    }
 
     @GetMapping("/open-download-directory")
     public ResponseEntity<CustomResponse<String>> openDownloadDirectory() {
@@ -123,6 +137,55 @@ public class File_Controller {
         fileService.update_folder_list(downloadFilePath);
         fileService.update_cart_list(url);
         return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
+    }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/download-file-server-v2")
+    public ResponseEntity<CustomResponse<String>> downloadFileServerV2(@RequestBody Map<String, Object> requestBody) {
+
+        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
+        String civitaiFileName = ((String) modelObject.get("civitaiFileName"));
+        List<Map<String, Object>> civitaiModelFileList = (List<Map<String, Object>>) modelObject
+                .get("civitaiModelFileList");
+        String downloadFilePath = (String) modelObject.get("downloadFilePath");
+        String civitaiUrl = (String) modelObject.get("civitaiUrl");
+        String civitaiModelID = (String) modelObject.get("civitaiModelID");
+        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+
+        // Validate null or empty
+        if (modelObject == null ||
+                civitaiUrl == null || civitaiUrl == "" ||
+                downloadFilePath == null || downloadFilePath == "" ||
+                civitaiUrl == null || civitaiUrl == "" ||
+                civitaiModelID == null || civitaiModelID == "" ||
+                civitaiVersionID == null || civitaiVersionID == "" ||
+                civitaiModelFileList == null || civitaiModelFileList.isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+
+            Optional<Map<String, Object>> modelVersionOptional = civitai_Service.findModelByVersionID(civitaiVersionID);
+
+            if (!modelVersionOptional.isPresent()) {
+                return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+            } else {
+                Map<String, Object> modelVersionObject = modelVersionOptional.get();
+
+                // Extract URLs
+                String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
+
+                fileService.download_file_by_server_v2(civitaiFileName, civitaiModelFileList, downloadFilePath,
+                        modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
+                        (String) modelVersionObject.get("baseModel"), imageUrlsArray);
+
+                return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
+            }
+
+        } catch (Exception ex) {
+            System.err.println("An error occurred: " + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
     }
 
 }

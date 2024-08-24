@@ -71,7 +71,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @PostConstruct
         public void civitaiSQL_Service_Startup() {
-                System.out.println("civitaiSQL_Service_Startup");
+                //System.out.println("civitaiSQL_Service_Startup");
                 //updateMainModelName2();
         }
 
@@ -80,12 +80,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 //this one would find the database dto then call the civitai api 
                 //and update the MainModelName then save it
 
-
                 // Step 1: Get all model_number and ids where mainModelName is null, limited to the first 1000 records
                 List<Object[]> results = models_Table_Repository.findModelNumberAndIdWhereMainModelNameIsNull();
 
                 // Process only the first 1000 records
-                int limit = 10;
+                int limit = 2000;
                 for (int i = 0; i < results.size() && i < limit; i++) {
                         Object[] row = results.get(i);
                         String modelNumber = (String) row[0];
@@ -105,19 +104,24 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         entity.setMainModelName(Optional.ofNullable((String) model.get("name"))
                                                         .orElse(null));
                                         updateModelsTable(entity, id);
-                                        System.out.println(i + "# " + entity.getName() + " has been updated.");
+                                        System.out.println((i + 1) + " # - id " + id + " # : " + entity.getName()
+                                                        + " has been updated.");
 
                                 }
-                        } catch (HttpClientErrorException e) {
-                                // Handle specific 404 Not Found error
-                                if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                                        System.err.println("Model not found for ID " + modelNumber + ". Skipping...");
-                                } else {
-                                        // Handle other HTTP errors
-                                        System.err.println("HTTP error occurred on models_Table id: " + id);
-                                }
-                                limit++;
                         } catch (Exception e) {
+
+                                // Call the external service and update the model
+                                Optional<Models_DTO> entityOptional = find_one_models_DTO_from_all_tables_by_id(id);
+
+                                if (entityOptional != null && entityOptional.isPresent()) {
+                                        Models_DTO entity = entityOptional.get();
+                                        entity.setUrlAccessable(false);
+                                        updateModelsTable(entity, id);
+                                        System.out.println((i + 1) + " # - id " + id + " # : " + entity.getName()
+                                                        + ", the urlAccessable has set to false");
+
+                                }
+
                                 // Handle any other unexpected errors
                                 System.err.println("An unexpected error occurred: on models_Table id: " + id);
                                 limit++;
@@ -161,7 +165,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 if (newUpdateEntityOptional != null && newUpdateEntityOptional.isPresent()) {
                                         Models_DTO models_DTO = newUpdateEntityOptional.get();
                                         updateModelsTableByField(models_DTO, id, "main_model_name");
-                                        System.out.println(i + "# " + models_DTO.getName() + " has been updated.");
+                                        System.out.println(i + " # - id " + id + " # :" + models_DTO.getName()
+                                                        + " has been updated.");
                                 }
                         } catch (HttpClientErrorException e) {
                                 // Handle specific 404 Not Found error
@@ -1105,6 +1110,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 dto.setUsageTips(usageTips);
                                 dto.setCreatorName(creatorName);
                                 dto.setImageUrls(images);
+                                dto.setUrlAccessable(true);
 
                                 return Optional.of(dto);
                         } else {
@@ -1136,6 +1142,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         entity.setTriggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()));
                         entity.setNsfw(dto.getNsfw());
                         entity.setFlag(dto.getFlag());
+                        entity.setUrlAccessable(dto.getUrlAccessable());
                         models_Table_Repository.save(entity);
                 }
         }

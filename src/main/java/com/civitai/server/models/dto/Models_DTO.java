@@ -49,6 +49,8 @@ public class Models_DTO {
 
     private Boolean flag;
 
+    private Boolean urlAccessable;
+
     private List<Map<String, Object>> imageUrls;
 
 }
