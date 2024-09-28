@@ -868,6 +868,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         public Models_DTO convertToDTO(Models_Table_Entity entity) {
                 // Method to convert Models_Table_Entity to Models_DTO
                 Tables_DTO tables_DTO = new Tables_DTO();
+
                 tables_DTO.setModels_Table_Entitiy(entity);
                 tables_DTO.setModels_Descriptions_Table_Entity(
                                 models_Descriptions_Table_Repository

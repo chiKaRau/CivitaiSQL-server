@@ -92,6 +92,19 @@ public class File_Controller {
         }
     }
 
+    @GetMapping("/get_tags_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getTagsList() {
+        // Retrieve both top 10 and recent 10 lists
+        Map<String, List<Map<String, Object>>> tagsMap = fileService.get_tags_list();
+
+        // Check if both lists are empty
+        if (!tagsMap.get("topTags").isEmpty() || !tagsMap.get("recentTags").isEmpty()) {
+            return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval successful", tagsMap));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the database"));
+        }
+    }
+
     @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server")
     public ResponseEntity<CustomResponse<String>> downloadFileServer(@RequestBody Map<String, Object> requestBody) {
@@ -136,6 +149,7 @@ public class File_Controller {
 
         fileService.update_folder_list(downloadFilePath);
         fileService.update_cart_list(url);
+        fileService.update_tags_list(downloadFilePath);
         return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
@@ -178,7 +192,7 @@ public class File_Controller {
                 fileService.download_file_by_server_v2(civitaiFileName, civitaiModelFileList, downloadFilePath,
                         modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
                         (String) modelVersionObject.get("baseModel"), imageUrlsArray);
-
+                fileService.update_tags_list(downloadFilePath);
                 return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
             }
 

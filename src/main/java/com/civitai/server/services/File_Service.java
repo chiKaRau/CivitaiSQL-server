@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 public interface File_Service {
         public List<String> get_folders_list();
 
+        Map<String, List<Map<String, Object>>> get_tags_list();
+
         public void update_folder_list(String downloadFilePath);
 
         public void empty_cart_list();
@@ -22,6 +24,10 @@ public interface File_Service {
         public void update_error_model_list(String url);
 
         public void open_download_directory();
+
+        public void create_tags_list();
+
+        public void update_tags_list(String inputTag);
 
         public void download_file_by_server(String loraFileName, String modelID, String versionID,
                         String downloadFilePath,

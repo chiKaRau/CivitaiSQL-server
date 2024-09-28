@@ -17,8 +17,10 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +68,9 @@ public class File_Service_Impl implements File_Service {
 
         // Create a must_add_list if have none
         create_must_add_list();
+
+        // Create a tags list if have none
+        create_tags_list();
 
         // Create a error_model_list if have none
         create_error_model_list();
@@ -146,6 +151,30 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    public void create_tags_list() {
+        String tagsListFile = "files/data/tags_list.json";
+        try {
+            if (!Files.exists(Paths.get(tagsListFile))) {
+                // Create an empty list of tag records
+                List<Map<String, Object>> tagsList = new ArrayList<>();
+
+                // Convert the empty list to a JSON string
+                String tagsListJson = new ObjectMapper().writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(tagsList);
+
+                // Write the JSON string to the file
+                Files.write(Path.of(tagsListFile), tagsListJson.getBytes(), StandardOpenOption.CREATE);
+
+                System.out.println("tags_list.json has been created as an empty file.");
+            } else {
+                System.out.println("tags_list.json already exists: " + tagsListFile + ". Doing nothing.");
+            }
+        } catch (IOException e) {
+            log.error("Unexpected error while creating tags_list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
     public void create_folder_list() {
         try {
             String inputFile = "files/data/folder_list.txt";
@@ -216,6 +245,65 @@ public class File_Service_Impl implements File_Service {
         } catch (IOException e) {
             // Log and handle other types of exceptions
             log.error("Unexpected error while retreving folder list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public Map<String, List<Map<String, Object>>> get_tags_list() {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+
+            // Read and parse the tags_list.json as a List of Maps
+            List<Map<String, Object>> dataList = objectMapper.readValue(
+                    Files.readAllBytes(Paths.get("files/data/tags_list.json")),
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // Check if dataList is null or empty
+            if (dataList == null || dataList.isEmpty()) {
+                return Map.of("topTags", Collections.emptyList(), "recentTags", Collections.emptyList());
+            }
+
+            // Filter out any entries where string_value contains "/@scan@/Update/"
+            List<Map<String, Object>> filteredList = dataList.stream()
+                    .filter(map -> !((String) map.get("string_value")).contains("/@scan@/Update/"))
+                    .collect(Collectors.toList());
+
+            // Define the current date and the date one month ago
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime oneMonthAgo = now.minusMonths(1);
+
+            // Filter the tags that were added in the last month
+            List<Map<String, Object>> recentMonthTags = filteredList.stream()
+                    .filter(map -> {
+                        LocalDateTime lastAddedDate = LocalDateTime.parse((String) map.get("last_added"));
+                        return lastAddedDate.isAfter(oneMonthAgo);
+                    })
+                    .collect(Collectors.toList());
+
+            // Sort by count (descending) and get the top 10 for tags in the last month
+            List<Map<String, Object>> topTags = recentMonthTags.stream()
+                    .sorted((map1, map2) -> Integer.compare((int) map2.get("count"), (int) map1.get("count")))
+                    .limit(10)
+                    .collect(Collectors.toList());
+
+            // Sort by last_added (descending) and get the most recent 10
+            List<Map<String, Object>> recentTags = filteredList.stream()
+                    .sorted((map1, map2) -> {
+                        LocalDateTime date1 = LocalDateTime.parse((String) map1.get("last_added"));
+                        LocalDateTime date2 = LocalDateTime.parse((String) map2.get("last_added"));
+                        return date2.compareTo(date1);
+                    })
+                    .limit(10)
+                    .collect(Collectors.toList());
+
+            // Return both lists in a map
+            return Map.of("topTags", topTags, "recentTags", recentTags);
+
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while retrieving tags list", e);
             throw new CustomException("An unexpected error occurred", e);
         }
     }
@@ -440,6 +528,61 @@ public class File_Service_Impl implements File_Service {
         } catch (IOException e) {
             // Log and handle other types of exceptions
             log.error("Unexpected error while updating cart list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void update_tags_list(String inputTag) {
+        try {
+            // Ignore input tags that start with "/@scan@/Update/"
+            if (inputTag.startsWith("/@scan@/Update/")) {
+                System.out.println("Ignoring tag: \"" + inputTag + "\" as it starts with \"/@scan@/Update/\".");
+                return;
+            }
+
+            Path filePath = Path.of("files/data/tags_list.json");
+
+            // Read the content of the JSON file
+            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+
+            // Parse the JSON data into a list of maps
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<Map<String, Object>> tagsList = objectMapper.readValue(data, List.class);
+
+            // Check if the input tag already exists
+            boolean found = false;
+            for (Map<String, Object> entry : tagsList) {
+                if (entry.get("string_value").equals(inputTag)) {
+                    // Increment the count and update the last_added timestamp
+                    int count = (int) entry.get("count");
+                    entry.put("count", count + 1);
+                    entry.put("last_added", LocalDateTime.now().toString());
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                // If the tag doesn't exist, add a new entry
+                Map<String, Object> newEntry = new HashMap<>();
+                newEntry.put("string_value", inputTag);
+                newEntry.put("count", 1);
+                newEntry.put("last_added", LocalDateTime.now().toString());
+                tagsList.add(newEntry);
+            }
+
+            // Convert the updated list back to a JSON string
+            String updatedTagsListJson = objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(tagsList);
+
+            // Write the updated JSON string back to the file
+            Files.write(filePath, updatedTagsListJson.getBytes(StandardCharsets.UTF_8));
+            System.out.println("Updated tags_list.json with \"" + inputTag + "\".");
+
+        } catch (IOException e) {
+            log.error("Unexpected error while updating tags list", e);
             throw new CustomException("An unexpected error occurred", e);
         }
     }
