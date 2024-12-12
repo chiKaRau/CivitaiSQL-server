@@ -18,6 +18,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -250,7 +251,53 @@ public class File_Service_Impl implements File_Service {
     }
 
     @Override
-    public Map<String, List<Map<String, Object>>> get_tags_list() {
+    public List<Map<String, String>> get_categories_prefix_list() {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            // Read the JSON file and parse it as a Map
+            Map<String, List<Map<String, String>>> jsonData = objectMapper.readValue(
+                    Files.readAllBytes(Paths.get("files/data/categories_prefix_list.json")),
+                    new TypeReference<Map<String, List<Map<String, String>>>>() {
+                    });
+
+            // Retrieve the "prefixsList" key from the JSON map
+            List<Map<String, String>> dataList = jsonData.getOrDefault("categoriesPrefixsList",
+                    Collections.emptyList());
+
+            // Return the full list of objects
+            return dataList;
+        } catch (IOException e) {
+            // Log and handle exceptions
+            log.error("Unexpected error while retrieving categories_prefix_list list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public List<Map<String, String>> get_filePath_categories_list() {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            // Read the JSON file and parse it as a Map
+            Map<String, List<Map<String, String>>> jsonData = objectMapper.readValue(
+                    Files.readAllBytes(Paths.get("files/data/filepath_categories_list.json")),
+                    new TypeReference<Map<String, List<Map<String, String>>>>() {
+                    });
+
+            // Retrieve the "prefixsList" key from the JSON map
+            List<Map<String, String>> dataList = jsonData.getOrDefault("filePathCategoriesList",
+                    Collections.emptyList());
+
+            // Return the full list of objects
+            return dataList;
+        } catch (IOException e) {
+            // Log and handle exceptions
+            log.error("Unexpected error while retrieving filepath_categories_list list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public Map<String, List<Map<String, Object>>> get_tags_list(String prefix) {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
 
@@ -267,8 +314,21 @@ public class File_Service_Impl implements File_Service {
 
             // Filter out any entries where string_value contains "/@scan@/Update/"
             List<Map<String, Object>> filteredList = dataList.stream()
-                    .filter(map -> !((String) map.get("string_value")).contains("/@scan@/Update/"))
+                    .filter(map -> {
+                        String stringValue = (String) map.get("string_value");
+                        return stringValue != null && !stringValue.contains("/@scan@/Update/");
+                    })
                     .collect(Collectors.toList());
+
+            // If a prefix is provided, filter the list by the prefix
+            if (prefix != null && !prefix.isEmpty()) {
+                filteredList = filteredList.stream()
+                        .filter(map -> {
+                            String stringValue = (String) map.get("string_value");
+                            return stringValue != null && stringValue.startsWith(prefix);
+                        })
+                        .collect(Collectors.toList());
+            }
 
             // Define the current date and the date one month ago
             LocalDateTime now = LocalDateTime.now();
@@ -277,23 +337,44 @@ public class File_Service_Impl implements File_Service {
             // Filter the tags that were added in the last month
             List<Map<String, Object>> recentMonthTags = filteredList.stream()
                     .filter(map -> {
-                        LocalDateTime lastAddedDate = LocalDateTime.parse((String) map.get("last_added"));
+                        String lastAddedStr = (String) map.get("last_added");
+                        if (lastAddedStr == null || lastAddedStr.isEmpty()) {
+                            return false;
+                        }
+                        LocalDateTime lastAddedDate;
+                        try {
+                            lastAddedDate = LocalDateTime.parse(lastAddedStr);
+                        } catch (DateTimeParseException e) {
+                            // If the date format is incorrect, exclude this tag
+                            return false;
+                        }
                         return lastAddedDate.isAfter(oneMonthAgo);
                     })
                     .collect(Collectors.toList());
 
             // Sort by count (descending) and get the top 10 for tags in the last month
             List<Map<String, Object>> topTags = recentMonthTags.stream()
-                    .sorted((map1, map2) -> Integer.compare((int) map2.get("count"), (int) map1.get("count")))
+                    .sorted((map1, map2) -> {
+                        Integer count1 = (Integer) map1.get("count");
+                        Integer count2 = (Integer) map2.get("count");
+                        return count2.compareTo(count1);
+                    })
                     .limit(10)
                     .collect(Collectors.toList());
 
             // Sort by last_added (descending) and get the most recent 10
             List<Map<String, Object>> recentTags = filteredList.stream()
                     .sorted((map1, map2) -> {
-                        LocalDateTime date1 = LocalDateTime.parse((String) map1.get("last_added"));
-                        LocalDateTime date2 = LocalDateTime.parse((String) map2.get("last_added"));
-                        return date2.compareTo(date1);
+                        String dateStr1 = (String) map1.get("last_added");
+                        String dateStr2 = (String) map2.get("last_added");
+                        try {
+                            LocalDateTime date1 = LocalDateTime.parse(dateStr1);
+                            LocalDateTime date2 = LocalDateTime.parse(dateStr2);
+                            return date2.compareTo(date1);
+                        } catch (DateTimeParseException e) {
+                            // Handle parsing error by considering unparsable dates as older
+                            return 0;
+                        }
                     })
                     .limit(10)
                     .collect(Collectors.toList());
@@ -798,7 +879,8 @@ public class File_Service_Impl implements File_Service {
             }
 
             // Log zip completion
-            System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m");
+            System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m"
+                    + " and saved into " + downloadFilePath);
 
         } catch (Exception e) {
 
@@ -1054,7 +1136,8 @@ public class File_Service_Impl implements File_Service {
             }
 
             // Log zip completion
-            System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m");
+            System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m"
+                    + " and saved into " + downloadFilePath);
 
         } catch (Exception e) {
 

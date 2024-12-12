@@ -25,6 +25,7 @@ public interface CivitaiSQL_Service {
 
     Optional<List<String>> find_all_categories();
 
+    Optional<List<String>> find_version_numbers_for_model(String modelNumber, List<String> versionNumbers);
     // All Tables only //
     Optional<List<Tables_DTO>> find_all_from_all_tables();
 

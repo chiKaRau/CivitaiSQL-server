@@ -184,6 +184,38 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    @CrossOrigin(origins = "*")
+    @PostMapping(path = "/find-version-numbers-for-model")
+    public ResponseEntity<CustomResponse<Map<String, List<String>>>> findVersionNumbersForModel(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelNumber = (String) requestBody.get("modelNumber");
+        List<String> versionNumbers = ((List<?>) requestBody.get("versionNumbers")).stream()
+                .map(Object::toString) // Ensures each element is treated as a String
+                .collect(Collectors.toList());
+
+        // Validate null or empty
+        if (modelNumber == null || modelNumber.isEmpty() || versionNumbers == null || versionNumbers.isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        Optional<List<String>> versionExistenceMapOptional = civitaiSQL_Service
+                .find_version_numbers_for_model(modelNumber, versionNumbers);
+
+        Map<String, List<String>> payload = new HashMap<>();
+        if (versionExistenceMapOptional.isPresent()) {
+            List<String> versionExistenceMap = versionExistenceMapOptional.get();
+            payload.put("existedVersionsList", versionExistenceMap);
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Version number check successful", payload));
+        } else {
+            // Return success with an empty list when no models are found
+            payload.put("existedVersionsList", new ArrayList<>());
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("No existing versions found", payload));
+        }
+    }
+
     @PostMapping(path = "/find-one-models-dto-from-all-table-by-url")
     public ResponseEntity<CustomResponse<Map<String, Models_DTO>>> findOneModelsDTOFromAllTableByUrl(
             @RequestBody Map<String, Object> requestBody) {
@@ -294,13 +326,13 @@ public class CivitaiSQL_Controller {
             //For Early Access
             Boolean isEarlyAccess = false;
             try {
-                String earlyAccessDate = modelVersionList
+                String availability = modelVersionList
                         .map(list -> list.get(0))
-                        .filter(firstObject -> firstObject.containsKey("earlyAccessDeadline"))
-                        .map(firstObject -> firstObject.get("earlyAccessDeadline").toString())
+                        .filter(firstObject -> firstObject.containsKey("availability"))
+                        .map(firstObject -> firstObject.get("availability").toString())
                         .orElse(null);
 
-                if (earlyAccessDate != null) {
+                if ("EarlyAccess".equalsIgnoreCase(availability)) {
                     isEarlyAccess = true;
                 } else {
                     isEarlyAccess = false;

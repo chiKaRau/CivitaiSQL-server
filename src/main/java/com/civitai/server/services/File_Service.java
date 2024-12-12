@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 public interface File_Service {
         public List<String> get_folders_list();
 
-        Map<String, List<Map<String, Object>>> get_tags_list();
+        public Map<String, List<Map<String, Object>>> get_tags_list(String prefix);
 
         public void update_folder_list(String downloadFilePath);
 
@@ -28,6 +28,10 @@ public interface File_Service {
         public void create_tags_list();
 
         public void update_tags_list(String inputTag);
+
+        public List<Map<String, String>> get_categories_prefix_list();
+
+        public List<Map<String, String>> get_filePath_categories_list();
 
         public void download_file_by_server(String loraFileName, String modelID, String versionID,
                         String downloadFilePath,

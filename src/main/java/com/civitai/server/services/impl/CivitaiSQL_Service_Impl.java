@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
@@ -658,6 +659,40 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 } else {
                         return Optional.empty();
                 }
+        }
+
+        @Override
+        public Optional<List<String>> find_version_numbers_for_model(String modelNumber, List<String> versionNumbers) {
+                List<String> existingVersionNumbersList = new ArrayList<>();
+
+                try {
+                        // Retrieve all models with the specified model number
+                        List<Models_Table_Entity> entities = models_Table_Repository.findByModelNumber(modelNumber);
+                        if (entities.isEmpty()) {
+                                // If no models found, return an empty Optional
+                                return Optional.empty();
+                        }
+
+                        // Create a set of existing version numbers for the given model number
+                        Set<String> existingVersionNumbers = entities.stream()
+                                        .map(Models_Table_Entity::getVersionNumber)
+                                        .collect(Collectors.toSet());
+
+                        // Add each version number in the request that exists in the existing version numbers
+                        for (String versionNumber : versionNumbers) {
+                                if (existingVersionNumbers.contains(versionNumber)) {
+                                        existingVersionNumbersList.add(versionNumber);
+                                }
+                        }
+                } catch (DataAccessException e) {
+                        log.error("Database error while checking version numbers for model", e);
+                        throw new CustomDatabaseException("An unexpected database error occurred", e);
+                } catch (Exception e) {
+                        log.error("Unexpected error while checking version numbers for model", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+
+                return Optional.of(existingVersionNumbersList);
         }
 
         //Transcation Actions

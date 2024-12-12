@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.civitai.server.services.CivitaiSQL_Service;
@@ -93,15 +94,45 @@ public class File_Controller {
     }
 
     @GetMapping("/get_tags_list")
-    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getTagsList() {
-        // Retrieve both top 10 and recent 10 lists
-        Map<String, List<Map<String, Object>>> tagsMap = fileService.get_tags_list();
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getTagsList(
+            @RequestParam(value = "prefix", required = false) String prefix) {
+        // Retrieve both top 10 and recent 10 lists based on prefix
+        Map<String, List<Map<String, Object>>> tagsMap = fileService.get_tags_list(prefix);
 
         // Check if both lists are empty
         if (!tagsMap.get("topTags").isEmpty() || !tagsMap.get("recentTags").isEmpty()) {
             return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval successful", tagsMap));
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the database"));
+        }
+    }
+
+    @GetMapping("/get_categories_prefix_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getCategoriesPrefixsList() {
+        List<Map<String, String>> categoriesPrefixsList = fileService.get_categories_prefix_list();
+
+        if (!categoriesPrefixsList.isEmpty()) {
+            Map<String, List<Map<String, String>>> payload = new HashMap<>();
+            payload.put("categoriesPrefixsList", categoriesPrefixsList);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Categories prefix retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No categories found in the database"));
+        }
+    }
+
+    @GetMapping("/get_filePath_categories_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getFilePathCategoriesList() {
+        List<Map<String, String>> filePathCategoriesList = fileService.get_filePath_categories_list();
+
+        if (!filePathCategoriesList.isEmpty()) {
+            Map<String, List<Map<String, String>>> payload = new HashMap<>();
+            payload.put("filePathCategoriesList", filePathCategoriesList);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("filePathCategoriesList retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No categories found in the database"));
         }
     }
 
