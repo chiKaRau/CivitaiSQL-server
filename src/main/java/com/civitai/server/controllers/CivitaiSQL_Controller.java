@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Function;
@@ -25,6 +26,7 @@ import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
+import com.civitai.server.services.File_Service;
 import com.civitai.server.utils.CustomResponse;
 
 @RestController
@@ -206,6 +208,7 @@ public class CivitaiSQL_Controller {
         if (versionExistenceMapOptional.isPresent()) {
             List<String> versionExistenceMap = versionExistenceMapOptional.get();
             payload.put("existedVersionsList", versionExistenceMap);
+
             return ResponseEntity.ok()
                     .body(CustomResponse.success("Version number check successful", payload));
         } else {
@@ -357,9 +360,16 @@ public class CivitaiSQL_Controller {
                     }
                 } else {
                     latestVersionNumber = modelVersionList
-                            .map(list -> list.get(0).get("id"))
-                            .map(Object::toString)
+                            .map(list -> list.stream()
+                                    .map(map -> map.get("id")) // Extract the id object
+                                    .filter(Objects::nonNull) // Ensure it's not null
+                                    .map(Object::toString) // Convert to String
+                                    .map(Integer::valueOf) // Convert to Integer for comparison
+                                    .max(Integer::compareTo) // Get the maximum ID
+                                    .map(String::valueOf) // Convert back to String
+                                    .orElse(null))
                             .orElse(null);
+
                 }
             } catch (Exception e) {
                 latestVersionNumber = null;

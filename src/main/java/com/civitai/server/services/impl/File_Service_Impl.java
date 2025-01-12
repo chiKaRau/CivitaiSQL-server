@@ -10,11 +10,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
@@ -25,6 +27,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -61,6 +65,9 @@ public class File_Service_Impl implements File_Service {
     @PostConstruct
     public void createFileAtStartup() {
 
+        // Create a offline_download_list if have none
+        create_offline_download_list();
+
         // Create a folder_list if have none
         create_folder_list();
 
@@ -75,6 +82,298 @@ public class File_Service_Impl implements File_Service {
 
         // Create a error_model_list if have none
         create_error_model_list();
+    }
+
+    public void create_offline_download_list() {
+        String offlineDownloadFile = "files/data/offline_download_list.json";
+        try {
+            Path filePath = Paths.get(offlineDownloadFile);
+
+            // Ensure parent directories exist
+            if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
+                Files.createDirectories(filePath.getParent());
+            }
+
+            if (!Files.exists(filePath)) {
+                // Initialize the list to hold maps
+                List<Map<String, Object>> offlineDownloadList = new ArrayList<>();
+
+                // // (Optional) Add sample data to the list
+                // // Comment out the following block if you want to start with an empty list
+                // Map<String, Object> sampleItem = new HashMap<>();
+                // sampleItem.put("civitaiFileName", "sample_file_name");
+                // sampleItem.put("civitaiModelFileList", new ArrayList<Map<String, Object>>()); // Empty list or populate as needed
+                // sampleItem.put("downloadFilePath", "/path/to/download");
+                // sampleItem.put("modelVersionObject", new HashMap<String, Object>()); // Empty map or populate as needed
+                // sampleItem.put("civitaiModelID", "model_12345");
+                // sampleItem.put("civitaiVersionID", "version_1.0");
+                // sampleItem.put("civitaiUrl", "https://civitai.com/model/12345");
+                // sampleItem.put("civitaiBaseModel", "base_model_xyz");
+                // sampleItem.put("imageUrlsArray", new String[] {
+                //         "https://civitai.com/images/img1.png",
+                //         "https://civitai.com/images/img2.png"
+                // });
+
+                // offlineDownloadList.add(sampleItem);
+
+                // Convert the list to a JSON string with pretty printing
+                ObjectMapper objectMapper = new ObjectMapper();
+                String offlineDownloadListJson = objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(offlineDownloadList);
+
+                // Write the JSON string to the file
+                Files.write(filePath, offlineDownloadListJson.getBytes(), StandardOpenOption.CREATE_NEW);
+
+                System.out.println("offline_download_list.json has been created with sample data.");
+            } else {
+                System.out.println(
+                        "offline_download_list.json already exists: " + offlineDownloadFile + ". Doing nothing.");
+            }
+        } catch (IOException e) {
+            // Log and handle exceptions appropriately
+            log.error("Unexpected error while creating offline_download_list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public long checkQuantityOfOfflineDownloadList(String civitaiModelID) {
+        String offlineDownloadFile = "files/data/offline_download_list.json";
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            Path filePath = Paths.get(offlineDownloadFile);
+
+            // Check if parent directories exist
+            if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
+                System.err.println("Parent directories do not exist for the file: " + offlineDownloadFile);
+                return 0;
+            }
+
+            if (!Files.exists(filePath)) {
+                // File does not exist
+                System.err.println("The file does not exist: " + offlineDownloadFile);
+                return 0;
+            }
+
+            // Read all bytes from the file
+            byte[] fileBytes = Files.readAllBytes(filePath);
+            String data = new String(fileBytes, StandardCharsets.UTF_8).trim();
+
+            if (data.isEmpty()) {
+                // File is empty
+                System.err.println("The file is empty: " + offlineDownloadFile);
+                return 0;
+            }
+
+            // Deserialize JSON array into List<Map<String, Object>>
+            List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
+                    data, new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // Use Streams to count the occurrences of the civitaiModelID
+            long count = offlineDownloadList.stream()
+                    .filter(item -> civitaiModelID.equals(item.get("civitaiModelID")))
+                    .count();
+
+            return (int) count;
+
+        } catch (IOException e) {
+            // Log the exception to standard error
+            System.err.println(
+                    "Unexpected error while counting civitaiModelID in offline_download_list: " + e.getMessage());
+            // Optionally, rethrow the exception as a runtime exception
+            throw new RuntimeException("An unexpected error occurred while counting the offline download list.", e);
+        }
+    }
+
+    // Method to update the offline_download_list.json
+    @SuppressWarnings("unchecked")
+    public void update_offline_download_list(
+            String civitaiFileName,
+            List<Map<String, Object>> civitaiModelFileList,
+            String downloadFilePath,
+            Map<String, Object> modelVersionObject,
+            String civitaiModelID,
+            String civitaiVersionID,
+            String civitaiUrl,
+            String civitaiBaseModel,
+            String[] imageUrlsArray,
+            String selectedCategory,
+            Boolean isModifyMode) {
+
+        String offlineDownloadFile = "files/data/offline_download_list.json";
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            Path filePath = Paths.get(offlineDownloadFile);
+
+            // Ensure parent directories exist
+            if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
+                Files.createDirectories(filePath.getParent());
+            }
+
+            List<Map<String, Object>> offlineDownloadList;
+
+            if (Files.exists(filePath)) {
+                // Read existing JSON data
+                String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+
+                if (data.trim().isEmpty()) {
+                    // If file is empty, initialize an empty list
+                    offlineDownloadList = new ArrayList<>();
+                } else {
+                    // Deserialize existing JSON array into List<Map<String, Object>>
+                    offlineDownloadList = objectMapper.readValue(data, new TypeReference<List<Map<String, Object>>>() {
+                    });
+                }
+            } else {
+                // If file does not exist, initialize a new list
+                offlineDownloadList = new ArrayList<>();
+            }
+
+            // Find the index of the existing entry, if any
+            int existingIndex = -1;
+            for (int i = 0; i < offlineDownloadList.size(); i++) {
+                Map<String, Object> item = offlineDownloadList.get(i);
+                if (Objects.equals(item.get("civitaiModelID"), civitaiModelID) &&
+                        Objects.equals(item.get("civitaiVersionID"), civitaiVersionID)) {
+                    existingIndex = i;
+                    break;
+                }
+            }
+
+            if (existingIndex != -1) { // Entry exists
+                if (Boolean.TRUE.equals(isModifyMode)) {
+                    // Modify mode: update specific fields
+                    Map<String, Object> existingEntry = offlineDownloadList.get(existingIndex);
+                    existingEntry.put("downloadFilePath", downloadFilePath);
+                    existingEntry.put("selectedCategory", selectedCategory);
+
+                    // Optionally, update other fields if needed
+                    // existingEntry.put("otherField", newValue);
+
+                    System.out.println(
+                            "Existing entry with civitaiModelID \"" + civitaiModelID + "\" and civitaiVersionID \""
+                                    + civitaiVersionID + " updated with new downloadFilePath and selectedCategory.");
+                } else {
+                    // Add mode: do not add duplicate entry
+                    System.out.println("An entry with civitaiModelID \"" + civitaiModelID +
+                            "\" and civitaiVersionID \"" + civitaiVersionID + "\" already exists. No action taken.");
+                    return; // Do nothing if entry exists and not in modify mode
+                }
+            } else { // Entry does not exist
+                if (Boolean.TRUE.equals(isModifyMode)) {
+                    // Modify mode but entry does not exist: optionally, decide behavior
+                    // For this example, we'll add the new entry
+                    System.out.println("Modify mode is enabled but no existing entry found. Adding new entry.");
+                }
+
+                // Create a new map for the new entry
+                Map<String, Object> newEntry = new HashMap<>();
+                newEntry.put("civitaiFileName", civitaiFileName);
+                newEntry.put("civitaiModelFileList", civitaiModelFileList);
+                newEntry.put("downloadFilePath", downloadFilePath);
+                newEntry.put("modelVersionObject", modelVersionObject);
+                newEntry.put("civitaiModelID", civitaiModelID);
+                newEntry.put("civitaiVersionID", civitaiVersionID);
+                newEntry.put("civitaiUrl", civitaiUrl);
+                newEntry.put("civitaiBaseModel", civitaiBaseModel);
+                newEntry.put("imageUrlsArray", imageUrlsArray);
+                newEntry.put("selectedCategory", selectedCategory);
+
+                // Add the new entry to the list
+                offlineDownloadList.add(newEntry);
+
+                System.out.println("New entry added to offline_download_list.json.");
+            }
+
+            // Serialize the updated list back to JSON
+            String updatedJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(offlineDownloadList);
+
+            // Write the updated JSON back to the file
+            Files.write(filePath, updatedJson.getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+            System.out.println("offline_download_list.json has been successfully updated.");
+
+        } catch (IOException e) {
+            // Log and handle exceptions appropriately
+            log.error("Unexpected error while updating offline_download_list", e);
+            throw new CustomException("An unexpected error occurred while updating the offline download list.", e);
+        }
+    }
+
+    /**
+     * Removes entries from offline_download_list.json based on civitaiModelID and civitaiVersionID.
+     *
+     * @param civitaiModelID   The ID of the model to remove.
+     * @param civitaiVersionID The version ID of the model to remove.
+     */
+    public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID) {
+        String offlineDownloadFile = "files/data/offline_download_list.json";
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            Path filePath = Paths.get(offlineDownloadFile);
+
+            if (!Files.exists(filePath)) {
+                System.out.println("The file " + offlineDownloadFile + " does not exist. Nothing to remove.");
+                return;
+            }
+
+            // Read existing JSON data
+            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+
+            if (data.trim().isEmpty()) {
+                System.out.println("The file " + offlineDownloadFile + " is empty. Nothing to remove.");
+                return;
+            }
+
+            // Deserialize JSON array into List<Map<String, Object>>
+            List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(data,
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // Filter out entries that match both civitaiModelID and civitaiVersionID
+            List<Map<String, Object>> updatedList = new ArrayList<>();
+            boolean removed = false;
+
+            for (Map<String, Object> item : offlineDownloadList) {
+                String currentModelID = (String) item.get("civitaiModelID");
+                String currentVersionID = (String) item.get("civitaiVersionID");
+
+                if (Objects.equals(currentModelID, civitaiModelID) &&
+                        Objects.equals(currentVersionID, civitaiVersionID)) {
+                    removed = true;
+                    System.out.println("Removing entry with civitaiModelID \"" + civitaiModelID +
+                            "\" and civitaiVersionID \"" + civitaiVersionID + "\".");
+                    // Skip adding this item to updatedList to effectively remove it
+                } else {
+                    updatedList.add(item);
+                }
+            }
+
+            if (removed) {
+                // Serialize the updated list back to JSON
+                String updatedJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(updatedList);
+
+                // Write the updated JSON back to the file
+                Files.write(filePath, updatedJson.getBytes(StandardCharsets.UTF_8),
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+                System.out.println(
+                        "offline_download_list.json has been successfully updated by removing the specified entry.");
+            } else {
+                System.out.println("No entry found with civitaiModelID \"" + civitaiModelID +
+                        "\" and civitaiVersionID \"" + civitaiVersionID + "\". No changes made.");
+            }
+
+        } catch (IOException e) {
+            // Log and handle exceptions appropriately
+            System.out.println("Unexpected error while removing from offline_download_list " + e);
+            throw new CustomException("An unexpected error occurred while removing from the offline download list.", e);
+        }
     }
 
     public void create_cart_list() {
@@ -293,6 +592,59 @@ public class File_Service_Impl implements File_Service {
             // Log and handle exceptions
             log.error("Unexpected error while retrieving filepath_categories_list list", e);
             throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    /**
+    * Retrieves the offline download list from offline_download_list.json.
+    *
+    * @return A list of maps representing each offline download entry.
+    */
+    @Override
+    public List<Map<String, Object>> get_offline_download_list() {
+        String offlineDownloadFile = "files/data/offline_download_list.json";
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            Path filePath = Paths.get(offlineDownloadFile);
+
+            // Check if the file exists
+            if (!Files.exists(filePath)) {
+                System.out.println("The file " + offlineDownloadFile + " does not exist. Returning an empty list.");
+                return Collections.emptyList();
+            }
+
+            // Read the content of offline_download_list.json
+            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+
+            // Parse the JSON data into a list of maps
+            List<Map<String, Object>> downloadList = objectMapper.readValue(
+                    data,
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // Check if downloadList is null or empty
+            if (downloadList == null || downloadList.isEmpty()) {
+                System.out.println("offline_download_list.json is empty. Returning an empty list.");
+                return Collections.emptyList();
+            }
+
+            // (Optional) Apply filtering if needed. For example, remove entries with specific criteria.
+            // Example: Filter out entries where 'civitaiBaseModel' is null or empty
+            List<Map<String, Object>> filteredList = downloadList.stream()
+                    .filter(entry -> {
+                        Object baseModel = entry.get("civitaiBaseModel");
+                        return baseModel != null && !baseModel.toString().isEmpty();
+                    })
+                    .collect(Collectors.toList());
+
+            System.out.println("Retrieved " + filteredList.size() + " entries from offline_download_list.json.");
+            return filteredList;
+
+        } catch (IOException e) {
+            // Log and handle exceptions appropriately
+            System.out.println("Unexpected error while retrieving offline download list" + e);
+            throw new CustomException("An unexpected error occurred while retrieving the offline download list.", e);
         }
     }
 
@@ -899,6 +1251,221 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    //zip with png
+    // @Override
+    // public void download_file_by_server_v2(String civitaiFileName,
+    //         List<Map<String, Object>> civitaiModelFileList,
+    //         String downloadFilePath,
+    //         Map<String, Object> modelVersionObject,
+    //         String civitaiModelID,
+    //         String civitaiVersionID,
+    //         String civitaiUrl,
+    //         String civitaiBaseModel,
+    //         String[] imageUrlsArray) {
+
+    //     String modelID = civitaiModelID,
+    //             versionID = civitaiVersionID,
+    //             url = civitaiUrl,
+    //             name = civitaiFileName.split("\\.")[0];
+
+    //     String modelName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name;
+    //     Path modelDirectory = Paths.get("files/download/", modelName);
+
+    //     // Load the configuration
+    //     ConfigUtils.loadConfig("civitaiConfig.json");
+    //     String civitaiApiKey = ConfigUtils.getConfigValue("apiKey");
+
+    //     try {
+    //         String downloadPath = "/" + modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name
+    //                 + downloadFilePath;
+
+    //         update_folder_list(downloadFilePath);
+    //         update_cart_list(url);
+
+    //         Path downloadDirectory = Paths.get("files", "download");
+    //         Files.createDirectories(downloadDirectory);
+
+    //         // Create user-specified folders
+    //         Path currentPath = downloadDirectory;
+    //         for (String dir : downloadPath.split("/")) {
+    //             if (!dir.isEmpty()) {
+    //                 currentPath = currentPath.resolve(dir);
+    //                 Files.createDirectories(currentPath);
+    //             }
+    //         }
+
+    //         // Download each file
+    //         for (Map<String, Object> data : civitaiModelFileList) {
+    //             String fileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + data.get("name");
+    //             String prepareUrl = (String) data.get("downloadUrl");
+
+    //             // Append token if needed
+    //             if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
+    //                 prepareUrl = prepareUrl + "?token=" + civitaiApiKey;
+    //             }
+
+    //             // Skip if it's a training file or VAE
+    //             if (prepareUrl.contains("Training") || prepareUrl.contains("VAE")) {
+    //                 continue;
+    //             }
+
+    //             URL downloadUrl = new URL(prepareUrl);
+    //             Path filePath = currentPath.resolve(fileName);
+
+    //             URLConnection connection = downloadUrl.openConnection();
+    //             long totalSize = connection.getContentLengthLong();
+
+    //             try (InputStream inputStream = downloadUrl.openStream();
+    //                     FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
+
+    //                 // Custom progress-bar copy
+    //                 ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
+    //             }
+
+    //             // Create .civitai.info file
+    //             String fName = civitaiFileName.replace(".safetensors", "");
+    //             String civitaiInfoFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+    //                     + ".civitai.info";
+    //             Path civitaiInfoFilePath = currentPath.resolve(civitaiInfoFileName);
+
+    //             String modelVersionJson = new ObjectMapper().writeValueAsString(modelVersionObject);
+    //             Files.write(civitaiInfoFilePath, modelVersionJson.getBytes(StandardCharsets.UTF_8));
+    //             System.out.println("Created: " + civitaiInfoFilePath);
+
+    //             // Handle preview image
+    //             String previewImageFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+    //                     + ".preview.png";
+    //             Path previewImagePath = currentPath.resolve(previewImageFileName);
+    //             boolean validImageFound = false;
+
+    //             for (String imageUrl : imageUrlsArray) {
+    //                 try {
+    //                     BufferedImage image = ImageIO.read(new URL(imageUrl));
+    //                     if (image != null) {
+    //                         downloadImage(imageUrl, previewImagePath);
+    //                         System.out.println("Saved preview image: " + previewImagePath);
+    //                         validImageFound = true;
+    //                         break; // Stop after the first valid image
+    //                     }
+    //                 } catch (Exception e) {
+    //                     System.out.println("Failed to download or process image from URL: " + imageUrl);
+    //                 }
+    //             }
+
+    //             // Use an online placeholder if no valid image was found
+    //             if (!validImageFound) {
+    //                 try {
+    //                     String placeholderUrl = "https://placehold.co/350x450.png";
+    //                     BufferedImage placeholderImage = ImageIO.read(new URL(placeholderUrl));
+    //                     if (placeholderImage != null) {
+    //                         downloadImage(placeholderUrl, previewImagePath);
+    //                         System.out.println("No valid image found, using placeholder: " + previewImagePath);
+    //                     } else {
+    //                         System.out.println("Failed to download placeholder image.");
+    //                     }
+    //                 } catch (Exception e) {
+    //                     System.out.println("Failed to download the placeholder image.");
+    //                 }
+    //             }
+
+    //             // -------------------------------------------------------
+    //             // (Optional) If you only ever have ONE preview image per call,
+    //             // you can copy it here directly after it's downloaded.
+    //             // If you expect multiple model files each with its own preview,
+    //             // you may need to manage these differently. 
+    //             // -------------------------------------------------------
+
+    //             // Copy preview to the main download folder (same as .zip location)
+    //             Path finalPreviewFilePath = Paths.get("files/download",
+    //                     modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".preview.png");
+    //             try {
+    //                 Files.copy(previewImagePath, finalPreviewFilePath, StandardCopyOption.REPLACE_EXISTING); // <<-- ADDED
+    //                 System.out.println("Copied preview image to: " + finalPreviewFilePath); // <<-- ADDED
+    //             } catch (IOException e) {
+    //                 System.out.println("Failed to copy preview image: " + e.getMessage());
+    //             }
+    //             // -------------------------------------------------------
+    //         }
+
+    //         // Log download completion
+    //         System.out.println("Download completed for: " + name);
+
+    //         // Create ZIP
+    //         Path zipFilePath = Paths.get("files/download/",
+    //                 modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name);
+    //         Path zipFile = Paths.get("files/download/",
+    //                 modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".zip");
+
+    //         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile.toFile()))) {
+    //             long totalSize = ProgressBarUtils.calculateTotalSize(zipFilePath);
+
+    //             Files.walkFileTree(zipFilePath, new SimpleFileVisitor<>() {
+    //                 @Override
+    //                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+    //                     if (attributes.isSymbolicLink()) {
+    //                         return FileVisitResult.CONTINUE;
+    //                     }
+    //                     try (FileInputStream fis = new FileInputStream(file.toFile())) {
+    //                         Path targetFile = zipFilePath.relativize(file);
+    //                         zos.putNextEntry(new ZipEntry(targetFile.toString()));
+    //                         byte[] buffer = new byte[1024];
+    //                         int len;
+    //                         long bytesRead = 0;
+    //                         while ((len = fis.read(buffer)) > 0) {
+    //                             zos.write(buffer, 0, len);
+    //                             bytesRead += len;
+    //                             ProgressBarUtils.updateProgressBar(bytesRead, totalSize,
+    //                                     modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".zip");
+    //                         }
+    //                         zos.closeEntry();
+    //                     } catch (IOException e) {
+    //                         e.printStackTrace();
+    //                     }
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+
+    //                 @Override
+    //                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
+    //                     System.err.printf("Unable to zip : %s%n%s%n", file, exc);
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+    //             });
+    //         }
+
+    //         // Delete the folder and its contents
+    //         Files.walkFileTree(zipFilePath, new SimpleFileVisitor<>() {
+    //             @Override
+    //             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+    //                 Files.delete(file);
+    //                 return FileVisitResult.CONTINUE;
+    //             }
+
+    //             @Override
+    //             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+    //                 Files.delete(dir);
+    //                 return FileVisitResult.CONTINUE;
+    //             }
+    //         });
+
+    //         long zipFileSize = Files.size(zipFile);
+    //         if ((zipFileSize / 1024) < 15) {
+    //             Files.delete(zipFile);
+    //             throw new Exception(zipFile + " size is less than 15kb, may need browser download.");
+    //         }
+
+    //         // Log zip completion
+    //         System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m"
+    //                 + " and saved into " + downloadFilePath);
+
+    //     } catch (Exception e) {
+    //         System.out.println("Error Model Name: " + modelName);
+    //         System.out.println(e);
+    //         update_error_model_list(modelName);
+    //         FileUtils.deleteDirectory(modelDirectory);
+    //         throw new CustomException("An unexpected error occurred", e);
+    //     }
+    // }
+
     @Override
     public void download_file_by_server_v2(String civitaiFileName, List<Map<String, Object>> civitaiModelFileList,
             String downloadFilePath, Map<String, Object> modelVersionObject, String civitaiModelID,
@@ -1154,6 +1721,7 @@ public class File_Service_Impl implements File_Service {
             throw new CustomException("An unexpected error occurred", e);
 
         }
+
     }
 
     // Method to save optimized PNG using TwelveMonkeys
@@ -1186,6 +1754,378 @@ public class File_Service_Impl implements File_Service {
             }
 
             System.out.println("Image saved to " + previewImagePath.toString());
+        }
+    }
+
+    //outer zip which includes inner zip with png
+    // @Override
+    // public void download_file_by_server_v2(String civitaiFileName,
+    //         List<Map<String, Object>> civitaiModelFileList,
+    //         String downloadFilePath,
+    //         Map<String, Object> modelVersionObject,
+    //         String civitaiModelID,
+    //         String civitaiVersionID,
+    //         String civitaiUrl,
+    //         String civitaiBaseModel,
+    //         String[] imageUrlsArray) {
+
+    //     String modelID = civitaiModelID,
+    //             versionID = civitaiVersionID,
+    //             url = civitaiUrl,
+    //             name = civitaiFileName.split("\\.")[0];
+
+    //     String modelName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name;
+    //     Path modelDirectory = Paths.get("files", "download", modelName);
+
+    //     // Load the configuration
+    //     ConfigUtils.loadConfig("civitaiConfig.json");
+    //     String civitaiApiKey = ConfigUtils.getConfigValue("apiKey");
+
+    //     try {
+    //         String downloadPath = "/" + modelName + downloadFilePath;
+
+    //         update_folder_list(downloadFilePath);
+    //         update_cart_list(url);
+
+    //         // Ensure "files/download" exists
+    //         Path downloadDirectory = Paths.get("files", "download");
+    //         Files.createDirectories(downloadDirectory);
+    //         System.out.println("Ensured download directory exists: " + downloadDirectory.toString());
+
+    //         // Create user-specified nested directories
+    //         Path currentPath = downloadDirectory;
+    //         for (String dir : downloadPath.split("/")) {
+    //             if (!dir.isEmpty()) {
+    //                 currentPath = currentPath.resolve(dir);
+    //                 Files.createDirectories(currentPath);
+    //                 System.out.println("Created directory: " + currentPath.toString());
+    //             }
+    //         }
+    //         // At this point, 'currentPath' points to the deepest directory (e.g., abc/def/ghi/jkl)
+
+    //         // **Create a final copy of currentPath** to use inside the inner class
+    //         final Path finalCurrentPath = currentPath;
+
+    //         // Download each file into 'currentPath'
+    //         for (Map<String, Object> data : civitaiModelFileList) {
+    //             String dataName = (String) data.get("name");
+    //             String fileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + dataName;
+    //             String prepareUrl = (String) data.get("downloadUrl");
+
+    //             // Append token if needed
+    //             if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
+    //                 prepareUrl += "?token=" + civitaiApiKey;
+    //             }
+
+    //             // Skip if it's a training file or VAE
+    //             if (prepareUrl.contains("Training") || prepareUrl.contains("VAE")) {
+    //                 System.out.println("Skipping file due to Training/VAE in URL: " + prepareUrl);
+    //                 continue;
+    //             }
+
+    //             // Download the file
+    //             URL downloadUrl = new URL(prepareUrl);
+    //             Path filePath = currentPath.resolve(fileName);
+
+    //             URLConnection connection = downloadUrl.openConnection();
+    //             long totalSize = connection.getContentLengthLong();
+
+    //             System.out.println("Starting download: " + downloadUrl.toString() + " to " + filePath.toString());
+
+    //             try (InputStream inputStream = downloadUrl.openStream();
+    //                     FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
+
+    //                 // Custom progress-bar copy
+    //                 ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
+    //                 System.out.println("Downloaded file: " + filePath.toString());
+    //             } catch (IOException e) {
+    //                 System.err.println("Failed to download file: " + downloadUrl.toString());
+    //                 e.printStackTrace();
+    //                 continue; // Proceed with the next file
+    //             }
+
+    //             // Create .civitai.info file
+    //             String fName = civitaiFileName.replace(".safetensors", "");
+    //             String civitaiInfoFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+    //                     + ".civitai.info";
+    //             Path civitaiInfoFilePath = currentPath.resolve(civitaiInfoFileName);
+
+    //             String modelVersionJson = new ObjectMapper().writeValueAsString(modelVersionObject);
+    //             try {
+    //                 Files.write(civitaiInfoFilePath, modelVersionJson.getBytes(StandardCharsets.UTF_8));
+    //                 System.out.println("Created info file: " + civitaiInfoFilePath.toString());
+    //             } catch (IOException e) {
+    //                 System.err.println("Failed to create info file: " + civitaiInfoFilePath.toString());
+    //                 e.printStackTrace();
+    //                 continue; // Proceed with the next file
+    //             }
+
+    //             // Handle preview image
+    //             String previewImageFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+    //                     + ".preview.png";
+    //             Path previewImagePath = currentPath.resolve(previewImageFileName);
+
+    //             boolean validImageFound = false;
+    //             for (String imageUrl : imageUrlsArray) {
+    //                 try {
+    //                     BufferedImage image = ImageIO.read(new URL(imageUrl));
+    //                     if (image != null) {
+    //                         downloadImage(imageUrl, previewImagePath);
+    //                         System.out.println("Saved preview image: " + previewImagePath.toString());
+    //                         validImageFound = true;
+    //                         break; // Stop after the first valid image
+    //                     }
+    //                 } catch (Exception e) {
+    //                     System.out.println("Failed to download or process image from URL: " + imageUrl);
+    //                     e.printStackTrace();
+    //                 }
+    //             }
+
+    //             // Use an online placeholder if no valid image was found
+    //             if (!validImageFound) {
+    //                 try {
+    //                     String placeholderUrl = "https://placehold.co/350x450.png";
+    //                     BufferedImage placeholderImage = ImageIO.read(new URL(placeholderUrl));
+    //                     if (placeholderImage != null) {
+    //                         downloadImage(placeholderUrl, previewImagePath);
+    //                         System.out
+    //                                 .println("No valid image found, using placeholder: " + previewImagePath.toString());
+    //                     } else {
+    //                         System.out.println("Failed to download placeholder image.");
+    //                     }
+    //                 } catch (Exception e) {
+    //                     System.out.println("Failed to download the placeholder image.");
+    //                     e.printStackTrace();
+    //                 }
+    //             }
+
+    //             // **Removed** the step that copies the preview image to the top-level download directory
+    //             // This ensures the preview image only exists inside the nested directory and within the inner ZIP
+    //         }
+
+    //         // Log download completion
+    //         System.out.println("Download completed for: " + name);
+
+    //         // ------------------------------------------------------------------
+    //         // 1) CREATE THE "INNER ZIP" INSIDE THE NESTED FOLDER (finalCurrentPath).
+    //         //    This zip will contain the .safetensor, .civitai.info, and .preview.png files.
+    //         // ------------------------------------------------------------------
+    //         Path innerZipFile = finalCurrentPath.resolve(modelName + ".zip");
+    //         System.out.println("Creating Inner ZIP at: " + innerZipFile.toString());
+    //         try (ZipOutputStream innerZos = new ZipOutputStream(new FileOutputStream(innerZipFile.toFile()))) {
+    //             long totalSizeInner = ProgressBarUtils.calculateTotalSize(finalCurrentPath);
+    //             System.out.println("Total size for Inner ZIP: " + totalSizeInner + " bytes");
+
+    //             Files.walkFileTree(finalCurrentPath, new SimpleFileVisitor<Path>() {
+    //                 @Override
+    //                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+    //                     // Skip the inner zip itself to avoid recursion
+    //                     if (file.equals(innerZipFile)) {
+    //                         return FileVisitResult.CONTINUE;
+    //                     }
+    //                     if (attributes.isSymbolicLink()) {
+    //                         return FileVisitResult.CONTINUE;
+    //                     }
+    //                     try (FileInputStream fis = new FileInputStream(file.toFile())) {
+    //                         Path targetFile = finalCurrentPath.relativize(file);
+    //                         ZipEntry zipEntry = new ZipEntry(targetFile.toString());
+    //                         innerZos.putNextEntry(zipEntry);
+
+    //                         byte[] buffer = new byte[4096];
+    //                         int len;
+    //                         long bytesRead = 0;
+    //                         while ((len = fis.read(buffer)) > 0) {
+    //                             innerZos.write(buffer, 0, len);
+    //                             bytesRead += len;
+    //                             // Update progress bar for inner zip
+    //                             ProgressBarUtils.updateProgressBar(bytesRead, totalSizeInner,
+    //                                     "INNER-ZIP: " + innerZipFile.getFileName().toString());
+    //                         }
+    //                         innerZos.closeEntry();
+    //                         System.out.println("Added to Inner ZIP: " + targetFile.toString());
+    //                     } catch (IOException e) {
+    //                         System.err.println("Failed to add file to Inner ZIP: " + file.toString());
+    //                         e.printStackTrace();
+    //                     }
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+
+    //                 @Override
+    //                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
+    //                     System.err.printf("Unable to zip (inner) : %s%n%s%n", file, exc);
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+    //             });
+    //         }
+    //         System.out.println("Inner ZIP created: " + innerZipFile.toString());
+
+    //         // **Delete individual files (.safetensor and .civitai.info) from the nested directory**
+    //         // Leaving only the innerZip and the preview.png
+    //         try (DirectoryStream<Path> stream = Files.newDirectoryStream(finalCurrentPath)) {
+    //             for (Path file : stream) {
+    //                 String fileName = file.getFileName().toString();
+    //                 if (!file.equals(innerZipFile) && !fileName.equals(modelName + ".preview.png")) {
+    //                     Files.delete(file);
+    //                     System.out.println("Deleted file from nested directory: " + file.toString());
+    //                 }
+    //             }
+    //         } catch (IOException e) {
+    //             System.err.println("Failed to delete individual files from nested directory.");
+    //             e.printStackTrace();
+    //             // Depending on your requirements, you might want to throw an exception here
+    //         }
+
+    //         // ------------------------------------------------------------------
+    //         // 2) CREATE THE "OUTER ZIP" IN THE TOP-LEVEL "files/download" FOLDER
+    //         //    This zip will include the entire nested directory structure,
+    //         //    which now contains the innerZip and the preview PNG.
+    //         // ------------------------------------------------------------------
+    //         Path outerZipFile = Paths.get("files", "download", modelName + ".zip");
+    //         System.out.println("Creating Outer ZIP at: " + outerZipFile.toString());
+    //         try (ZipOutputStream outerZos = new ZipOutputStream(new FileOutputStream(outerZipFile.toFile()))) {
+    //             long totalSizeOuter = ProgressBarUtils.calculateTotalSize(modelDirectory);
+    //             System.out.println("Total size for Outer ZIP: " + totalSizeOuter + " bytes");
+
+    //             Files.walkFileTree(modelDirectory, new SimpleFileVisitor<Path>() {
+    //                 @Override
+    //                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+    //                     if (attributes.isSymbolicLink()) {
+    //                         return FileVisitResult.CONTINUE;
+    //                     }
+    //                     try (FileInputStream fis = new FileInputStream(file.toFile())) {
+    //                         // Build the relative path so the nested structure is preserved
+    //                         Path targetFile = modelDirectory.relativize(file);
+    //                         ZipEntry zipEntry = new ZipEntry(targetFile.toString());
+    //                         outerZos.putNextEntry(zipEntry);
+
+    //                         byte[] buffer = new byte[4096];
+    //                         int len;
+    //                         long bytesRead = 0;
+    //                         while ((len = fis.read(buffer)) > 0) {
+    //                             outerZos.write(buffer, 0, len);
+    //                             bytesRead += len;
+    //                             // Update progress bar for outer zip
+    //                             ProgressBarUtils.updateProgressBar(bytesRead, totalSizeOuter,
+    //                                     "OUTER-ZIP: " + outerZipFile.getFileName().toString());
+    //                         }
+    //                         outerZos.closeEntry();
+    //                         System.out.println("Added to Outer ZIP: " + targetFile.toString());
+    //                     } catch (IOException e) {
+    //                         System.err.println("Failed to add file to Outer ZIP: " + file.toString());
+    //                         e.printStackTrace();
+    //                     }
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+
+    //                 @Override
+    //                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
+    //                     System.err.printf("Unable to zip (outer) : %s%n%s%n", file, exc);
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+    //             });
+    //         }
+    //         System.out.println("Outer ZIP created: " + outerZipFile.toString());
+
+    //         // ------------------------------------------------------------------
+    //         // 3) Delete the folder and its contents
+    //         //    Now that we have the outer ZIP, the entire folder can be removed.
+    //         // ------------------------------------------------------------------
+    //         System.out.println("Deleting temporary directory: " + modelDirectory.toString());
+    //         Files.walkFileTree(modelDirectory, new SimpleFileVisitor<Path>() {
+    //             @Override
+    //             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+    //                 Files.delete(file);
+    //                 System.out.println("Deleted file: " + file.toString());
+    //                 return FileVisitResult.CONTINUE;
+    //             }
+
+    //             @Override
+    //             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+    //                 Files.delete(dir);
+    //                 System.out.println("Deleted directory: " + dir.toString());
+    //                 return FileVisitResult.CONTINUE;
+    //             }
+    //         });
+
+    //         // Check the outer ZIP size
+    //         long outerZipFileSize = Files.size(outerZipFile);
+    //         System.out.println("Outer ZIP size: " + outerZipFileSize + " bytes");
+    //         if ((outerZipFileSize / 1024) < 15) {
+    //             Files.delete(outerZipFile);
+    //             throw new Exception(outerZipFile + " size is less than 15kb, may need browser download.");
+    //         }
+
+    //         // Final log
+    //         System.out.println("\nZip-within-zip process completed for: " + "\u001B[1m"
+    //                 + name + ".zip\u001B[0m"
+    //                 + " and saved into " + downloadFilePath);
+
+    //     } catch (Exception e) {
+    //         System.out.println("Error Model Name: " + modelName);
+    //         e.printStackTrace();
+    //         update_error_model_list(modelName);
+    //         FileUtils.deleteDirectory(modelDirectory);
+    //         throw new CustomException("An unexpected error occurred", e);
+    //     }
+    // }
+
+    @SuppressWarnings("unchecked")
+    public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID) {
+        String offlineDownloadFile = "files/data/offline_download_list.json";
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<String> civitaiVersionIds = new ArrayList<>();
+
+        try {
+            Path filePath = Paths.get(offlineDownloadFile);
+
+            // Check if parent directories exist
+            if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
+                System.err.println("Parent directories do not exist for the file: " + offlineDownloadFile);
+                return Optional.of(civitaiVersionIds); // Return empty list
+            }
+
+            if (!Files.exists(filePath)) {
+                // File does not exist
+                System.err.println("The file does not exist: " + offlineDownloadFile);
+                return Optional.of(civitaiVersionIds); // Return empty list
+            }
+
+            // Read all bytes from the file
+            byte[] fileBytes = Files.readAllBytes(filePath);
+            String data = new String(fileBytes, StandardCharsets.UTF_8).trim();
+
+            if (data.isEmpty()) {
+                // File is empty
+                System.err.println("The file is empty: " + offlineDownloadFile);
+                return Optional.of(civitaiVersionIds); // Return empty list
+            }
+
+            // Deserialize JSON array into List<Map<String, Object>>
+            List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
+                    data, new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // Iterate through the list and collect civitaiVersionIDs where civitaiModelID matches
+            for (Map<String, Object> item : offlineDownloadList) {
+                if (civitaiModelID.equals(item.get("civitaiModelID"))) {
+                    Object versionIdObj = item.get("civitaiVersionID");
+                    if (versionIdObj instanceof String) {
+                        civitaiVersionIds.add((String) versionIdObj);
+                    } else {
+                        // Handle cases where civitaiVersionID is not a string or is missing
+                        System.err.println("Invalid or missing civitaiVersionID in item: " + item);
+                    }
+                }
+            }
+
+            return Optional.of(civitaiVersionIds);
+
+        } catch (IOException e) {
+            // Log the exception to standard error
+            System.err.println("Unexpected error while retrieving civitaiVersionIDs from offline_download_list: "
+                    + e.getMessage());
+            //log.error("Unexpected error while downloading file", e);
+            throw new CustomException("An unexpected error occurred", e);
         }
     }
 
