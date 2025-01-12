@@ -257,6 +257,31 @@ public class File_Controller {
     }
 
     @SuppressWarnings("unchecked")
+    @PostMapping("/remove-offline-download-file-into-offline-download-list")
+    public ResponseEntity<CustomResponse<String>> removeOfflineDownloadFileIntoOfflineDownloadList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
+        String civitaiModelID = (String) modelObject.get("civitaiModelID");
+        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+        // Validate null or empty
+        if (civitaiModelID == null || civitaiModelID == "" ||
+                civitaiVersionID == null || civitaiVersionID == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+            fileService.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Success remove download file from offline download list"));
+
+        } catch (Exception ex) {
+            System.err.println("An error occurred: " + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server-v2")
     public ResponseEntity<CustomResponse<String>> downloadFileServerV2(@RequestBody Map<String, Object> requestBody) {
 
@@ -341,7 +366,7 @@ public class File_Controller {
 
         Map<String, List<String>> payload = new HashMap<>();
         if (versionExistenceMapOptional.isPresent()) {
-            
+
             List<String> versionExistenceMap = versionExistenceMapOptional.get();
             payload.put("existedVersionsList", versionExistenceMap);
 
