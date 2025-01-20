@@ -1,6 +1,7 @@
 package com.civitai.server.services.impl;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -1589,299 +1591,299 @@ public class File_Service_Impl implements File_Service {
     //     }
     // }
 
-    @Override
-    public void download_file_by_server_v2(String civitaiFileName, List<Map<String, Object>> civitaiModelFileList,
-            String downloadFilePath, Map<String, Object> modelVersionObject, String civitaiModelID,
-            String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray) {
+    // @Override
+    // public void download_file_by_server_v2(String civitaiFileName, List<Map<String, Object>> civitaiModelFileList,
+    //         String downloadFilePath, Map<String, Object> modelVersionObject, String civitaiModelID,
+    //         String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray) {
 
-        String modelID = civitaiModelID, versionID = civitaiVersionID, url = civitaiUrl,
-                name = civitaiFileName.split("\\.")[0].trim();
+    //     String modelID = civitaiModelID, versionID = civitaiVersionID, url = civitaiUrl,
+    //             name = civitaiFileName.split("\\.")[0].trim();
 
-        String modelName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name;
+    //     String modelName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name;
 
-        Path modelDirectory = Paths.get("files/download/", modelName);
+    //     Path modelDirectory = Paths.get("files/download/", modelName);
 
-        // Load the configuration file
-        ConfigUtils.loadConfig("civitaiConfig.json");
+    //     // Load the configuration file
+    //     ConfigUtils.loadConfig("civitaiConfig.json");
 
-        // Get a specific configuration value
-        String civitaiApiKey = ConfigUtils.getConfigValue("apiKey");
-
-        try {
-            String downloadPath = "/" + modelID + "_" + versionID + "_" + civitaiBaseModel + "_"
-                    + name
-                    + downloadFilePath;
-
-            // Check if the downloadPath inside the folder_list.json,
-            // if not, append it
-            update_folder_list(downloadFilePath);
-            update_cart_list(url);
-
-            // Create the 'download' directory within the 'files' directory
-            Path downloadDirectory = Paths.get("files", "download");
-            Files.createDirectories(downloadDirectory);
-
-            // Create the directories based on the user input path
-            Path currentPath = downloadDirectory;
-            for (String dir : downloadPath.split("/")) {
-                if (!dir.isEmpty()) {
-                    currentPath = currentPath.resolve(dir);
-                    Files.createDirectories(currentPath);
-                }
-            }
-
-            // Download files
-            for (Map<String, Object> data : civitaiModelFileList) {
-                String fileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + data.get("name");
-
-                String prepareUrl = (String) data.get("downloadUrl");
-
-                System.out.println(prepareUrl);
-
-                // Check if the URL does NOT contain either 'type' or 'format'
-                if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
-                    prepareUrl = prepareUrl + "?token=" + civitaiApiKey;
-                }
-
-                if (prepareUrl.contains("Training")) {
-                    continue;
-                }
-
-                if (prepareUrl.contains("VAE")) {
-                    continue;
-                }
-
-                if (prepareUrl.contains("format")) {
-                    continue;
-                }
-
-                URL downloadUrl = new URL(prepareUrl);
-
-                Path filePath = currentPath.resolve(fileName);
-
-                URLConnection connection = downloadUrl.openConnection();
-                long totalSize = connection.getContentLengthLong();
-
-                try (InputStream inputStream = downloadUrl.openStream();
-                        FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
-
-                    // Download the file
-                    /*
-                     * byte[] buffer = new byte[1024];
-                     * int bytesRead;
-                     * while ((bytesRead = inputStream.read(buffer)) != -1) {
-                     * fileOutputStream.write(buffer, 0, bytesRead);
-                     * }
-                     */
-
-                    // Use a custom method to copy the InputStream to the file with a progress
-                    // indicator
-                    ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
-
-                }
-
-                // Create .civitai.info file
-                String fName = civitaiFileName.replace(".safetensors", "");
-                String civitaiInfoFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
-                        + ".civitai.info";
-                Path civitaiInfoFilePath = currentPath.resolve(civitaiInfoFileName);
-
-                String modelVersionJson = new ObjectMapper().writeValueAsString(modelVersionObject);
-
-                Files.write(civitaiInfoFilePath, modelVersionJson.getBytes(StandardCharsets.UTF_8));
-
-                System.out.println("Created: " + civitaiInfoFilePath.toString());
-
-                // Handle preview image
-                String previewImageFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
-                        + ".preview.png";
-                Path previewImagePath = currentPath.resolve(previewImageFileName);
-                boolean validImageFound = false;
-
-                for (String imageUrl : imageUrlsArray) {
-                    try {
-                        BufferedImage image = ImageIO.read(new URL(imageUrl));
-                        if (image != null) {
-                            downloadImage(imageUrl, previewImagePath);
-                            //ImageIO.write(image, "png", previewImagePath.toFile());
-                            System.out.println("Saved preview image: " + previewImagePath.toString());
-                            validImageFound = true;
-                            break; // Stop after the first valid image
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Failed to download or process image from URL: " + imageUrl);
-                    }
-                }
-
-                // Use an online placeholder if no valid image was found
-                if (!validImageFound) {
-                    try {
-                        String placeholderUrl = "https://placehold.co/350x450.png";
-                        BufferedImage placeholderImage = ImageIO.read(new URL(placeholderUrl));
-                        if (placeholderImage != null) {
-                            downloadImage(placeholderUrl, previewImagePath);
-                            //ImageIO.write(placeholderImage, "png", previewImagePath.toFile());
-                            System.out.println(
-                                    "No valid image found, using online placeholder: " + previewImagePath.toString());
-                        } else {
-                            System.out.println("Failed to download the online placeholder image.");
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Failed to download the online placeholder image.");
-                    }
-                }
-            }
-
-            // Log download completion
-            System.out.println("Download completed for: " + name);
-
-            // Create ZIP archive
-            Path zipFilePath = Paths.get("files/download/",
-                    modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name);
-            Path zipFile = Paths.get("files/download/",
-                    modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name
-                            + ".zip");
-
-            try (
-                    ZipOutputStream zos = new ZipOutputStream(
-                            new FileOutputStream(zipFile.toFile()))) {
-
-                long totalSize = ProgressBarUtils.calculateTotalSize(zipFilePath);
-
-                // Convert totalSize to kilobytes
-                // long totalSizeKB = totalSize / 1024;
-
-                // System.out.println(totalSizeKB);
-
-                // if (totalSizeKB < 15) {
-                // throw new Exception("File size is less than 15kb, may need browser
-                // download.");
-                // }
-
-                Files.walkFileTree(zipFilePath, new SimpleFileVisitor<>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file,
-                            BasicFileAttributes attributes) {
-
-                        // only copy files, no symbolic links
-                        if (attributes.isSymbolicLink()) {
-                            return FileVisitResult.CONTINUE;
-                        }
-
-                        try (FileInputStream fis = new FileInputStream(file.toFile())) {
-                            Path targetFile = zipFilePath.relativize(file);
-                            zos.putNextEntry(new ZipEntry(targetFile.toString()));
-
-                            byte[] buffer = new byte[1024];
-                            int len;
-                            long bytesRead = 0;
-
-                            while ((len = fis.read(buffer)) > 0) {
-                                zos.write(buffer, 0, len);
-                                bytesRead += len;
-
-                                // Update the progress bar in the console
-                                ProgressBarUtils.updateProgressBar(bytesRead, totalSize,
-                                        modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".zip");
-
-                            }
-
-                            // if large file, throws out of memory
-                            // byte[] bytes = Files.readAllBytes(file);
-                            // zos.write(bytes, 0, bytes.length);
-
-                            zos.closeEntry();
-
-                            // System.out.printf("Zip file : %s%n", file);
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                        System.err.printf("Unable to zip : %s%n%s%n", file, exc);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            }
-
-            // Delete the folder and its contents
-            Files.walkFileTree(zipFilePath, new SimpleFileVisitor<>() {
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                    Files.delete(dir);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-
-            long zipFileSize = Files.size(zipFile);
-            if ((zipFileSize / 1024) < 15) {
-                Files.delete(zipFile);
-                throw new Exception(zipFile + " size is less than 15kb, may need browser download.");
-            }
-
-            // Log zip completion
-            System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m"
-                    + " and saved into " + downloadFilePath);
-
-        } catch (Exception e) {
-
-            // Log and handle other types of exceptions
-            System.out.println("Error Model Name: " + modelName);
-
-            // update_error_model_list(modelName);
-
-            FileUtils.deleteDirectory(modelDirectory);
-
-            //log.error("Unexpected error while downloading file", e);
-            throw new CustomException(e.getMessage());
-
-        }
-
-    }
-
-    // Method to save optimized PNG using TwelveMonkeys
-    public void saveOptimizedPng(BufferedImage image, File outputFile) throws IOException {
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("png").next();
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(outputFile)) {
-            writer.setOutput(ios);
-            ImageWriteParam param = writer.getDefaultWriteParam();
-            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(1.0f); // Max quality, but optimized size
-
-            writer.write(null, new IIOImage(image, null, null), param);
-        } finally {
-            writer.dispose();
-        }
-    }
-
-    public static void downloadImage(String imageUrl, Path previewImagePath) throws Exception {
-        URL url = new URL(imageUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-
-        try (InputStream inputStream = connection.getInputStream();
-                FileOutputStream fileOutputStream = new FileOutputStream(previewImagePath.toFile())) {
-
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                fileOutputStream.write(buffer, 0, bytesRead);
-            }
-
-            System.out.println("Image saved to " + previewImagePath.toString());
-        }
-    }
+    //     // Get a specific configuration value
+    //     String civitaiApiKey = ConfigUtils.getConfigValue("apiKey");
+
+    //     try {
+    //         String downloadPath = "/" + modelID + "_" + versionID + "_" + civitaiBaseModel + "_"
+    //                 + name
+    //                 + downloadFilePath;
+
+    //         // Check if the downloadPath inside the folder_list.json,
+    //         // if not, append it
+    //         update_folder_list(downloadFilePath);
+    //         update_cart_list(url);
+
+    //         // Create the 'download' directory within the 'files' directory
+    //         Path downloadDirectory = Paths.get("files", "download");
+    //         Files.createDirectories(downloadDirectory);
+
+    //         // Create the directories based on the user input path
+    //         Path currentPath = downloadDirectory;
+    //         for (String dir : downloadPath.split("/")) {
+    //             if (!dir.isEmpty()) {
+    //                 currentPath = currentPath.resolve(dir);
+    //                 Files.createDirectories(currentPath);
+    //             }
+    //         }
+
+    //         // Download files
+    //         for (Map<String, Object> data : civitaiModelFileList) {
+    //             String fileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + data.get("name");
+
+    //             String prepareUrl = (String) data.get("downloadUrl");
+
+    //             System.out.println(prepareUrl);
+
+    //             // Check if the URL does NOT contain either 'type' or 'format'
+    //             if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
+    //                 prepareUrl = prepareUrl + "?token=" + civitaiApiKey;
+    //             }
+
+    //             if (prepareUrl.contains("Training")) {
+    //                 continue;
+    //             }
+
+    //             if (prepareUrl.contains("VAE")) {
+    //                 continue;
+    //             }
+
+    //             if (prepareUrl.contains("format")) {
+    //                 continue;
+    //             }
+
+    //             URL downloadUrl = new URL(prepareUrl);
+
+    //             Path filePath = currentPath.resolve(fileName);
+
+    //             URLConnection connection = downloadUrl.openConnection();
+    //             long totalSize = connection.getContentLengthLong();
+
+    //             try (InputStream inputStream = downloadUrl.openStream();
+    //                     FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
+
+    //                 // Download the file
+    //                 /*
+    //                  * byte[] buffer = new byte[1024];
+    //                  * int bytesRead;
+    //                  * while ((bytesRead = inputStream.read(buffer)) != -1) {
+    //                  * fileOutputStream.write(buffer, 0, bytesRead);
+    //                  * }
+    //                  */
+
+    //                 // Use a custom method to copy the InputStream to the file with a progress
+    //                 // indicator
+    //                 ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
+
+    //             }
+
+    //             // Create .civitai.info file
+    //             String fName = civitaiFileName.replace(".safetensors", "");
+    //             String civitaiInfoFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+    //                     + ".civitai.info";
+    //             Path civitaiInfoFilePath = currentPath.resolve(civitaiInfoFileName);
+
+    //             String modelVersionJson = new ObjectMapper().writeValueAsString(modelVersionObject);
+
+    //             Files.write(civitaiInfoFilePath, modelVersionJson.getBytes(StandardCharsets.UTF_8));
+
+    //             System.out.println("Created: " + civitaiInfoFilePath.toString());
+
+    //             // Handle preview image
+    //             String previewImageFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+    //                     + ".preview.png";
+    //             Path previewImagePath = currentPath.resolve(previewImageFileName);
+    //             boolean validImageFound = false;
+
+    //             for (String imageUrl : imageUrlsArray) {
+    //                 try {
+    //                     BufferedImage image = ImageIO.read(new URL(imageUrl));
+    //                     if (image != null) {
+    //                         downloadImage(imageUrl, previewImagePath);
+    //                         //ImageIO.write(image, "png", previewImagePath.toFile());
+    //                         System.out.println("Saved preview image: " + previewImagePath.toString());
+    //                         validImageFound = true;
+    //                         break; // Stop after the first valid image
+    //                     }
+    //                 } catch (Exception e) {
+    //                     System.out.println("Failed to download or process image from URL: " + imageUrl);
+    //                 }
+    //             }
+
+    //             // Use an online placeholder if no valid image was found
+    //             if (!validImageFound) {
+    //                 try {
+    //                     String placeholderUrl = "https://placehold.co/350x450.png";
+    //                     BufferedImage placeholderImage = ImageIO.read(new URL(placeholderUrl));
+    //                     if (placeholderImage != null) {
+    //                         downloadImage(placeholderUrl, previewImagePath);
+    //                         //ImageIO.write(placeholderImage, "png", previewImagePath.toFile());
+    //                         System.out.println(
+    //                                 "No valid image found, using online placeholder: " + previewImagePath.toString());
+    //                     } else {
+    //                         System.out.println("Failed to download the online placeholder image.");
+    //                     }
+    //                 } catch (Exception e) {
+    //                     System.out.println("Failed to download the online placeholder image.");
+    //                 }
+    //             }
+    //         }
+
+    //         // Log download completion
+    //         System.out.println("Download completed for: " + name);
+
+    //         // Create ZIP archive
+    //         Path zipFilePath = Paths.get("files/download/",
+    //                 modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name);
+    //         Path zipFile = Paths.get("files/download/",
+    //                 modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name
+    //                         + ".zip");
+
+    //         try (
+    //                 ZipOutputStream zos = new ZipOutputStream(
+    //                         new FileOutputStream(zipFile.toFile()))) {
+
+    //             long totalSize = ProgressBarUtils.calculateTotalSize(zipFilePath);
+
+    //             // Convert totalSize to kilobytes
+    //             // long totalSizeKB = totalSize / 1024;
+
+    //             // System.out.println(totalSizeKB);
+
+    //             // if (totalSizeKB < 15) {
+    //             // throw new Exception("File size is less than 15kb, may need browser
+    //             // download.");
+    //             // }
+
+    //             Files.walkFileTree(zipFilePath, new SimpleFileVisitor<>() {
+    //                 @Override
+    //                 public FileVisitResult visitFile(Path file,
+    //                         BasicFileAttributes attributes) {
+
+    //                     // only copy files, no symbolic links
+    //                     if (attributes.isSymbolicLink()) {
+    //                         return FileVisitResult.CONTINUE;
+    //                     }
+
+    //                     try (FileInputStream fis = new FileInputStream(file.toFile())) {
+    //                         Path targetFile = zipFilePath.relativize(file);
+    //                         zos.putNextEntry(new ZipEntry(targetFile.toString()));
+
+    //                         byte[] buffer = new byte[1024];
+    //                         int len;
+    //                         long bytesRead = 0;
+
+    //                         while ((len = fis.read(buffer)) > 0) {
+    //                             zos.write(buffer, 0, len);
+    //                             bytesRead += len;
+
+    //                             // Update the progress bar in the console
+    //                             ProgressBarUtils.updateProgressBar(bytesRead, totalSize,
+    //                                     modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".zip");
+
+    //                         }
+
+    //                         // if large file, throws out of memory
+    //                         // byte[] bytes = Files.readAllBytes(file);
+    //                         // zos.write(bytes, 0, bytes.length);
+
+    //                         zos.closeEntry();
+
+    //                         // System.out.printf("Zip file : %s%n", file);
+
+    //                     } catch (IOException e) {
+    //                         e.printStackTrace();
+    //                     }
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+
+    //                 @Override
+    //                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
+    //                     System.err.printf("Unable to zip : %s%n%s%n", file, exc);
+    //                     return FileVisitResult.CONTINUE;
+    //                 }
+    //             });
+    //         }
+
+    //         // Delete the folder and its contents
+    //         Files.walkFileTree(zipFilePath, new SimpleFileVisitor<>() {
+
+    //             @Override
+    //             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+    //                 Files.delete(file);
+    //                 return FileVisitResult.CONTINUE;
+    //             }
+
+    //             @Override
+    //             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+    //                 Files.delete(dir);
+    //                 return FileVisitResult.CONTINUE;
+    //             }
+    //         });
+
+    //         long zipFileSize = Files.size(zipFile);
+    //         if ((zipFileSize / 1024) < 15) {
+    //             Files.delete(zipFile);
+    //             throw new Exception(zipFile + " size is less than 15kb, may need browser download.");
+    //         }
+
+    //         // Log zip completion
+    //         System.out.println("\nZip process completed for: " + "\u001B[1m" + name + ".zip" + "\u001B[0m"
+    //                 + " and saved into " + downloadFilePath);
+
+    //     } catch (Exception e) {
+
+    //         // Log and handle other types of exceptions
+    //         System.out.println("Error Model Name: " + modelName);
+
+    //         // update_error_model_list(modelName);
+
+    //         FileUtils.deleteDirectory(modelDirectory);
+
+    //         //log.error("Unexpected error while downloading file", e);
+    //         throw new CustomException(e.getMessage());
+
+    //     }
+
+    // }
+
+    // // Method to save optimized PNG using TwelveMonkeys
+    // public void saveOptimizedPng(BufferedImage image, File outputFile) throws IOException {
+    //     ImageWriter writer = ImageIO.getImageWritersByFormatName("png").next();
+    //     try (ImageOutputStream ios = ImageIO.createImageOutputStream(outputFile)) {
+    //         writer.setOutput(ios);
+    //         ImageWriteParam param = writer.getDefaultWriteParam();
+    //         param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+    //         param.setCompressionQuality(1.0f); // Max quality, but optimized size
+
+    //         writer.write(null, new IIOImage(image, null, null), param);
+    //     } finally {
+    //         writer.dispose();
+    //     }
+    // }
+
+    // public static void downloadImage(String imageUrl, Path previewImagePath) throws Exception {
+    //     URL url = new URL(imageUrl);
+    //     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    //     connection.setRequestMethod("GET");
+
+    //     try (InputStream inputStream = connection.getInputStream();
+    //             FileOutputStream fileOutputStream = new FileOutputStream(previewImagePath.toFile())) {
+
+    //         byte[] buffer = new byte[4096];
+    //         int bytesRead;
+    //         while ((bytesRead = inputStream.read(buffer)) != -1) {
+    //             fileOutputStream.write(buffer, 0, bytesRead);
+    //         }
+
+    //         System.out.println("Image saved to " + previewImagePath.toString());
+    //     }
+    // }
 
     //outer zip which includes inner zip with png
     // @Override
@@ -2254,4 +2256,402 @@ public class File_Service_Impl implements File_Service {
             throw new CustomException("An unexpected error occurred", e);
         }
     }
+
+    @Override
+    public void download_file_by_server_v2(String civitaiFileName,
+            List<Map<String, Object>> civitaiModelFileList,
+            String downloadFilePath,
+            Map<String, Object> modelVersionObject,
+            String civitaiModelID,
+            String civitaiVersionID,
+            String civitaiUrl,
+            String civitaiBaseModel,
+            String[] imageUrlsArray) {
+
+        String modelID = civitaiModelID,
+                versionID = civitaiVersionID,
+                url = civitaiUrl,
+                name = civitaiFileName.split("\\.")[0];
+
+        String modelName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name;
+
+        Path baseDownloadDirectory = Paths.get("files", "download");
+
+        // Load config once
+        ConfigUtils.loadConfig("civitaiConfig.json");
+        String civitaiApiKey = ConfigUtils.getConfigValue("apiKey");
+
+        Path finalPreviewImagePath = null;
+        Path uniqueDirectory = null;
+
+        // NEW: Track whether we actually downloaded anything
+        boolean anyFileDownloaded = false;
+
+        try {
+            // Normalize downloadFilePath
+            String normalizedDownloadFilePath = downloadFilePath
+                    .replaceAll("^/+", "")
+                    .replaceAll("/+$", "");
+
+            update_folder_list(downloadFilePath);
+            update_cart_list(url);
+
+            Files.createDirectories(baseDownloadDirectory);
+            System.out.println("Ensured download directory exists: " + baseDownloadDirectory);
+
+            // Create a unique directory for each request
+            String uniqueID = UUID.randomUUID().toString();
+            uniqueDirectory = baseDownloadDirectory.resolve(
+                    Paths.get(normalizedDownloadFilePath, uniqueID));
+            Files.createDirectories(uniqueDirectory);
+            System.out.println("Created unique download directory: " + uniqueDirectory);
+
+            // Download each file
+            for (Map<String, Object> data : civitaiModelFileList) {
+                String dataName = (String) data.get("name");
+                String fileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + dataName;
+                String prepareUrl = (String) data.get("downloadUrl");
+
+                // Append token if needed
+                if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
+                    prepareUrl += "?token=" + civitaiApiKey;
+                }
+
+                // Skip if it's a training file or VAE
+                if (prepareUrl.contains("Training") || prepareUrl.contains("VAE")) {
+                    System.out.println("Skipping file due to Training/VAE in URL: " + prepareUrl);
+                    continue;
+                }
+
+                // Download the file
+                URL downloadUrl;
+                URLConnection connection;
+                long totalSize;
+                Path filePath = uniqueDirectory.resolve(fileName);
+
+                try {
+                    downloadUrl = new URL(prepareUrl);
+                    connection = downloadUrl.openConnection();
+                    totalSize = connection.getContentLengthLong();
+
+                    System.out.println("Starting download: " + downloadUrl + " to " + filePath);
+
+                    try (InputStream inputStream = downloadUrl.openStream()) {
+                        ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
+                        System.out.println("Downloaded file: " + filePath);
+                        // If we get here, at least one file has succeeded
+                        anyFileDownloaded = true;
+                    }
+                } catch (IOException e) {
+                    System.err.println("Failed to download file: " + prepareUrl);
+                    e.printStackTrace();
+                    // skip to next file
+                    continue;
+                }
+
+                // Create .civitai.info
+                String fName = civitaiFileName.replace(".safetensors", "");
+                String civitaiInfoFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+                        + ".civitai.info";
+                Path civitaiInfoFilePath = uniqueDirectory.resolve(civitaiInfoFileName);
+
+                String modelVersionJson = new ObjectMapper().writeValueAsString(modelVersionObject);
+                try {
+                    Files.write(civitaiInfoFilePath, modelVersionJson.getBytes(StandardCharsets.UTF_8));
+                    System.out.println("Created info file: " + civitaiInfoFilePath);
+                } catch (IOException e) {
+                    System.err.println("Failed to create info file: " + civitaiInfoFilePath);
+                    e.printStackTrace();
+                }
+
+                // Attempt to create preview image
+                String previewImageFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
+                        + ".preview.png";
+                Path previewImagePath = uniqueDirectory.resolve(previewImageFileName);
+                boolean validImageFound = false;
+
+                for (String imageUrl : imageUrlsArray) {
+                    try {
+                        BufferedImage image = ImageIO.read(new URL(imageUrl));
+                        if (image != null) {
+                            saveOptimizedPng(image, previewImagePath.toFile());
+                            System.out.println("Saved optimized PNG preview: " + previewImagePath);
+                            validImageFound = true;
+                            break;
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Failed to download or process image from URL: " + imageUrl);
+                    }
+                }
+
+                // Use placeholder if none found
+                if (!validImageFound) {
+                    try {
+                        String placeholderUrl = "https://placehold.co/350x450.png";
+                        BufferedImage placeholderImage = ImageIO.read(new URL(placeholderUrl));
+                        if (placeholderImage != null) {
+                            saveOptimizedPng(placeholderImage, previewImagePath.toFile());
+                            System.out.println("No valid image found, used placeholder: " + previewImagePath);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Failed to download or process the placeholder image.");
+                    }
+                }
+
+                // Keep track of preview image
+                finalPreviewImagePath = previewImagePath;
+            }
+
+            // If no files were successfully downloaded, skip zip creation
+            if (!anyFileDownloaded) {
+                System.out.println("No files were downloaded successfully; skipping zip creation for: " + name);
+
+                // Optionally, remove the uniqueDirectory if you want no leftover
+                try {
+                    if (Files.exists(uniqueDirectory)) {
+                        Files.walkFileTree(uniqueDirectory, new SimpleFileVisitor<Path>() {
+                            @Override
+                            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                                Files.delete(file);
+                                return FileVisitResult.CONTINUE;
+                            }
+
+                            @Override
+                            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                                if (exc == null) {
+                                    Files.delete(dir);
+                                    return FileVisitResult.CONTINUE;
+                                }
+                                throw exc;
+                            }
+                        });
+                    }
+                    System.out.println("Cleaned up empty directory due to no successful downloads.");
+                } catch (IOException e) {
+                    System.err.println("Failed to clean up directory: " + uniqueDirectory);
+                }
+
+                // Instead of `return;` we throw an exception
+                throw new CustomException("No files were downloaded successfully for: " + name);
+            }
+
+            // If we get here, at least one file was downloaded
+            System.out.println("Download completed for: " + name);
+
+            // ------------------------------------------------------------
+            // 1) CREATE THE "INNER ZIP" 
+            // ------------------------------------------------------------
+            String innerZipFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".zip";
+            Path innerZipFile = uniqueDirectory.resolve(innerZipFileName);
+            System.out.println("Creating Inner ZIP at: " + innerZipFile);
+
+            final Path finalUniqueDirectory = uniqueDirectory;
+            try (ZipOutputStream innerZos = new ZipOutputStream(
+                    new FileOutputStream(innerZipFile.toFile()))) {
+
+                long totalSizeInner = ProgressBarUtils.calculateTotalSize(finalUniqueDirectory);
+                System.out.println("Total size for Inner ZIP: " + totalSizeInner + " bytes");
+
+                Files.walkFileTree(finalUniqueDirectory, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                        if (file.equals(innerZipFile) || attributes.isSymbolicLink()) {
+                            return FileVisitResult.CONTINUE;
+                        }
+                        try (FileInputStream fis = new FileInputStream(file.toFile())) {
+                            Path targetFile = finalUniqueDirectory.relativize(file);
+                            ZipEntry zipEntry = new ZipEntry(targetFile.toString());
+                            innerZos.putNextEntry(zipEntry);
+
+                            byte[] buffer = new byte[4096];
+                            int len;
+                            long bytesRead = 0;
+                            while ((len = fis.read(buffer)) > 0) {
+                                innerZos.write(buffer, 0, len);
+                                bytesRead += len;
+                                // progress bar
+                                ProgressBarUtils.updateProgressBar(
+                                        bytesRead,
+                                        totalSizeInner,
+                                        "INNER-ZIP: " + innerZipFile.getFileName());
+                            }
+                            innerZos.closeEntry();
+                            System.out.println("Added to Inner ZIP: " + targetFile);
+                        } catch (IOException e) {
+                            System.err.println("Failed to add file to Inner ZIP: " + file);
+                        }
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                        System.err.printf("Unable to zip (inner) : %s%n%s%n", file, exc);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            }
+            System.out.println("Inner ZIP created: " + innerZipFile);
+
+            // ------------------------------------------------------------
+            // 2) DELETE individual files, leaving only the .zip + preview
+            // ------------------------------------------------------------
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(uniqueDirectory)) {
+                for (Path file : stream) {
+                    if (!file.equals(innerZipFile) &&
+                            (finalPreviewImagePath == null || !file.equals(finalPreviewImagePath))) {
+                        Files.delete(file);
+                        System.out.println("Deleted file from unique directory: " + file);
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Failed to delete individual files from unique directory.");
+                e.printStackTrace();
+            }
+
+            // (Optional) final verification
+            // ...
+
+            System.out.println("\nZip-within-zip process completed for: " + name + ".zip" +
+                    " and saved into " + downloadFilePath);
+
+            // ------------------------------------------------------------
+            // 4) Move .zip & .preview.png up, remove unique directory
+            // ------------------------------------------------------------
+            try {
+                Path parentDirectory = uniqueDirectory.getParent();
+
+                // Move the final zip up
+                if (Files.exists(innerZipFile)) {
+                    Path movedZip = parentDirectory.resolve(innerZipFile.getFileName());
+                    Files.move(innerZipFile, movedZip, StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("Moved final ZIP to: " + movedZip);
+                }
+
+                // Move the preview image up
+                if (finalPreviewImagePath != null && Files.exists(finalPreviewImagePath)) {
+                    Path movedPreview = parentDirectory.resolve(finalPreviewImagePath.getFileName());
+                    Files.move(finalPreviewImagePath, movedPreview, StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("Moved preview image to: " + movedPreview);
+                }
+
+                // Now remove the uniqueDirectory
+                Files.walkFileTree(uniqueDirectory, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        if (exc != null)
+                            throw exc;
+                        Files.delete(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+                System.out.println("Removed unique directory: " + uniqueDirectory);
+
+            } catch (IOException e) {
+                System.err.println("Failed to move final files or remove unique directory.");
+                e.printStackTrace();
+            }
+
+        } catch (Exception e) {
+            System.out.println("Error Model Name: " + modelName);
+            e.printStackTrace();
+            // update_error_model_list(modelName);
+
+            // Cleanup if something failed
+            if (uniqueDirectory != null && Files.exists(uniqueDirectory)) {
+                try {
+                    Files.walkFileTree(uniqueDirectory, new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                            Files.delete(file);
+                            return FileVisitResult.CONTINUE;
+                        }
+
+                        @Override
+                        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                            if (exc != null)
+                                throw exc;
+                            Files.delete(dir);
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+                    System.out.println("Deleted unique directory due to error: " + uniqueDirectory);
+                } catch (IOException ioException) {
+                    System.err.println("Failed to delete unique directory: " + uniqueDirectory);
+                }
+            }
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Save a PNG using TwelveMonkeys for better compression.
+    // You need the TwelveMonkeys ImageIO plugin on the classpath.
+    // ------------------------------------------------------------------------
+    private void saveOptimizedPng(BufferedImage image, File outputFile) throws IOException {
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("png").next();
+        try (ImageOutputStream ios = ImageIO.createImageOutputStream(outputFile)) {
+            writer.setOutput(ios);
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            // We can set compression mode & quality (1.0f is “best”).
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(1.0f);
+
+            writer.write(null, new IIOImage(image, null, null), param);
+        } finally {
+            writer.dispose();
+        }
+    }
+
+    /**
+     * Utility class for handling progress updates and size calculations.
+     */
+    public static class ProgressBarUtils {
+        public static void copyInputStreamWithProgress(InputStream inputStream,
+                Path filePath,
+                long totalSize,
+                String fileName) throws IOException {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            long bytesCopied = 0;
+            // Ensure the file is empty before starting
+            Files.deleteIfExists(filePath);
+            Files.createFile(filePath);
+            try (BufferedOutputStream bos = new BufferedOutputStream(
+                    Files.newOutputStream(filePath, StandardOpenOption.WRITE))) {
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    bos.write(buffer, 0, bytesRead);
+                    bytesCopied += bytesRead;
+                    updateProgressBar(bytesCopied, totalSize, fileName);
+                }
+            }
+        }
+
+        public static void updateProgressBar(long bytesRead, long totalSize, String fileName) {
+            if (totalSize > 0) {
+                int progress = (int) ((bytesRead * 100) / totalSize);
+                // Use carriage return (\r) + flush instead of println
+                System.out.print("\rDownloading " + fileName + ": " + progress + "%");
+                System.out.flush();
+            }
+        }
+
+        public static long calculateTotalSize(Path directory) throws IOException {
+            final long[] total = { 0 };
+            Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    total[0] += attrs.size();
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            return total[0];
+        }
+    }
+
 }
