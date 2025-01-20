@@ -187,6 +187,8 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    private static final Object JSON_WRITE_LOCK = new Object();
+
     // Method to update the offline_download_list.json
     @SuppressWarnings("unchecked")
     public void update_offline_download_list(
@@ -200,107 +202,97 @@ public class File_Service_Impl implements File_Service {
             String civitaiBaseModel,
             String[] imageUrlsArray,
             String selectedCategory,
+            List<String> civitaiTags,
             Boolean isModifyMode) {
 
         String offlineDownloadFile = "files/data/offline_download_list.json";
         ObjectMapper objectMapper = new ObjectMapper();
 
-        try {
-            Path filePath = Paths.get(offlineDownloadFile);
+        synchronized (JSON_WRITE_LOCK) { // <--- Use a lock if multi-threaded
+            try {
+                Path filePath = Paths.get(offlineDownloadFile);
 
-            // Ensure parent directories exist
-            if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
-                Files.createDirectories(filePath.getParent());
-            }
+                // Ensure parent directories exist
+                if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
+                    Files.createDirectories(filePath.getParent());
+                }
 
-            List<Map<String, Object>> offlineDownloadList;
-
-            if (Files.exists(filePath)) {
-                // Read existing JSON data
-                String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
-
-                if (data.trim().isEmpty()) {
-                    // If file is empty, initialize an empty list
+                // Read existing JSON data (if file exists)
+                List<Map<String, Object>> offlineDownloadList;
+                if (Files.exists(filePath)) {
+                    String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+                    if (data.trim().isEmpty()) {
+                        offlineDownloadList = new ArrayList<>();
+                    } else {
+                        offlineDownloadList = objectMapper.readValue(
+                                data, new TypeReference<List<Map<String, Object>>>() {
+                                });
+                    }
+                } else {
                     offlineDownloadList = new ArrayList<>();
+                }
+
+                // Find if there's an existing entry
+                int existingIndex = -1;
+                for (int i = 0; i < offlineDownloadList.size(); i++) {
+                    Map<String, Object> item = offlineDownloadList.get(i);
+                    if (Objects.equals(item.get("civitaiModelID"), civitaiModelID) &&
+                            Objects.equals(item.get("civitaiVersionID"), civitaiVersionID)) {
+                        existingIndex = i;
+                        break;
+                    }
+                }
+
+                if (existingIndex != -1) {
+                    // Existing entry found
+                    if (Boolean.TRUE.equals(isModifyMode)) {
+                        // Update the existing entry
+                        Map<String, Object> existingEntry = offlineDownloadList.get(existingIndex);
+                        existingEntry.put("downloadFilePath", downloadFilePath);
+                        existingEntry.put("selectedCategory", selectedCategory);
+                        // ... other updates as needed
+                    } else {
+                        // Not in modify mode, so do nothing if entry exists
+                        return;
+                    }
                 } else {
-                    // Deserialize existing JSON array into List<Map<String, Object>>
-                    offlineDownloadList = objectMapper.readValue(data, new TypeReference<List<Map<String, Object>>>() {
-                    });
+                    // No existing entry
+                    if (Boolean.TRUE.equals(isModifyMode)) {
+                        // If in modify mode but no entry found, decide your logic; here we add a new entry
+                        System.out.println("Modify mode but entry not found. Adding a new entry...");
+                    }
+
+                    // Create and add new entry
+                    Map<String, Object> newEntry = new HashMap<>();
+                    newEntry.put("civitaiFileName", civitaiFileName);
+                    newEntry.put("civitaiModelFileList", civitaiModelFileList);
+                    newEntry.put("downloadFilePath", downloadFilePath);
+                    newEntry.put("modelVersionObject", modelVersionObject);
+                    newEntry.put("civitaiModelID", civitaiModelID);
+                    newEntry.put("civitaiVersionID", civitaiVersionID);
+                    newEntry.put("civitaiUrl", civitaiUrl);
+                    newEntry.put("civitaiBaseModel", civitaiBaseModel);
+                    newEntry.put("imageUrlsArray", imageUrlsArray);
+                    newEntry.put("selectedCategory", selectedCategory);
+                    newEntry.put("civitaiTags", civitaiTags);
+
+                    offlineDownloadList.add(newEntry);
                 }
-            } else {
-                // If file does not exist, initialize a new list
-                offlineDownloadList = new ArrayList<>();
+
+                // Serialize the updated list back to JSON
+                String updatedJson = objectMapper
+                        .writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(offlineDownloadList);
+
+                // --- Perform an atomic write here ---
+                writeJsonAtomically(filePath, updatedJson);
+
+            } catch (IOException e) {
+                // Handle exceptions appropriately
+                log.error("Unexpected error while updating offline_download_list", e);
+                throw new CustomException(
+                        "An unexpected error occurred while updating the offline download list.", e);
             }
-
-            // Find the index of the existing entry, if any
-            int existingIndex = -1;
-            for (int i = 0; i < offlineDownloadList.size(); i++) {
-                Map<String, Object> item = offlineDownloadList.get(i);
-                if (Objects.equals(item.get("civitaiModelID"), civitaiModelID) &&
-                        Objects.equals(item.get("civitaiVersionID"), civitaiVersionID)) {
-                    existingIndex = i;
-                    break;
-                }
-            }
-
-            if (existingIndex != -1) { // Entry exists
-                if (Boolean.TRUE.equals(isModifyMode)) {
-                    // Modify mode: update specific fields
-                    Map<String, Object> existingEntry = offlineDownloadList.get(existingIndex);
-                    existingEntry.put("downloadFilePath", downloadFilePath);
-                    existingEntry.put("selectedCategory", selectedCategory);
-
-                    // Optionally, update other fields if needed
-                    // existingEntry.put("otherField", newValue);
-
-                    System.out.println(
-                            "Existing entry with civitaiModelID \"" + civitaiModelID + "\" and civitaiVersionID \""
-                                    + civitaiVersionID + " updated with new downloadFilePath and selectedCategory.");
-                } else {
-                    // Add mode: do not add duplicate entry
-                    System.out.println("An entry with civitaiModelID \"" + civitaiModelID +
-                            "\" and civitaiVersionID \"" + civitaiVersionID + "\" already exists. No action taken.");
-                    return; // Do nothing if entry exists and not in modify mode
-                }
-            } else { // Entry does not exist
-                if (Boolean.TRUE.equals(isModifyMode)) {
-                    // Modify mode but entry does not exist: optionally, decide behavior
-                    // For this example, we'll add the new entry
-                    System.out.println("Modify mode is enabled but no existing entry found. Adding new entry.");
-                }
-
-                // Create a new map for the new entry
-                Map<String, Object> newEntry = new HashMap<>();
-                newEntry.put("civitaiFileName", civitaiFileName);
-                newEntry.put("civitaiModelFileList", civitaiModelFileList);
-                newEntry.put("downloadFilePath", downloadFilePath);
-                newEntry.put("modelVersionObject", modelVersionObject);
-                newEntry.put("civitaiModelID", civitaiModelID);
-                newEntry.put("civitaiVersionID", civitaiVersionID);
-                newEntry.put("civitaiUrl", civitaiUrl);
-                newEntry.put("civitaiBaseModel", civitaiBaseModel);
-                newEntry.put("imageUrlsArray", imageUrlsArray);
-                newEntry.put("selectedCategory", selectedCategory);
-
-                // Add the new entry to the list
-                offlineDownloadList.add(newEntry);
-
-                System.out.println("New entry added to offline_download_list.json.");
-            }
-
-            // Serialize the updated list back to JSON
-            String updatedJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(offlineDownloadList);
-
-            // Write the updated JSON back to the file
-            Files.write(filePath, updatedJson.getBytes(StandardCharsets.UTF_8),
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
-            System.out.println("offline_download_list.json has been successfully updated.");
-
-        } catch (IOException e) {
-            // Log and handle exceptions appropriately
-            log.error("Unexpected error while updating offline_download_list", e);
-            throw new CustomException("An unexpected error occurred while updating the offline download list.", e);
         }
     }
 
@@ -314,66 +306,76 @@ public class File_Service_Impl implements File_Service {
         String offlineDownloadFile = "files/data/offline_download_list.json";
         ObjectMapper objectMapper = new ObjectMapper();
 
-        try {
-            Path filePath = Paths.get(offlineDownloadFile);
+        synchronized (JSON_WRITE_LOCK) { // <--- Use a lock if multi-threaded
+            try {
+                Path filePath = Paths.get(offlineDownloadFile);
 
-            if (!Files.exists(filePath)) {
-                System.out.println("The file " + offlineDownloadFile + " does not exist. Nothing to remove.");
-                return;
-            }
-
-            // Read existing JSON data
-            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
-
-            if (data.trim().isEmpty()) {
-                System.out.println("The file " + offlineDownloadFile + " is empty. Nothing to remove.");
-                return;
-            }
-
-            // Deserialize JSON array into List<Map<String, Object>>
-            List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(data,
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
-
-            // Filter out entries that match both civitaiModelID and civitaiVersionID
-            List<Map<String, Object>> updatedList = new ArrayList<>();
-            boolean removed = false;
-
-            for (Map<String, Object> item : offlineDownloadList) {
-                String currentModelID = (String) item.get("civitaiModelID");
-                String currentVersionID = (String) item.get("civitaiVersionID");
-
-                if (Objects.equals(currentModelID, civitaiModelID) &&
-                        Objects.equals(currentVersionID, civitaiVersionID)) {
-                    removed = true;
-                    System.out.println("Removing entry with civitaiModelID \"" + civitaiModelID +
-                            "\" and civitaiVersionID \"" + civitaiVersionID + "\".");
-                    // Skip adding this item to updatedList to effectively remove it
-                } else {
-                    updatedList.add(item);
+                if (!Files.exists(filePath)) {
+                    System.out.println("File does not exist. Nothing to remove.");
+                    return;
                 }
+
+                // Read existing JSON data
+                String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+                if (data.trim().isEmpty()) {
+                    System.out.println("File is empty. Nothing to remove.");
+                    return;
+                }
+
+                List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
+                        data, new TypeReference<List<Map<String, Object>>>() {
+                        });
+
+                // Filter out the matching entries
+                List<Map<String, Object>> updatedList = new ArrayList<>();
+                boolean removed = false;
+
+                for (Map<String, Object> item : offlineDownloadList) {
+                    String currentModelID = (String) item.get("civitaiModelID");
+                    String currentVersionID = (String) item.get("civitaiVersionID");
+
+                    if (Objects.equals(currentModelID, civitaiModelID) &&
+                            Objects.equals(currentVersionID, civitaiVersionID)) {
+                        removed = true;
+                    } else {
+                        updatedList.add(item);
+                    }
+                }
+
+                if (removed) {
+                    // Serialize and write updated list atomically
+                    String updatedJson = objectMapper
+                            .writerWithDefaultPrettyPrinter()
+                            .writeValueAsString(updatedList);
+
+                    writeJsonAtomically(filePath, updatedJson);
+
+                    System.out.println("Successfully removed the specified entry.");
+                } else {
+                    System.out.println("No matching entry found. No changes made.");
+                }
+
+            } catch (IOException e) {
+                System.out.println("Unexpected error while removing from offline_download_list " + e);
+                throw new CustomException(
+                        "An unexpected error occurred while removing from the offline download list.",
+                        e);
             }
-
-            if (removed) {
-                // Serialize the updated list back to JSON
-                String updatedJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(updatedList);
-
-                // Write the updated JSON back to the file
-                Files.write(filePath, updatedJson.getBytes(StandardCharsets.UTF_8),
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
-                System.out.println(
-                        "offline_download_list.json has been successfully updated by removing the specified entry.");
-            } else {
-                System.out.println("No entry found with civitaiModelID \"" + civitaiModelID +
-                        "\" and civitaiVersionID \"" + civitaiVersionID + "\". No changes made.");
-            }
-
-        } catch (IOException e) {
-            // Log and handle exceptions appropriately
-            System.out.println("Unexpected error while removing from offline_download_list " + e);
-            throw new CustomException("An unexpected error occurred while removing from the offline download list.", e);
         }
+    }
+
+    private void writeJsonAtomically(Path targetFilePath, String jsonContent) throws IOException {
+        // Create a temp file in the same directory
+        Path tempFilePath = Files.createTempFile(targetFilePath.getParent(), "offline_download_list", ".tmp");
+
+        // Write the new JSON content to the temp file
+        Files.write(tempFilePath, jsonContent.getBytes(StandardCharsets.UTF_8),
+                StandardOpenOption.TRUNCATE_EXISTING);
+
+        // Atomically move/replace the old file with the temp file
+        Files.move(tempFilePath, targetFilePath,
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE);
     }
 
     public void create_cart_list() {
@@ -550,6 +552,76 @@ public class File_Service_Impl implements File_Service {
     }
 
     @Override
+    public List<String> get_error_model_list() {
+
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<String> dataList = objectMapper.readValue(
+                    Files.readAllBytes(Paths.get("files/data/error_model_list.json")),
+                    new TypeReference<List<String>>() {
+                    });
+
+            // Check if dataList is null or empty
+            if (dataList == null || dataList.isEmpty()) {
+                return Collections.emptyList(); // Return an empty list
+            }
+
+            return dataList.stream().collect(Collectors.toList());
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while retreving folder list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public void remove_from_error_model_list(String modelID, String versionID) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Path filePath = Paths.get("files/data/error_model_list.json");
+
+            // Check if the file exists
+            if (!Files.exists(filePath)) {
+                log.warn("File {} does not exist. Nothing to remove.", "files/data/error_model_list.json");
+                return;
+            }
+
+            // Read the existing list from the JSON file
+            List<String> dataList = objectMapper.readValue(
+                    Files.readAllBytes(filePath),
+                    new TypeReference<List<String>>() {
+                    });
+
+            if (dataList == null || dataList.isEmpty()) {
+                log.warn("Error model list is empty. Nothing to remove.");
+                return;
+            }
+
+            // Construct the prefix to match {modelID}_{versionID}_
+            String prefix = modelID + "_" + versionID + "_";
+
+            // Filter out the matching elements
+            List<String> updatedList = dataList.stream()
+                    .filter(item -> !item.startsWith(prefix))
+                    .collect(Collectors.toList());
+
+            // Check if any element was removed
+            if (updatedList.size() == dataList.size()) {
+                log.info("No matching elements found for ModelID: {} and VersionID: {}", modelID, versionID);
+                return;
+            }
+
+            // Write the updated list back to the JSON file with pretty printing
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), updatedList);
+
+            log.info("Successfully removed elements with ModelID: {} and VersionID: {}", modelID, versionID);
+        } catch (IOException e) {
+            log.error("Unexpected error while removing from error model list", e);
+            throw new CustomException("An unexpected error occurred while removing the model", e);
+        }
+    }
+
+    @Override
     public List<Map<String, String>> get_categories_prefix_list() {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
@@ -645,6 +717,57 @@ public class File_Service_Impl implements File_Service {
             // Log and handle exceptions appropriately
             System.out.println("Unexpected error while retrieving offline download list" + e);
             throw new CustomException("An unexpected error occurred while retrieving the offline download list.", e);
+        }
+    }
+
+    /**
+    * Backs up the offline_download_list.json file by creating a copy with an incremental name.
+    *
+    * @return true if the backup was successful, false otherwise.
+    */
+    public boolean backupOfflineDownloadList() {
+        String originalFilePath = "files/data/offline_download_list.json";
+        Path originalPath = Paths.get(originalFilePath);
+
+        synchronized (JSON_WRITE_LOCK) { // Ensure thread safety
+            try {
+                if (!Files.exists(originalPath)) {
+                    System.out.println("Original file does not exist. Backup not created.");
+                    return false;
+                }
+
+                // Define the backup directory path
+                Path backupDir = originalPath.getParent().resolve("offlinebackup");
+
+                // Create the backup directory if it doesn't exist
+                if (!Files.exists(backupDir)) {
+                    Files.createDirectories(backupDir);
+                    System.out.println("Backup directory created at: " + backupDir.toString());
+                }
+
+                // Determine the backup file name
+                String baseName = "offline_download_list";
+                String extension = ".json";
+                int copyIndex = 1;
+                Path backupPath;
+
+                do {
+                    String backupFileName = String.format("%s copy %d%s", baseName, copyIndex, extension);
+                    backupPath = backupDir.resolve(backupFileName);
+                    copyIndex++;
+                } while (Files.exists(backupPath));
+
+                // Copy the file to the backup directory
+                Files.copy(originalPath, backupPath, StandardCopyOption.COPY_ATTRIBUTES);
+
+                System.out.println("Backup created at: " + backupPath.toString());
+                return true;
+
+            } catch (IOException e) {
+                System.out.println("Error while backing up the file: " + e.getMessage());
+                // Optionally, log the error or rethrow as a custom exception
+                return false;
+            }
         }
     }
 
@@ -1241,7 +1364,7 @@ public class File_Service_Impl implements File_Service {
 
             System.out.println(e);
 
-            update_error_model_list(modelName);
+            // update_error_model_list(modelName);
 
             FileUtils.deleteDirectory(modelDirectory);
 
@@ -1472,9 +1595,10 @@ public class File_Service_Impl implements File_Service {
             String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray) {
 
         String modelID = civitaiModelID, versionID = civitaiVersionID, url = civitaiUrl,
-                name = civitaiFileName.split("\\.")[0];
+                name = civitaiFileName.split("\\.")[0].trim();
 
         String modelName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name;
+
         Path modelDirectory = Paths.get("files/download/", modelName);
 
         // Load the configuration file
@@ -1524,6 +1648,10 @@ public class File_Service_Impl implements File_Service {
                 }
 
                 if (prepareUrl.contains("VAE")) {
+                    continue;
+                }
+
+                if (prepareUrl.contains("format")) {
                     continue;
                 }
 
@@ -1711,14 +1839,12 @@ public class File_Service_Impl implements File_Service {
             // Log and handle other types of exceptions
             System.out.println("Error Model Name: " + modelName);
 
-            System.out.println(e);
-
-            update_error_model_list(modelName);
+            // update_error_model_list(modelName);
 
             FileUtils.deleteDirectory(modelDirectory);
 
             //log.error("Unexpected error while downloading file", e);
-            throw new CustomException("An unexpected error occurred", e);
+            throw new CustomException(e.getMessage());
 
         }
 
@@ -2128,5 +2254,4 @@ public class File_Service_Impl implements File_Service {
             throw new CustomException("An unexpected error occurred", e);
         }
     }
-
 }

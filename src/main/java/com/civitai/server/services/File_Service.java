@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service;
 public interface File_Service {
         public List<String> get_folders_list();
 
+        public List<String> get_error_model_list();
+
+        public void remove_from_error_model_list(String ModelID, String versionID);
+
         public Map<String, List<Map<String, Object>>> get_tags_list(String prefix);
 
         public void update_offline_download_list(
@@ -23,7 +27,10 @@ public interface File_Service {
                         String civitaiBaseModel,
                         String[] imageUrlsArray,
                         String selectedCategory,
+                        List<String> civitaiTags,
                         Boolean isModifyMode);
+
+        public boolean backupOfflineDownloadList();
 
         public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
 

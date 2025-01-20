@@ -111,6 +111,20 @@ public class File_Controller {
         }
     }
 
+    @GetMapping("/get_error_model_list")
+    public ResponseEntity<CustomResponse<Map<String, List<String>>>> getErrorModelList() {
+        List<String> errorModelList = fileService.get_error_model_list();
+
+        if (!errorModelList.isEmpty()) {
+            Map<String, List<String>> payload = new HashMap<>();
+            payload.put("errorModelList", errorModelList);
+
+            return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+        }
+    }
+
     @GetMapping("/get_tags_list")
     public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getTagsList(
             @RequestParam(value = "prefix", required = false) String prefix) {
@@ -203,6 +217,27 @@ public class File_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
+    /**
+    * Endpoint to backup the offline_download_list.json file.
+    *
+    * @return ResponseEntity with isBackedUp flag.
+    */
+    @PostMapping("/backup_offline_download_list")
+    public ResponseEntity<CustomResponse<Map<String, Boolean>>> backupOfflineDownloadList() {
+        boolean isBackedUp = fileService.backupOfflineDownloadList();
+
+        Map<String, Boolean> payload = new HashMap<>();
+        payload.put("isBackedUp", isBackedUp);
+
+        if (isBackedUp) {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Backup created successfully.", payload));
+        } else {
+            return ResponseEntity.status(500)
+                    .body(CustomResponse.failure("Backup failed. Please check server logs for details."));
+        }
+    }
+
     @SuppressWarnings("unchecked")
     @PostMapping("/add-offline-download-file-into-offline-download-list")
     public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadList(
@@ -218,6 +253,9 @@ public class File_Controller {
         String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
         String selectedCategory = (String) modelObject.get("selectedCategory");
         Boolean isModifyMode = (Boolean) requestBody.get("isModifyMode");
+        List<String> civitaiTags = (List<String>) modelObject.get("civitaiTags") != null
+                ? (List<String>) modelObject.get("civitaiTags")
+                : new ArrayList<>(); // Assign an empty list or handle accordingly
 
         // Validate null or empty
         if (modelObject == null ||
@@ -227,7 +265,7 @@ public class File_Controller {
                 civitaiModelID == null || civitaiModelID == "" ||
                 civitaiVersionID == null || civitaiVersionID == "" ||
                 selectedCategory == null || selectedCategory == "" ||
-                civitaiModelFileList == null || civitaiModelFileList.isEmpty()) {
+                civitaiModelFileList == null || civitaiModelFileList.isEmpty() || civitaiTags == null) {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
@@ -245,7 +283,9 @@ public class File_Controller {
 
                 fileService.update_offline_download_list(civitaiFileName, civitaiModelFileList, downloadFilePath,
                         modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
-                        (String) modelVersionObject.get("baseModel"), imageUrlsArray, selectedCategory, isModifyMode);
+                        (String) modelVersionObject.get("baseModel"), imageUrlsArray, selectedCategory, civitaiTags,
+                        isModifyMode);
+                fileService.update_folder_list(downloadFilePath);
 
                 return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
             }
@@ -282,6 +322,33 @@ public class File_Controller {
     }
 
     @SuppressWarnings("unchecked")
+    @PostMapping("/remove-from-error-model-list")
+    public ResponseEntity<CustomResponse<String>> removeFromErrorModelList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
+        String civitaiModelID = (String) modelObject.get("civitaiModelID");
+        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+        // Validate null or empty
+        if (civitaiModelID == null || civitaiModelID == "" ||
+                civitaiVersionID == null || civitaiVersionID == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        System.out.println(civitaiModelID + "  " + civitaiVersionID);
+
+        try {
+            fileService.remove_from_error_model_list(civitaiModelID, civitaiVersionID);
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Success remove download file from offline download list"));
+
+        } catch (Exception ex) {
+            System.err.println("An error occurred: " + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server-v2")
     public ResponseEntity<CustomResponse<String>> downloadFileServerV2(@RequestBody Map<String, Object> requestBody) {
 
@@ -305,10 +372,16 @@ public class File_Controller {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
+        Optional<Map<String, Object>> modelVersionOptional = null;
+
         try {
+            modelVersionOptional = civitai_Service.findModelByVersionID(civitaiVersionID);
+        } catch (Exception ex) {
+            System.err.println("Failed calling civitai to retrieve model information" + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
 
-            Optional<Map<String, Object>> modelVersionOptional = civitai_Service.findModelByVersionID(civitaiVersionID);
-
+        try {
             if (!modelVersionOptional.isPresent()) {
                 return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
             } else {
@@ -320,13 +393,27 @@ public class File_Controller {
                 fileService.download_file_by_server_v2(civitaiFileName, civitaiModelFileList, downloadFilePath,
                         modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
                         (String) modelVersionObject.get("baseModel"), imageUrlsArray);
+
                 fileService.update_tags_list(downloadFilePath);
                 fileService.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
                 return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
             }
 
         } catch (Exception ex) {
-            System.err.println("An error occurred: " + ex.getMessage());
+            String modelID = civitaiModelID, versionID = civitaiVersionID, url = civitaiUrl,
+                    name = civitaiFileName.split("\\.")[0].trim();
+            String modelName = modelID + "_" + versionID + "_" + name;
+
+            // Map<String, Object> modelVersionObject = modelVersionOptional.get();
+
+            fileService.update_error_model_list(modelName);
+            // List<String> emptyList = new ArrayList<>();
+            // fileService.update_error_model_list_v2(civitaiFileName, civitaiModelFileList, downloadFilePath, modelObject,
+            //         civitaiModelID, civitaiVersionID, civitaiUrl, (String) modelVersionObject.get("baseModel"),
+            //         emptyList.toArray(new String[0]), "N/A", emptyList);
+
+            System.err.println("An error occurred while downloading " + civitaiModelID + "_" + civitaiVersionID + "_"
+                    + civitaiFileName + "\n" + ex.getMessage());
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
     }
