@@ -82,6 +82,7 @@ public class File_Controller {
         }
     }
 
+    @CrossOrigin(origins = "*")
     @GetMapping("/get_offline_download_list")
     public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getOfflineDownloadList() {
         List<Map<String, Object>> offlineDownloadList = fileService.get_offline_download_list();
@@ -378,6 +379,13 @@ public class File_Controller {
             modelVersionOptional = civitai_Service.findModelByVersionID(civitaiVersionID);
         } catch (Exception ex) {
             System.err.println("Failed calling civitai to retrieve model information" + ex.getMessage());
+            String modelID = civitaiModelID, versionID = civitaiVersionID, url = civitaiUrl,
+                    name = civitaiFileName.split("\\.")[0].trim();
+            String modelName = modelID + "_" + versionID + "_" + name;
+
+            // Map<String, Object> modelVersionObject = modelVersionOptional.get();
+
+            fileService.update_error_model_list(modelName);
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
@@ -488,5 +496,35 @@ public class File_Controller {
     //         return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
     //     }
     // }
+
+    @CrossOrigin(origins = "*")
+    @PostMapping(path = "/search_offline_downloads")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> searchOfflineDownloads(
+            @RequestBody Map<String, Object> requestBody) {
+
+        List<String> keywords = (List<String>) requestBody.get("keywords");
+
+        try {
+            // Call the service method and get the matching entries
+            List<Map<String, Object>> filteredList = fileService.searchOfflineDownloads(keywords);
+
+            if (filteredList.isEmpty()) {
+                // Return a "failure" response if nothing found
+                return ResponseEntity.ok()
+                        .body(CustomResponse.failure("No offline downloads found matching the given keywords."));
+            }
+
+            // Otherwise, wrap the results in your preferred response format
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("offlineDownloadList", filteredList);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Search results found", payload));
+        } catch (Exception ex) {
+            System.out.println(ex);
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+    }
 
 }

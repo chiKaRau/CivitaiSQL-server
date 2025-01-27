@@ -2654,4 +2654,94 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    @Override
+    public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords) {
+        // 1. Get the full list from JSON
+        List<Map<String, Object>> offlineDownloadList = get_offline_download_list();
+
+        // 2. If no keywords, return everything (or handle however you prefer)
+        if (keywords == null || keywords.isEmpty()) {
+            return offlineDownloadList;
+        }
+
+        // 3. Filter by matching all keywords (AND), but in any field (OR).
+        return offlineDownloadList.stream()
+                .filter(entry -> {
+                    // For each entry, ensure that **each** keyword is found in at least one field
+                    for (String keyword : keywords) {
+                        if (keyword == null || keyword.trim().isEmpty()) {
+                            // Skip empty keywords or handle as needed
+                            continue;
+                        }
+
+                        String lowerKeyword = keyword.toLowerCase();
+                        boolean foundKeyword = false;
+
+                        // --- (A) Check civitaiFileName ---
+                        String fileName = (String) entry.get("civitaiFileName");
+                        if (containsIgnoreCase(fileName, lowerKeyword)) {
+                            foundKeyword = true;
+                        }
+
+                        // --- (B) Check modelVersionObject.name and modelVersionObject.model.name ---
+                        if (!foundKeyword) {
+                            Map<String, Object> modelVersionObject = (Map<String, Object>) entry
+                                    .get("modelVersionObject");
+                            if (modelVersionObject != null) {
+                                // modelVersionObject.name
+                                String versionName = (String) modelVersionObject.get("name");
+                                if (containsIgnoreCase(versionName, lowerKeyword)) {
+                                    foundKeyword = true;
+                                } else {
+                                    // modelVersionObject.model.name
+                                    Map<String, Object> model = (Map<String, Object>) modelVersionObject.get("model");
+                                    if (model != null) {
+                                        String modelName = (String) model.get("name");
+                                        if (containsIgnoreCase(modelName, lowerKeyword)) {
+                                            foundKeyword = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // --- (C) Check civitaiUrl ---
+                        if (!foundKeyword) {
+                            String civitaiUrl = (String) entry.get("civitaiUrl");
+                            if (containsIgnoreCase(civitaiUrl, lowerKeyword)) {
+                                foundKeyword = true;
+                            }
+                        }
+
+                        // --- (D) Check civitaiTags (List<String>) ---
+                        if (!foundKeyword) {
+                            List<String> tags = (List<String>) entry.get("civitaiTags");
+                            if (tags != null) {
+                                for (String tag : tags) {
+                                    if (containsIgnoreCase(tag, lowerKeyword)) {
+                                        foundKeyword = true;
+                                        break; // no need to check other tags once found
+                                    }
+                                }
+                            }
+                        }
+
+                        // If the current keyword wasn't found in ANY field, exclude this entry
+                        if (!foundKeyword) {
+                            return false;
+                        }
+                    }
+                    // If we passed all keywords, keep this entry
+                    return true;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Checks whether 'source' contains 'keyword' in a case-insensitive way.
+     */
+    private boolean containsIgnoreCase(String source, String keyword) {
+        return source != null && keyword != null && source.toLowerCase().contains(keyword.toLowerCase());
+    }
+
 }

@@ -69,4 +69,6 @@ public interface File_Service {
         public void download_file_by_server_v2(String civitaiFileName, List<Map<String, Object>> civitaiModelFileList,
                         String downloadFilePath, Map<String, Object> modelVersionObject, String civitaiModelID,
                         String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray);
+
+        public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords);
 }
