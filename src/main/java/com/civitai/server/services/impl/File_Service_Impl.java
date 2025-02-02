@@ -84,6 +84,10 @@ public class File_Service_Impl implements File_Service {
 
         // Create a error_model_list if have none
         create_error_model_list();
+
+        create_pending_remove_tags_list();
+
+        create_creator_url_list();
     }
 
     public void create_offline_download_list() {
@@ -298,6 +302,135 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    @Override
+    public List<Map<String, Object>> get_creator_url_list() {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<Map<String, Object>> creatorUrlList = objectMapper.readValue(
+                    Files.readAllBytes(Paths.get("files/data/creator_url_list.json")),
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // Check if the list is null or empty, and return an empty list if so.
+            if (creatorUrlList == null || creatorUrlList.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            return creatorUrlList;
+        } catch (IOException e) {
+            // Log and handle the exception as needed
+            log.error("Unexpected error while retrieving creator URL list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked) {
+        try {
+            // Path to the JSON file
+            Path filePath = Path.of("files/data/creator_url_list.json");
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> list = new ArrayList<>();
+
+            // Read file if it exists and is not empty
+            if (Files.exists(filePath)) {
+                String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+                if (!jsonData.isEmpty()) {
+                    list = mapper.readValue(jsonData, new TypeReference<List<Map<String, Object>>>() {
+                    });
+                }
+            }
+
+            // If lastChecked is true, ensure no other entry is marked as true.
+            if (lastChecked != null && lastChecked) {
+                for (Map<String, Object> entry : list) {
+                    if (Boolean.TRUE.equals(entry.get("lastChecked"))) {
+                        entry.put("lastChecked", false);
+                    }
+                }
+            }
+
+            boolean found = false;
+            // Look for an entry with the matching creatorUrl
+            for (Map<String, Object> entry : list) {
+                if (creatorUrl.equals(entry.get("creatorUrl"))) {
+                    found = true;
+                    String currentStatus = String.valueOf(entry.get("status"));
+                    // Update if the current status is different (ignoring case)
+                    if (!status.equalsIgnoreCase(currentStatus)) {
+                        entry.put("status", status);
+                        entry.put("lastChecked", lastChecked);
+                        System.out.println("Updated entry: " + entry);
+                    } else {
+                        System.out.println("Entry for " + creatorUrl
+                                + " already has the same status; no update performed.");
+                    }
+                    break;
+                }
+            }
+
+            // If not found, add a new entry with the provided values.
+            if (!found) {
+                Map<String, Object> newEntry = new HashMap<>();
+                newEntry.put("creatorUrl", creatorUrl);
+                newEntry.put("status", status);
+                newEntry.put("lastChecked", lastChecked);
+                list.add(newEntry);
+                System.out.println("Added new entry: " + newEntry);
+            }
+
+            // Write the updated list back to the file using pretty printing.
+            byte[] updatedJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(list);
+            Files.write(filePath, updatedJson, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new CustomException("Error updating creator URL list", e);
+        }
+    }
+
+    /**
+     * Removes an entry with the given creatorUrl from the JSON file.
+     *
+     * @param creatorUrl The creator URL to remove.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public void remove_creator_url(String creatorUrl) {
+        try {
+            // Path to the JSON file
+            Path filePath = Path.of("files/data/creator_url_list.json");
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> list = new ArrayList<>();
+
+            // Read file if it exists and is not empty
+            if (Files.exists(filePath)) {
+                String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+                if (!jsonData.isEmpty()) {
+                    list = mapper.readValue(jsonData, new TypeReference<List<Map<String, Object>>>() {
+                    });
+                }
+            }
+
+            // Remove entries matching the creatorUrl
+            boolean removed = list.removeIf(entry -> creatorUrl.equals(entry.get("creatorUrl")));
+
+            if (removed) {
+                byte[] updatedJson = mapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsBytes(list);
+                Files.write(filePath, updatedJson, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                System.out.println("Creator URL " + creatorUrl + " removed successfully.");
+            } else {
+                System.out.println("Creator URL " + creatorUrl + " not found in the list.");
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new CustomException("Error removing creator URL", e);
+        }
+    }
+
     /**
      * Removes entries from offline_download_list.json based on civitaiModelID and civitaiVersionID.
      *
@@ -479,6 +612,56 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    public void create_pending_remove_tags_list() {
+        String pendingRemoveTagsList = "files/data/pending_remove_tags_list.json";
+        try {
+            if (!Files.exists(Paths.get(pendingRemoveTagsList))) {
+                // Create an empty list of tag records
+                List<Map<String, Object>> tagsList = new ArrayList<>();
+
+                // Convert the empty list to a JSON string
+                String tagsListJson = new ObjectMapper().writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(tagsList);
+
+                // Write the JSON string to the file
+                Files.write(Path.of(pendingRemoveTagsList), tagsListJson.getBytes(), StandardOpenOption.CREATE);
+
+                System.out.println("pending_remove_tags_list.json has been created as an empty file.");
+            } else {
+                System.out.println(
+                        "pending_remove_tags_list.json already exists: " + pendingRemoveTagsList + ". Doing nothing.");
+            }
+        } catch (IOException e) {
+            log.error("Unexpected error while creating pending_remove_tags_list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    public void create_creator_url_list() {
+        String creatorUrlList = "files/data/creator_url_list.json";
+        try {
+            if (!Files.exists(Paths.get(creatorUrlList))) {
+                // Create an empty list of tag records
+                List<Map<String, Object>> tagsList = new ArrayList<>();
+
+                // Convert the empty list to a JSON string
+                String tagsListJson = new ObjectMapper().writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(tagsList);
+
+                // Write the JSON string to the file
+                Files.write(Path.of(creatorUrlList), tagsListJson.getBytes(), StandardOpenOption.CREATE);
+
+                System.out.println("creator_url_list.json has been created as an empty file.");
+            } else {
+                System.out.println(
+                        "creator_url_list.json already exists: " + creatorUrlList + ". Doing nothing.");
+            }
+        } catch (IOException e) {
+            log.error("Unexpected error while creating creator_url_list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
     public void create_folder_list() {
         try {
             String inputFile = "files/data/folder_list.txt";
@@ -549,6 +732,59 @@ public class File_Service_Impl implements File_Service {
         } catch (IOException e) {
             // Log and handle other types of exceptions
             log.error("Unexpected error while retreving folder list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public List<String> get_pending_remove_tags_list() {
+
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<String> pendingRemoveTagsList = objectMapper.readValue(
+                    Files.readAllBytes(Paths.get("files/data/pending_remove_tags_list.json")),
+                    new TypeReference<List<String>>() {
+                    });
+
+            // Check if dataList is null or empty
+            if (pendingRemoveTagsList == null || pendingRemoveTagsList.isEmpty()) {
+                return Collections.emptyList(); // Return an empty list
+            }
+
+            return pendingRemoveTagsList;
+        } catch (IOException e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while retreving pending remove tags list", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public void add_pending_remove_tag(String pendingRemoveTag) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Path filePath = Paths.get("files/data/pending_remove_tags_list.json");
+
+            List<String> pendingRemoveTagsList;
+
+            // Check if the file exists; if not, create a new ArrayList
+            if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                pendingRemoveTagsList = objectMapper.readValue(
+                        Files.readAllBytes(filePath),
+                        new TypeReference<List<String>>() {
+                        });
+            } else {
+                pendingRemoveTagsList = new ArrayList<>();
+            }
+
+            // Add the new tag
+            pendingRemoveTagsList.add(pendingRemoveTag);
+
+            // Write the updated list back to the JSON file
+            objectMapper.writeValue(filePath.toFile(), pendingRemoveTagsList);
+
+        } catch (IOException e) {
+            log.error("Unexpected error while adding pending remove tag", e);
             throw new CustomException("An unexpected error occurred", e);
         }
     }

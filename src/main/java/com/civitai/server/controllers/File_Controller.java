@@ -112,6 +112,40 @@ public class File_Controller {
         }
     }
 
+    @GetMapping("/get_pending_remove_tags_list")
+    public ResponseEntity<CustomResponse<Map<String, List<String>>>> getPendingRemoveTagsList() {
+        List<String> pendingRemoveTagsList = fileService.get_pending_remove_tags_list();
+
+        if (!pendingRemoveTagsList.isEmpty()) {
+            Map<String, List<String>> payload = new HashMap<>();
+            payload.put("pendingRemoveTagsList", pendingRemoveTagsList);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("pendingRemoveTagsList retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+        }
+    }
+
+    @PostMapping("/add_pending_remove_tag")
+    public ResponseEntity<CustomResponse<Void>> addPendingRemoveTag(
+            @RequestBody Map<String, Object> requestBody) {
+
+        // Extract the fields from the request body
+        String pendingRemoveTag = (String) requestBody.get("pendingRemoveTag");
+
+        // Validation (optional) - make sure 'pendingRemoveTag' is not null/empty
+        if (pendingRemoveTag == null || pendingRemoveTag.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: pendingRemoveTag cannot be null or empty"));
+        }
+
+        // Call the service method to add the tag
+        fileService.add_pending_remove_tag(pendingRemoveTag);
+
+        return ResponseEntity.ok(CustomResponse.success("Tag added successfully", null));
+    }
+
     @GetMapping("/get_error_model_list")
     public ResponseEntity<CustomResponse<Map<String, List<String>>>> getErrorModelList() {
         List<String> errorModelList = fileService.get_error_model_list();
@@ -124,6 +158,16 @@ public class File_Controller {
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
         }
+    }
+
+    @GetMapping("/get_creator_url_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getCreatorUrlList() {
+        List<Map<String, Object>> creatorUrlList = fileService.get_creator_url_list();
+
+        Map<String, List<Map<String, Object>>> payload = new HashMap<>();
+        payload.put("creatorUrlList", creatorUrlList);
+
+        return ResponseEntity.ok().body(CustomResponse.success("creatorUrlList retrieval successful", payload));
     }
 
     @GetMapping("/get_tags_list")
@@ -292,7 +336,8 @@ public class File_Controller {
             }
 
         } catch (Exception ex) {
-            System.err.println("An error occurred: " + ex.getMessage());
+            System.err.println("Error - " + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName + " : "
+                    + ex.getMessage());
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
     }
@@ -318,6 +363,60 @@ public class File_Controller {
 
         } catch (Exception ex) {
             System.err.println("An error occurred: " + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/update_creator_url_list")
+    public ResponseEntity<CustomResponse<String>> updateCreatorUrlList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String creatorUrl = (String) requestBody.get("creatorUrl");
+        String status = (String) requestBody.get("status");
+        Boolean lastChecked = (Boolean) requestBody.get("lastChecked");
+
+        // Validate null or empty
+        if (creatorUrl == null || creatorUrl == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+
+            fileService.update_creator_url_list(creatorUrl, status, lastChecked);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Success updating creator url list"));
+
+        } catch (Exception ex) {
+            System.err.println("Error - " + creatorUrl + " : "
+                    + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/remove_from_creator_url_list")
+    public ResponseEntity<CustomResponse<String>> removeFromCreatorUrlList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String creatorUrl = (String) requestBody.get("creatorUrl");
+
+        // Validate null or empty
+        if (creatorUrl == null || creatorUrl == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+
+            fileService.remove_creator_url(creatorUrl);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Success removing creator url from list"));
+
+        } catch (Exception ex) {
+            System.err.println("Error - " + creatorUrl + " : "
+                    + ex.getMessage());
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
     }

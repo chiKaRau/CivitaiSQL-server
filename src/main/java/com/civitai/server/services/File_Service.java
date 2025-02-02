@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service;
 public interface File_Service {
         public List<String> get_folders_list();
 
+        public List<String> get_pending_remove_tags_list();
+
+        public void add_pending_remove_tag(String pendingRemoveTag);
+
         public List<String> get_error_model_list();
 
         public void remove_from_error_model_list(String ModelID, String versionID);
@@ -57,6 +61,12 @@ public interface File_Service {
         public List<Map<String, Object>> get_offline_download_list();
 
         public void update_tags_list(String inputTag);
+
+        public List<Map<String, Object>> get_creator_url_list();
+
+        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked);
+
+        public void remove_creator_url(String creatorUrl);
 
         public List<Map<String, String>> get_categories_prefix_list();
 
