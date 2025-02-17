@@ -42,6 +42,11 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -213,6 +218,8 @@ public class File_Service_Impl implements File_Service {
 
         String offlineDownloadFile = "files/data/offline_download_list.json";
         ObjectMapper objectMapper = new ObjectMapper();
+
+        System.out.println("handling update_offline_download_list");
 
         synchronized (JSON_WRITE_LOCK) { // <--- Use a lock if multi-threaded
             try {
@@ -2610,10 +2617,11 @@ public class File_Service_Impl implements File_Service {
                     try {
                         BufferedImage image = ImageIO.read(new URL(imageUrl));
                         if (image != null) {
-                            saveOptimizedPng(image, previewImagePath.toFile());
-                            System.out.println("Saved optimized PNG preview: " + previewImagePath);
+                            downloadImage(imageUrl, previewImagePath);
+                            //ImageIO.write(image, "png", previewImagePath.toFile());
+                            System.out.println("Saved preview image: " + previewImagePath.toString());
                             validImageFound = true;
-                            break;
+                            break; // Stop after the first valid image
                         }
                     } catch (Exception e) {
                         System.out.println("Failed to download or process image from URL: " + imageUrl);
@@ -2626,8 +2634,12 @@ public class File_Service_Impl implements File_Service {
                         String placeholderUrl = "https://placehold.co/350x450.png";
                         BufferedImage placeholderImage = ImageIO.read(new URL(placeholderUrl));
                         if (placeholderImage != null) {
-                            saveOptimizedPng(placeholderImage, previewImagePath.toFile());
-                            System.out.println("No valid image found, used placeholder: " + previewImagePath);
+                            downloadImage(placeholderUrl, previewImagePath);
+                            //ImageIO.write(placeholderImage, "png", previewImagePath.toFile());
+                            System.out.println(
+                                    "No valid image found, using online placeholder: " + previewImagePath.toString());
+                        } else {
+                            System.out.println("Failed to download the online placeholder image.");
                         }
                     } catch (Exception e) {
                         System.out.println("Failed to download or process the placeholder image.");
@@ -2829,18 +2841,34 @@ public class File_Service_Impl implements File_Service {
     // Save a PNG using TwelveMonkeys for better compression.
     // You need the TwelveMonkeys ImageIO plugin on the classpath.
     // ------------------------------------------------------------------------
-    private void saveOptimizedPng(BufferedImage image, File outputFile) throws IOException {
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("png").next();
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(outputFile)) {
-            writer.setOutput(ios);
-            ImageWriteParam param = writer.getDefaultWriteParam();
-            // We can set compression mode & quality (1.0f is “best”).
-            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(1.0f);
+    //This one does not contain meta data
+    // private void saveOptimizedPng(BufferedImage image, File outputFile) throws IOException {
+    //     ImageWriter writer = ImageIO.getImageWritersByFormatName("png").next();
+    //     try (ImageOutputStream ios = ImageIO.createImageOutputStream(outputFile)) {
+    //         writer.setOutput(ios);
+    //         ImageWriteParam param = writer.getDefaultWriteParam();
+    //         // We can set compression mode & quality (1.0f is “best”).
+    //         param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+    //         param.setCompressionQuality(1.0f);
 
-            writer.write(null, new IIOImage(image, null, null), param);
-        } finally {
-            writer.dispose();
+    //         writer.write(null, new IIOImage(image, null, null), param);
+    //     } finally {
+    //         writer.dispose();
+    //     }
+    // }
+
+    public static void downloadImage(String imageUrl, Path previewImagePath) throws Exception {
+        URL url = new URL(imageUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        try (InputStream inputStream = connection.getInputStream();
+                FileOutputStream fileOutputStream = new FileOutputStream(previewImagePath.toFile())) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                fileOutputStream.write(buffer, 0, bytesRead);
+            }
+            System.out.println("Image saved to " + previewImagePath.toString());
         }
     }
 
@@ -2978,6 +3006,108 @@ public class File_Service_Impl implements File_Service {
      */
     private boolean containsIgnoreCase(String source, String keyword) {
         return source != null && keyword != null && source.toLowerCase().contains(keyword.toLowerCase());
+    }
+
+    @Override
+    public void updateAllPngs(Path downloadFolder) throws IOException, InterruptedException {
+
+        // 1) Regex to capture:
+        //    group(1) = modelId       (digits)
+        //    group(2) = versionId     (digits)
+        //    group(3) = baseModel     (word characters)
+        //    group(4) = original name (everything else) before ".preview.png"
+        Pattern FILENAME_PATTERN = Pattern.compile(
+                "^(\\d+)_(\\d+)_(\\w+)_(.+)\\.preview\\.png$");
+
+        // 2) Validate the folder
+        if (!Files.exists(downloadFolder)) {
+            System.out.println("Folder does not exist: " + downloadFolder);
+            return;
+        }
+
+        // 3) Gather all PNG files (recursively)
+        List<Path> pngFiles;
+        try (Stream<Path> walk = Files.walk(downloadFolder)) {
+            pngFiles = walk
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".png"))
+                    .collect(Collectors.toList());
+        }
+
+        if (pngFiles.isEmpty()) {
+            System.out.println("No PNG files found under: " + downloadFolder);
+            return;
+        }
+
+        // 4) Process each PNG
+        for (Path pngFile : pngFiles) {
+            String fileName = pngFile.getFileName().toString();
+            Matcher matcher = FILENAME_PATTERN.matcher(fileName);
+
+            if (!matcher.matches()) {
+                // Skip if it doesn't match the {modelId}_{versionId}_{baseModel}_{fileName}.preview.png pattern
+                System.out.println("Skipping file (no match): " + fileName);
+                continue;
+            }
+
+            // Extract data from the filename
+            String modelId = matcher.group(1); // e.g. "1231563"
+            String versionId = matcher.group(2); // e.g. "51651"
+            String baseModel = matcher.group(3); // e.g. "Pony"
+            String origName = matcher.group(4); // e.g. "abcdef"
+
+            System.out.println("\n=== Found PNG: " + fileName + " ===");
+            System.out.println("  modelId   = " + modelId);
+            System.out.println("  versionId = " + versionId);
+            System.out.println("  baseModel = " + baseModel);
+            System.out.println("  fileName  = " + origName);
+
+            // 5) Get a replacement PNG URL (placeholder logic)
+            String newPngUrl = null;
+            try {
+                // Normally you’d do an HTTP call here to fetch a real URL based on modelId/versionId
+                // For demonstration, we just use a placeholder image
+                newPngUrl = "https://placehold.co/350x450.png";
+            } catch (Exception e) {
+                System.out.println("  Failed to get new PNG URL, skipping: " + fileName);
+                e.printStackTrace();
+                continue;
+            }
+
+            // 6) If we got a valid URL, download & overwrite
+            if (newPngUrl != null && !newPngUrl.isEmpty()) {
+                System.out.println("  Downloading new image from: " + newPngUrl);
+                try {
+                    // Raw download of the image bytes (inline logic)
+                    URL url = new URL(newPngUrl);
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("GET");
+
+                    // If your server needs auth headers, set them here:
+                    // connection.setRequestProperty("Authorization", "Bearer <token>");
+
+                    // Download & overwrite the file
+                    try (InputStream in = connection.getInputStream();
+                            FileOutputStream out = new FileOutputStream(pngFile.toFile())) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, bytesRead);
+                        }
+                    }
+                    System.out.println("  Overwrote " + fileName + " with new image bytes.");
+
+                } catch (Exception e) {
+                    System.out.println("  Download or file overwrite failed: " + fileName);
+                    e.printStackTrace();
+                }
+            } else {
+                System.out.println("  Invalid or empty URL, skipping: " + fileName);
+            }
+
+            // 7) Delay 1 second (1000 ms) to avoid spamming requests
+            Thread.sleep(1000);
+        }
     }
 
 }

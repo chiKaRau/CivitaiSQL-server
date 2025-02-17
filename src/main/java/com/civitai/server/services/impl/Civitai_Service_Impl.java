@@ -95,6 +95,8 @@ public class Civitai_Service_Impl implements Civitai_Service {
     public Optional<Map<String, Object>> findModelByVersionID(String versionID) {
         try {
 
+            System.out.println("Calling findModelByVersionID");
+
             // Fetch the Tags using restTemplate
             Map<String, Object> response = restTemplate.getForObject(CIVITAI_MODELS_VERSION_ENDPOINT + versionID,
                     Map.class);

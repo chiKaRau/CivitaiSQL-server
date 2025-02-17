@@ -1284,4 +1284,65 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         }
 
+        @Override
+        public Optional<String> findFirstImageUrlByModelNumberAndVersionNumber(String modelNumber,
+                        String versionNumber) {
+                try {
+                        // Step 1: Get the entity for the given modelNumber
+                        List<Models_Table_Entity> entityList = models_Table_Repository.findByModelNumber(modelNumber);
+
+                        if (entityList == null || entityList.isEmpty()) {
+                                return Optional.empty();
+                        }
+
+                        // Step 2: Filter by versionNumber
+                        Models_Table_Entity matchingEntity = entityList.stream()
+                                        .filter(e -> versionNumber.equals(e.getVersionNumber()))
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (matchingEntity == null) {
+                                return Optional.empty();
+                        }
+
+                        // Step 3: Get the corresponding record in Models_Images_Table_Entity
+                        Optional<Models_Images_Table_Entity> imagesEntityOpt = models_Images_Table_Repository
+                                        .findById(matchingEntity.getId());
+                        if (!imagesEntityOpt.isPresent()) {
+                                return Optional.empty();
+                        }
+
+                        Models_Images_Table_Entity imagesEntity = imagesEntityOpt.get();
+
+                        // Step 4: Parse the JSON in imageUrls
+                        List<Map<String, Object>> imageUrlsList = JsonUtils.convertStringToObject(
+                                        imagesEntity.getImageUrls(), List.class);
+
+                        // Step 5: Return the first image's "url"
+                        if (imageUrlsList == null || imageUrlsList.isEmpty()) {
+                                return Optional.empty();
+                        }
+
+                        // The JSON structure was something like: 
+                        // [
+                        //   {
+                        //     "url" : "https://.../image1.jpg",
+                        //     "nsfw": "Soft",
+                        //     "width": 512,
+                        //     "height": 512
+                        //   },
+                        //   ...
+                        // ]
+                        String firstImageUrl = (String) imageUrlsList.get(0).get("url");
+                        return Optional.ofNullable(firstImageUrl);
+
+                } catch (DataAccessException e) {
+                        log.error("Database error while retrieving first image URL", e);
+                        throw new CustomDatabaseException("An unexpected database error occurred", e);
+                } catch (Exception e) {
+                        log.error("Error while retrieving first image URL", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
 }

@@ -1,12 +1,23 @@
 package com.civitai.server.controllers;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,17 +36,136 @@ import com.civitai.server.utils.CustomResponse;
 
 import com.civitai.server.utils.JsonUtils;
 
+import jakarta.annotation.PostConstruct;
+
 @RestController
 @RequestMapping("/api")
 public class File_Controller {
 
     private File_Service fileService;
     private Civitai_Service civitai_Service;
+    private CivitaiSQL_Service civitaiSQL_Service;
+
+    // @PostConstruct
+    // public void createFileAtStartup() {
+    //     try {
+    //         Path downloadFolder = Paths
+    //                 .get("G:\\Start_Here_Mac.app\\Formats\\AI Tools\\Stable Diffusion\\BackUp\\Temp\\New folder");
+    //         updateAllPngs(downloadFolder);
+    //     } catch (Exception e) {
+    //         e.printStackTrace();
+    //     }
+    // }
+
+    // // ---------------------------------------------------------------
+    // // The SINGLE METHOD that does the update process
+    // // ---------------------------------------------------------------
+    // private void updateAllPngs(Path downloadFolder) throws InterruptedException, IOException {
+
+    //     // Regex to match:
+    //     //   {modelId}_{versionId}_{baseModel}_{someName}.preview.png
+    //     // Example: "1231563_51651_Pony_abcdef.preview.png"
+    //     Pattern FILENAME_PATTERN = Pattern.compile(
+    //             "^(\\d+)_(\\d+)_(\\w+)_(.+)\\.preview\\.png$");
+
+    //     // 1) Validate folder
+    //     if (!Files.exists(downloadFolder)) {
+    //         System.out.println("Folder does not exist: " + downloadFolder);
+    //         return;
+    //     }
+
+    //     // 2) Gather *.png files (recursively)
+    //     List<Path> pngFiles;
+    //     try (Stream<Path> walk = Files.walk(downloadFolder)) {
+    //         pngFiles = walk
+    //                 .filter(Files::isRegularFile)
+    //                 .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".png"))
+    //                 .collect(Collectors.toList());
+    //     }
+
+    //     if (pngFiles.isEmpty()) {
+    //         System.out.println("No PNG files found under: " + downloadFolder);
+    //         return;
+    //     }
+
+    //     // 3) Loop through each .png
+    //     for (Path pngFile : pngFiles) {
+    //         String fileName = pngFile.getFileName().toString();
+    //         Matcher matcher = FILENAME_PATTERN.matcher(fileName);
+
+    //         // Skip if not matching your naming pattern
+    //         if (!matcher.matches()) {
+    //             System.out.println("Skipping file (no match): " + fileName);
+    //             continue;
+    //         }
+
+    //         // Extract modelId, versionId, baseModel, etc.
+    //         String modelId = matcher.group(1); // e.g. "1231563"
+    //         String versionId = matcher.group(2); // e.g. "51651"
+    //         String baseModel = matcher.group(3); // e.g. "Pony"
+    //         String origName = matcher.group(4); // e.g. "abcdef"
+
+    //         System.out.println("\n=== Found PNG: " + fileName + " ===");
+    //         System.out.println("  modelId   = " + modelId);
+    //         System.out.println("  versionId = " + versionId);
+    //         System.out.println("  baseModel = " + baseModel);
+    //         System.out.println("  fileName  = " + origName);
+
+    //         // 4) Retrieve the image URL from your database/service
+    //         //    Adjust to match your method signature:
+    //         //    findFirstImageUrlByModelNumberAndVersionNumber(String model, String version)
+    //         Optional<String> urlOpt = civitaiSQL_Service.findFirstImageUrlByModelNumberAndVersionNumber(modelId,
+    //                 versionId);
+
+    //         if (!urlOpt.isPresent() || urlOpt.get().isEmpty()) {
+    //             System.out.println("No image URL found in DB for " + modelId + "/" + versionId + "; skipping.");
+    //             continue;
+    //         }
+
+    //         String remoteImageUrl = urlOpt.get();
+    //         System.out.println("  DB returned URL: " + remoteImageUrl);
+
+    //         // 5) Download raw bytes from that URL & overwrite local .png
+    //         try {
+    //             downloadImage(remoteImageUrl, pngFile);
+    //             System.out.println("  Overwrote local PNG: " + pngFile);
+    //         } catch (Exception e) {
+    //             System.out.println("  Download/overwrite failed for file: " + fileName);
+    //             e.printStackTrace();
+    //         }
+
+    //         // 6) Delay 1 second to avoid spamming
+    //         Thread.sleep(2000);
+    //     }
+    // }
+
+    // ---------------------------------------------------------------
+    // The "raw byte" download in the same class for convenience
+    // ---------------------------------------------------------------
+    private void downloadImage(String imageUrl, Path outputPath) throws Exception {
+        URL url = new URL(imageUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+
+        // If you need auth headers, do it here:
+        // connection.setRequestProperty("Authorization", "Bearer <token>");
+
+        try (InputStream inputStream = connection.getInputStream();
+                FileOutputStream fileOutputStream = new FileOutputStream(outputPath.toFile())) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                fileOutputStream.write(buffer, 0, bytesRead);
+            }
+        }
+    }
 
     @Autowired
-    public File_Controller(File_Service fileService, Civitai_Service civitai_Service) {
+    public File_Controller(File_Service fileService, Civitai_Service civitai_Service,
+            CivitaiSQL_Service civitaiSQL_Service) {
         this.fileService = fileService;
         this.civitai_Service = civitai_Service;
+        this.civitaiSQL_Service = civitaiSQL_Service;
     }
 
     @GetMapping("/open-download-directory")
@@ -288,8 +418,13 @@ public class File_Controller {
     public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadList(
             @RequestBody Map<String, Object> requestBody) {
 
+        // Extract the input parameters
         Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
-        String civitaiFileName = ((String) modelObject.get("civitaiFileName"));
+        if (modelObject == null) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        String civitaiFileName = (String) modelObject.get("civitaiFileName");
         List<Map<String, Object>> civitaiModelFileList = (List<Map<String, Object>>) modelObject
                 .get("civitaiModelFileList");
         String downloadFilePath = (String) modelObject.get("downloadFilePath");
@@ -298,48 +433,93 @@ public class File_Controller {
         String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
         String selectedCategory = (String) modelObject.get("selectedCategory");
         Boolean isModifyMode = (Boolean) requestBody.get("isModifyMode");
-        List<String> civitaiTags = (List<String>) modelObject.get("civitaiTags") != null
+        List<String> civitaiTags = modelObject.get("civitaiTags") != null
                 ? (List<String>) modelObject.get("civitaiTags")
-                : new ArrayList<>(); // Assign an empty list or handle accordingly
+                : new ArrayList<>();
 
-        // Validate null or empty
-        if (modelObject == null ||
-                civitaiUrl == null || civitaiUrl == "" ||
-                downloadFilePath == null || downloadFilePath == "" ||
-                civitaiUrl == null || civitaiUrl == "" ||
-                civitaiModelID == null || civitaiModelID == "" ||
-                civitaiVersionID == null || civitaiVersionID == "" ||
-                selectedCategory == null || selectedCategory == "" ||
-                civitaiModelFileList == null || civitaiModelFileList.isEmpty() || civitaiTags == null) {
+        // Validate required parameters (using isEmpty() for String checks)
+        if (civitaiUrl == null || civitaiUrl.isEmpty() ||
+                downloadFilePath == null || downloadFilePath.isEmpty() ||
+                civitaiModelID == null || civitaiModelID.isEmpty() ||
+                civitaiVersionID == null || civitaiVersionID.isEmpty() ||
+                selectedCategory == null || selectedCategory.isEmpty() ||
+                civitaiModelFileList == null || civitaiModelFileList.isEmpty()) {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        try {
+        // Retry mechanism: try up to 5 times with 1-second delay between attempts.
+        final int maxAttempts = 5;
+        boolean success = false;
+        Exception lastException = null;
 
-            Optional<Map<String, Object>> modelVersionOptional = civitai_Service.findModelByVersionID(civitaiVersionID);
-
-            if (!modelVersionOptional.isPresent()) {
-                return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-            } else {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                // Attempt to find the model by version ID.
+                Optional<Map<String, Object>> modelVersionOptional = civitai_Service
+                        .findModelByVersionID(civitaiVersionID);
+                if (!modelVersionOptional.isPresent()) {
+                    throw new Exception("Model version not found");
+                }
                 Map<String, Object> modelVersionObject = modelVersionOptional.get();
 
-                // Extract URLs
+                // Extract image URLs from the model version object.
                 String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
 
-                fileService.update_offline_download_list(civitaiFileName, civitaiModelFileList, downloadFilePath,
-                        modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
-                        (String) modelVersionObject.get("baseModel"), imageUrlsArray, selectedCategory, civitaiTags,
+                // Update the offline download list.
+                fileService.update_offline_download_list(
+                        civitaiFileName,
+                        civitaiModelFileList,
+                        downloadFilePath,
+                        modelVersionObject,
+                        civitaiModelID,
+                        civitaiVersionID,
+                        civitaiUrl,
+                        (String) modelVersionObject.get("baseModel"),
+                        imageUrlsArray,
+                        selectedCategory,
+                        civitaiTags,
                         isModifyMode);
+
+                // Update the folder list.
                 fileService.update_folder_list(downloadFilePath);
 
-                return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
-            }
+                // Log success
+                System.out.println("Updated the offline List for: "
+                        + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
+                System.out.println("URL: " + civitaiUrl);
 
-        } catch (Exception ex) {
-            System.err.println("Error - " + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName + " : "
-                    + ex.getMessage());
+                // Mark the attempt as successful and exit the loop.
+                success = true;
+                break;
+            } catch (Exception ex) {
+                lastException = ex;
+                System.err.println("Attempt " + attempt + " failed for " + civitaiModelID + "_" + civitaiVersionID + "_"
+                        + civitaiFileName);
+
+                // Wait 1 second before trying again (unless this was the last attempt)
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(1000); // Delay in milliseconds
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        // Optionally break out if the thread is interrupted
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!success) {
+            // Log final error message
+            System.err.println("Error - Failed Updating the offline List for: "
+                    + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
+            System.err.println("URL: " + civitaiUrl);
+            System.err
+                    .println("Final error: " + (lastException != null ? lastException.getMessage() : "Unknown error"));
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
+
+        return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,7 @@
 package com.civitai.server.services;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -81,4 +83,6 @@ public interface File_Service {
                         String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray);
 
         public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords);
+
+        public void updateAllPngs(Path downloadFolder) throws IOException, InterruptedException;
 }
