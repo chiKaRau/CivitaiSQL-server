@@ -1345,4 +1345,22 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        /**
+         * Bulk updates the localPath for each record matching the modelID and versionID pairs.
+         *
+         * @param fileArray a list of maps each containing "modelID" and "versionID"
+         * @param localPath the new localPath value to set
+         * @return the number of records updated
+         */
+        @Override
+        public int updateLocalPath(List<Map<String, Object>> fileArray, String localPath) {
+                List<Object[]> pairs = new ArrayList<>();
+                for (Map<String, Object> file : fileArray) {
+                        String modelID = (String) file.get("modelID");
+                        String versionID = (String) file.get("versionID");
+                        pairs.add(new Object[] { modelID, versionID });
+                }
+                return models_Table_Repository.updateLocalPathByPairsDynamic(pairs, localPath);
+        }
+
 }

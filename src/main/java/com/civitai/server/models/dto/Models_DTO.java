@@ -19,6 +19,8 @@ public class Models_DTO {
 
     private List<String> localTags;
 
+    private List<String> aliases;
+
     private String url;
 
     private String category;
@@ -34,6 +36,8 @@ public class Models_DTO {
     private String type;
 
     private String stats;
+
+    private String localPath;
 
     private LocalDate uploaded;
 

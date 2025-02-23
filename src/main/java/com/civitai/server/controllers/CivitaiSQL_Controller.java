@@ -576,6 +576,18 @@ public class CivitaiSQL_Controller {
 
     }
 
+    @PostMapping("/update-local-path")
+    public ResponseEntity<CustomResponse<String>> updateLocalPath(
+            @RequestBody Map<String, Object> requestBody) {
+
+        List<Map<String, Object>> fileArray = (List<Map<String, Object>>) requestBody.get("fileArray");
+        String localPath = (String) requestBody.get("localPath");
+
+        int updatedCount = civitaiSQL_Service.updateLocalPath(fileArray, localPath);
+
+        return ResponseEntity.ok().body(CustomResponse.success("Model Updated successfully"));
+    }
+
     @PostMapping("/update-record-to-all-tables")
     public ResponseEntity<CustomResponse<String>> updateRecordToAllTables(
             @RequestBody Map<String, Object> requestBody) {

@@ -78,4 +78,6 @@ public interface CivitaiSQL_Service {
     Optional<String> findFirstImageUrlByModelNumberAndVersionNumber(String modelNumber,
             String versionNumber);
 
+    int updateLocalPath(List<Map<String, Object>> fileArray, String localPath);
+
 }

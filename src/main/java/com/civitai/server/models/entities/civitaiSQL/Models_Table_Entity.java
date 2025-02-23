@@ -33,6 +33,12 @@ public class Models_Table_Entity {
     @Column(name = "local_tags", columnDefinition = "JSON")
     private String localTags;
 
+    @Column(name = "aliases", columnDefinition = "JSON")
+    private String aliases;
+
+    @Column(name = "local_path")
+    private String localPath;
+
     @Column(name = "category")
     private String category;
 
