@@ -2579,11 +2579,32 @@ public class File_Service_Impl implements File_Service {
 
                     System.out.println("Starting download: " + downloadUrl + " to " + filePath);
 
-                    try (InputStream inputStream = downloadUrl.openStream()) {
-                        ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
-                        System.out.println("Downloaded file: " + filePath);
-                        // If we get here, at least one file has succeeded
-                        anyFileDownloaded = true;
+                    // Retry mechanism for ensuring complete download
+                    int maxRetries = 3;
+                    boolean success = false;
+                    for (int attempt = 1; attempt <= maxRetries && !success; attempt++) {
+                        try (InputStream inputStream = downloadUrl.openStream()) {
+                            // Perform the file download with a progress indicator
+                            ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
+                        }
+
+                        long downloadedSize = Files.size(filePath);
+                        if (downloadedSize != totalSize) {
+                            System.err.println("Attempt " + attempt + ": Incomplete download. Expected "
+                                    + totalSize + " bytes, but got " + downloadedSize + " bytes.");
+                            if (attempt == maxRetries) {
+                                // After max attempts, throw a CustomException to abort the process
+                                throw new CustomException("Incomplete download after " + attempt
+                                        + " attempts for file: " + fileName, null);
+                            }
+                            // Delete the incomplete file before retrying
+                            Files.deleteIfExists(filePath);
+                            System.out.println("Retrying download (attempt " + (attempt + 1) + ")...");
+                        } else {
+                            success = true;
+                            System.out.println("Downloaded file: " + filePath);
+                            anyFileDownloaded = true;
+                        }
                     }
                 } catch (IOException e) {
                     System.err.println("Failed to download file: " + prepareUrl);

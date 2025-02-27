@@ -80,4 +80,7 @@ public interface CivitaiSQL_Service {
 
     int updateLocalPath(List<Map<String, Object>> fileArray, String localPath);
 
+    public Optional<List<Models_DTO>> findListOfModelsDTOByModelAndVersion(
+                        List<Map<String, String>> compositeList);
+
 }

@@ -3,9 +3,15 @@ package com.civitai.server.repositories.civitaiSQL.impl;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.CustomModelsTableRepository;
 
 import java.util.ArrayList;
@@ -43,4 +49,27 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
 
         return query.executeUpdate();
     }
+
+    @Override
+    public List<Models_Table_Entity> findByModelNumberAndVersionNumberIn(List<Object[]> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Models_Table_Entity> query = cb.createQuery(Models_Table_Entity.class);
+        Root<Models_Table_Entity> root = query.from(Models_Table_Entity.class);
+
+        List<Predicate> predicates = new ArrayList<>();
+        for (Object[] pair : pairs) {
+            String modelID = (String) pair[0];
+            String versionID = (String) pair[1];
+            Predicate condition = cb.and(
+                    cb.equal(root.get("modelNumber"), modelID),
+                    cb.equal(root.get("versionNumber"), versionID));
+            predicates.add(condition);
+        }
+        query.where(cb.or(predicates.toArray(new Predicate[0])));
+        return entityManager.createQuery(query).getResultList();
+    }
+
 }

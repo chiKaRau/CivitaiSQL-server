@@ -588,6 +588,25 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("Model Updated successfully"));
     }
 
+    @PostMapping("/scan-local-files")
+    public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> searchModels(
+            @RequestBody Map<String, Object> requestBody) {
+        // Expecting the requestBody to contain "compositeList", a list of maps each with "modelID" and "versionID"
+        List<Map<String, String>> compositeList = (List<Map<String, String>>) requestBody.get("compositeList");
+        Optional<List<Models_DTO>> modelsOptional = civitaiSQL_Service
+                .findListOfModelsDTOByModelAndVersion(compositeList);
+        if (modelsOptional.isPresent()) {
+            List<Models_DTO> entityList = modelsOptional.get();
+
+            Map<String, List<Models_DTO>> payload = new HashMap<>();
+            payload.put("modelsList", entityList);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
+        } else {
+            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+        }
+    }
+
     @PostMapping("/update-record-to-all-tables")
     public ResponseEntity<CustomResponse<String>> updateRecordToAllTables(
             @RequestBody Map<String, Object> requestBody) {

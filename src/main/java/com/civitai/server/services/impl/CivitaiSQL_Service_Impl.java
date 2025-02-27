@@ -49,7 +49,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
@@ -1361,6 +1361,37 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         pairs.add(new Object[] { modelID, versionID });
                 }
                 return models_Table_Repository.updateLocalPathByPairsDynamic(pairs, localPath);
+        }
+
+        /**
+        * Retrieves a list of Models_DTO by searching for records matching a list of composite key pairs.
+        *
+        * @param compositeList a list of maps, each containing "modelID" and "versionID"
+        * @return an Optional list of Models_DTO
+        */
+        @Override
+        @Transactional(readOnly = true)
+        public Optional<List<Models_DTO>> findListOfModelsDTOByModelAndVersion(
+                        List<Map<String, String>> compositeList) {
+                if (compositeList == null || compositeList.isEmpty()) {
+                        return Optional.empty();
+                }
+                List<Object[]> pairs = new ArrayList<>();
+                for (Map<String, String> map : compositeList) {
+                        String modelID = map.get("modelID");
+                        String versionID = map.get("versionID");
+                        pairs.add(new Object[] { modelID, versionID });
+                }
+                List<Models_Table_Entity> entityList = models_Table_Repository
+                                .findByModelNumberAndVersionNumberIn(pairs);
+                if (entityList == null || entityList.isEmpty()) {
+                        return Optional.empty();
+                }
+                // Convert entities to DTOs. You may use your existing convertToDTO method.
+                List<Models_DTO> modelsDTOList = entityList.stream()
+                                .map(this::convertToDTO)
+                                .collect(Collectors.toList());
+                return Optional.of(modelsDTOList);
         }
 
 }
