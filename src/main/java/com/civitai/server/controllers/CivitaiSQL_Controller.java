@@ -1,6 +1,7 @@
 package com.civitai.server.controllers;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +30,9 @@ import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.services.File_Service;
 import com.civitai.server.utils.CustomResponse;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 @RestController
 @RequestMapping("/api")
@@ -665,6 +670,162 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.ok()
                     .body(CustomResponse.failure("Model not found in the database"));
         }
+    }
+
+    @PostMapping("/update-record-by-model-and-version")
+    public ResponseEntity<CustomResponse<String>> updateRecordByModelAndVersion(
+            @RequestBody Map<String, Object> requestBody) {
+        try {
+            // Retrieve required parameters from the request body
+            String modelId = (String) requestBody.get("modelId"); // corresponds to modelNumber
+            String versionId = (String) requestBody.get("versionId"); // corresponds to versionNumber
+            List<String> fieldsToUpdate = (List<String>) requestBody.get("fieldsToUpdate");
+
+            // Validate required input parameters
+            if (modelId == null || modelId.isEmpty() ||
+                    versionId == null || versionId.isEmpty() ||
+                    fieldsToUpdate == null || fieldsToUpdate.isEmpty()) {
+                return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+            }
+
+            // Build the DTO based on only the fields specified in fieldsToUpdate.
+            Models_DTO models_DTO = new Models_DTO();
+            if (fieldsToUpdate.contains("name") && requestBody.get("name") != null) {
+                models_DTO.setName((String) requestBody.get("name"));
+            }
+            if (fieldsToUpdate.contains("mainModelName") && requestBody.get("mainModelName") != null) {
+                models_DTO.setMainModelName((String) requestBody.get("mainModelName"));
+            }
+            if (fieldsToUpdate.contains("tags") && requestBody.get("tags") != null) {
+                models_DTO.setTags((List<String>) requestBody.get("tags"));
+            }
+            if (fieldsToUpdate.contains("localTags") && requestBody.get("localTags") != null) {
+                models_DTO.setLocalTags((List<String>) requestBody.get("localTags"));
+            }
+            if (fieldsToUpdate.contains("aliases") && requestBody.get("aliases") != null) {
+                models_DTO.setAliases((List<String>) requestBody.get("aliases"));
+            }
+            if (fieldsToUpdate.contains("versionNumber") && requestBody.get("versionNumber") != null) {
+                models_DTO.setVersionNumber((String) requestBody.get("versionNumber"));
+            }
+            if (fieldsToUpdate.contains("modelNumber") && requestBody.get("modelNumber") != null) {
+                models_DTO.setModelNumber((String) requestBody.get("modelNumber"));
+            }
+            if (fieldsToUpdate.contains("triggerWords") && requestBody.get("triggerWords") != null) {
+                models_DTO.setTriggerWords((List<String>) requestBody.get("triggerWords"));
+            }
+            if (fieldsToUpdate.contains("description") && requestBody.get("description") != null) {
+                models_DTO.setDescription((String) requestBody.get("description"));
+            }
+            if (fieldsToUpdate.contains("type") && requestBody.get("type") != null) {
+                models_DTO.setType((String) requestBody.get("type"));
+            }
+            if (fieldsToUpdate.contains("stats") && requestBody.get("stats") != null) {
+                Object statsObj = requestBody.get("stats");
+                String statsString;
+                if (statsObj instanceof String) {
+                    statsString = (String) statsObj;
+                } else {
+                    // Convert the LinkedHashMap (or any object) to a JSON string.
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    try {
+                        statsString = objectMapper.writeValueAsString(statsObj);
+                    } catch (JsonProcessingException e) {
+                        throw new RuntimeException("Error serializing stats field", e);
+                    }
+                }
+                models_DTO.setStats(statsString);
+            }
+            if (fieldsToUpdate.contains("localPath") && requestBody.get("localPath") != null) {
+                models_DTO.setLocalPath((String) requestBody.get("localPath"));
+            }
+            if (fieldsToUpdate.contains("uploaded") && requestBody.get("uploaded") != null) {
+                // Assuming uploaded is passed as a String in ISO format (yyyy-MM-dd)
+                models_DTO.setUploaded(LocalDate.parse((String) requestBody.get("uploaded")));
+            }
+            if (fieldsToUpdate.contains("baseModel") && requestBody.get("baseModel") != null) {
+                models_DTO.setBaseModel((String) requestBody.get("baseModel"));
+            }
+            if (fieldsToUpdate.contains("hash") && requestBody.get("hash") != null) {
+                models_DTO.setHash((String) requestBody.get("hash"));
+            }
+            if (fieldsToUpdate.contains("usageTips") && requestBody.get("usageTips") != null) {
+                models_DTO.setUsageTips((String) requestBody.get("usageTips"));
+            }
+            if (fieldsToUpdate.contains("creatorName") && requestBody.get("creatorName") != null) {
+                models_DTO.setCreatorName((String) requestBody.get("creatorName"));
+            }
+            if (fieldsToUpdate.contains("nsfw") && requestBody.get("nsfw") != null) {
+                models_DTO.setNsfw((Boolean) requestBody.get("nsfw"));
+            }
+            if (fieldsToUpdate.contains("flag") && requestBody.get("flag") != null) {
+                models_DTO.setFlag((Boolean) requestBody.get("flag"));
+            }
+            if (fieldsToUpdate.contains("urlAccessable") && requestBody.get("urlAccessable") != null) {
+                models_DTO.setUrlAccessable((Boolean) requestBody.get("urlAccessable"));
+            }
+            if (fieldsToUpdate.contains("imageUrls") && requestBody.get("imageUrls") != null) {
+                models_DTO.setImageUrls((List<Map<String, Object>>) requestBody.get("imageUrls"));
+            }
+
+            System.out.println("HELLO");
+            System.out.println(models_DTO);
+
+            // Look up the record using modelId and versionId (i.e. modelNumber and versionNumber)
+            Optional<Models_Table_Entity> mySQLEntityOptional = civitaiSQL_Service
+                    .find_one_from_models_table_by_model_and_version(modelId, versionId);
+
+            if (mySQLEntityOptional.isPresent()) {
+                // Retrieve the primary key from the found record and update all related tables.
+                Integer id = mySQLEntityOptional.get().getId();
+                civitaiSQL_Service.update_record_to_all_tables_by_model_and_version(models_DTO, id, fieldsToUpdate);
+                System.out.println(
+                        "Record with modelId " + modelId + " and versionId " + versionId + " has been updated.");
+                return ResponseEntity.ok().body(CustomResponse.success("Model updated successfully"));
+            } else {
+                return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the database"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(CustomResponse.failure("An error occurred: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/find-virtual-files")
+    public ResponseEntity<CustomResponse<List<Map<String, Object>>>> findVirtualFiles(
+            @RequestBody Map<String, String> requestBody) {
+
+        String path = requestBody.get("path");
+        if (path == null || path.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Provided path is empty or null"));
+        }
+
+        Optional<List<Map<String, Object>>> filesOptional = civitaiSQL_Service.findVirtualFiles(path);
+
+        return filesOptional
+                .map(files -> ResponseEntity.ok(CustomResponse.success("Virtual files retrieved successfully", files)))
+                .orElseGet(() -> ResponseEntity.ok(CustomResponse.failure("No virtual files found")));
+    }
+
+    @PostMapping("/find-virtual-directories")
+    public ResponseEntity<CustomResponse<List<Map<String, String>>>> findVirtualDirectories(
+            @RequestBody Map<String, String> requestBody) {
+
+        String path = requestBody.get("path");
+        if (path == null || path.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Provided path is empty or null"));
+        }
+
+        Optional<List<Map<String, String>>> directoriesOptional = civitaiSQL_Service
+                .findVirtualDirectoriesWithDrive(path);
+
+        return directoriesOptional
+                .map(dirs -> ResponseEntity
+                        .ok(CustomResponse.success("Virtual directories retrieved successfully", dirs)))
+                .orElseGet(() -> ResponseEntity.ok(CustomResponse.failure("No virtual directories found")));
     }
 
 }

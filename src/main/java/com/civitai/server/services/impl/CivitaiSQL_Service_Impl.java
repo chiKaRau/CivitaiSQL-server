@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -921,6 +922,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 Models_DTO models_DTO = new Models_DTO();
                 models_DTO.setId(tables_DTO.getModels_Table_Entitiy().getId());
                 models_DTO.setName(tables_DTO.getModels_Table_Entitiy().getName());
+                models_DTO.setMainModelName(tables_DTO.getModels_Table_Entitiy().getMainModelName());
                 models_DTO.setTags(JsonUtils.convertStringToObject(
                                 tables_DTO.getModels_Table_Entitiy().getTags(), List.class));
                 models_DTO.setCategory(tables_DTO.getModels_Table_Entitiy().getCategory());
@@ -1392,6 +1394,188 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 .map(this::convertToDTO)
                                 .collect(Collectors.toList());
                 return Optional.of(modelsDTOList);
+        }
+
+        @Transactional
+        @Override
+        public void update_record_to_all_tables_by_model_and_version(Models_DTO dto, Integer id,
+                        List<String> fieldsToUpdate) {
+                try {
+                        updateModelsTableByFields(dto, id, fieldsToUpdate);
+                        updateModelsUrlsTableByFields(dto, id, fieldsToUpdate);
+                        updateModelsDescriptionTableByFields(dto, id, fieldsToUpdate);
+                        updateModelsDetailsTableByFields(dto, id, fieldsToUpdate);
+                        updateModelsImagesTableByFields(dto, id, fieldsToUpdate);
+                } catch (Exception e) {
+                        log.error("Error while updating record into all tables by model and version", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
+        @Transactional
+        private void updateModelsTableByFields(Models_DTO dto, Integer id, List<String> fieldsToUpdate) {
+                Optional<Models_Table_Entity> entityOptional = models_Table_Repository.findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Table_Entity entity = entityOptional.get();
+                        if (fieldsToUpdate.contains("name")) {
+                                entity.setName(dto.getName());
+                        }
+                        if (fieldsToUpdate.contains("mainModelName")) {
+                                entity.setMainModelName(dto.getMainModelName());
+                        }
+                        if (fieldsToUpdate.contains("tags")) {
+                                entity.setTags(JsonUtils.convertObjectToString(dto.getTags()));
+                        }
+                        if (fieldsToUpdate.contains("localTags")) {
+                                entity.setLocalTags(JsonUtils.convertObjectToString(dto.getLocalTags()));
+                        }
+                        if (fieldsToUpdate.contains("aliases")) {
+                                entity.setAliases(JsonUtils.convertObjectToString(dto.getAliases()));
+                        }
+                        if (fieldsToUpdate.contains("versionNumber")) {
+                                entity.setVersionNumber(dto.getVersionNumber());
+                        }
+                        if (fieldsToUpdate.contains("modelNumber")) {
+                                entity.setModelNumber(dto.getModelNumber());
+                        }
+                        if (fieldsToUpdate.contains("triggerWords")) {
+                                entity.setTriggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()));
+                        }
+                        if (fieldsToUpdate.contains("nsfw")) {
+                                entity.setNsfw(dto.getNsfw());
+                        }
+                        if (fieldsToUpdate.contains("flag")) {
+                                entity.setFlag(dto.getFlag());
+                        }
+                        if (fieldsToUpdate.contains("localPath")) {
+                                entity.setLocalPath(dto.getLocalPath());
+                        }
+                        if (fieldsToUpdate.contains("urlAccessable")) {
+                                entity.setUrlAccessable(dto.getUrlAccessable());
+                        }
+                        models_Table_Repository.save(entity);
+                }
+        }
+
+        @Transactional
+        private void updateModelsUrlsTableByFields(Models_DTO dto, Integer id, List<String> fieldsToUpdate) {
+                Optional<Models_Urls_Table_Entity> entityOptional = models_Urls_Table_Repository.findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Urls_Table_Entity entity = entityOptional.get();
+                        // Update URL if specified (even though URL is ignored at the controller level, you can update it here if needed)
+                        if (fieldsToUpdate.contains("url") && dto.getUrl() != null) {
+                                entity.setUrl(dto.getUrl());
+                        }
+                        models_Urls_Table_Repository.save(entity);
+                }
+        }
+
+        @Transactional
+        private void updateModelsDescriptionTableByFields(Models_DTO dto, Integer id, List<String> fieldsToUpdate) {
+                Optional<Models_Descriptions_Table_Entity> entityOptional = models_Descriptions_Table_Repository
+                                .findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Descriptions_Table_Entity entity = entityOptional.get();
+                        if (fieldsToUpdate.contains("description")) {
+                                entity.setDescription(dto.getDescription());
+                        }
+                        models_Descriptions_Table_Repository.save(entity);
+                }
+        }
+
+        @Transactional
+        private void updateModelsDetailsTableByFields(Models_DTO dto, Integer id, List<String> fieldsToUpdate) {
+                Optional<Models_Details_Table_Entity> entityOptional = models_Details_Table_Repository.findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Details_Table_Entity entity = entityOptional.get();
+                        if (fieldsToUpdate.contains("type")) {
+                                entity.setType(dto.getType());
+                        }
+                        if (fieldsToUpdate.contains("stats")) {
+                                entity.setStats(dto.getStats());
+                        }
+                        if (fieldsToUpdate.contains("uploaded")) {
+                                entity.setUploaded(dto.getUploaded());
+                        }
+                        if (fieldsToUpdate.contains("baseModel")) {
+                                entity.setBaseModel(dto.getBaseModel());
+                        }
+                        if (fieldsToUpdate.contains("hash")) {
+                                entity.setHash(dto.getHash());
+                        }
+                        if (fieldsToUpdate.contains("usageTips")) {
+                                entity.setUsageTips(dto.getUsageTips());
+                        }
+                        if (fieldsToUpdate.contains("creatorName")) {
+                                entity.setCreatorName(dto.getCreatorName());
+                        }
+                        models_Details_Table_Repository.save(entity);
+                }
+        }
+
+        @Transactional
+        private void updateModelsImagesTableByFields(Models_DTO dto, Integer id, List<String> fieldsToUpdate) {
+                Optional<Models_Images_Table_Entity> entityOptional = models_Images_Table_Repository.findById(id);
+                if (entityOptional.isPresent()) {
+                        Models_Images_Table_Entity entity = entityOptional.get();
+                        if (fieldsToUpdate.contains("imageUrls")) {
+                                entity.setImageUrls(JsonUtils.convertObjectToString(dto.getImageUrls()));
+                        }
+                        models_Images_Table_Repository.save(entity);
+                }
+        }
+
+        @Override
+        public Optional<Models_Table_Entity> find_one_from_models_table_by_model_and_version(String modelNumber,
+                        String versionNumber) {
+                return models_Table_Repository.findByModelNumberAndVersionNumber(modelNumber, versionNumber);
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public Optional<List<Map<String, Object>>> findVirtualFiles(String path) {
+                // Remove trailing backslash if present
+                String normalizedPath = path.endsWith("\\") ? path.substring(0, path.length() - 1) : path;
+
+                List<Models_Table_Entity> entities = models_Table_Repository
+                                .findVirtualFilesByExactPath(normalizedPath);
+                if (entities.isEmpty()) {
+                        return Optional.empty();
+                }
+
+                List<Map<String, Object>> result = new ArrayList<>();
+                for (Models_Table_Entity entity : entities) {
+                        Map<String, Object> map = new HashMap<>();
+                        // Extract drive letter (assumes the first character of local_path is the drive letter)
+                        String drive = (entity.getLocalPath() != null && !entity.getLocalPath().isEmpty())
+                                        ? entity.getLocalPath().substring(0, 1)
+                                        : "";
+                        map.put("drive", drive);
+                        map.put("model", convertToDTO(entity));
+                        result.add(map);
+                }
+
+                return Optional.of(result);
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public Optional<List<Map<String, String>>> findVirtualDirectoriesWithDrive(String path) {
+                List<Object[]> results = models_Table_Repository.findVirtualDirectoriesWithDrive(path);
+                if (results == null || results.isEmpty()) {
+                        return Optional.empty();
+                }
+
+                List<Map<String, String>> directories = new ArrayList<>();
+                for (Object[] row : results) {
+                        Map<String, String> map = new HashMap<>();
+                        // Expecting row[0] is drive, row[1] is directory
+                        map.put("drive", row[0] != null ? row[0].toString() : "");
+                        map.put("directory", row[1] != null ? row[1].toString() : "");
+                        directories.add(map);
+                }
+
+                return Optional.of(directories);
         }
 
 }
