@@ -162,7 +162,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         try {
                                 // Call the external service and update the model
-                                Optional<Models_DTO> newUpdateEntityOptional = create_models_DTO_by_Url(url, category);
+                                Optional<Models_DTO> newUpdateEntityOptional = create_models_DTO_by_Url(url, category,
+                                                null);
 
                                 if (newUpdateEntityOptional != null && newUpdateEntityOptional.isPresent()) {
                                         Models_DTO models_DTO = newUpdateEntityOptional.get();
@@ -709,6 +710,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         .category(dto.getCategory())
                                         .versionNumber(dto.getVersionNumber())
                                         .modelNumber(dto.getModelNumber())
+                                        .localPath(dto.getLocalPath())
                                         .triggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()))
                                         .nsfw(dto.getNsfw())
                                         .flag(dto.getFlag())
@@ -950,7 +952,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @SuppressWarnings("unchecked")
-        public Optional<Models_DTO> create_models_DTO_by_Url(String url, String category) {
+        public Optional<Models_DTO> create_models_DTO_by_Url(String url, String category, String downloadFilePath) {
                 try {
 
                         String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
@@ -1140,6 +1142,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 dto.setTags(tags);
                                 dto.setTriggerWords(triggerWords);
                                 dto.setDescription(description);
+                                dto.setLocalPath(downloadFilePath);
                                 dto.setType(type);
                                 dto.setStats(stats);
                                 dto.setUploaded(uploaded);

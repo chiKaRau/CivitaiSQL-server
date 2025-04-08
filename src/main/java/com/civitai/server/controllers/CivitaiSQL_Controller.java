@@ -1,5 +1,6 @@
 package com.civitai.server.controllers;
 
+import java.io.File;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -558,6 +559,24 @@ public class CivitaiSQL_Controller {
 
         String category = (String) requestBody.get("category");
         String url = (String) requestBody.get("url");
+        String downloadFilePath = (String) requestBody.get("downloadFilePath");
+
+        if (downloadFilePath == "") {
+            downloadFilePath = null;
+        } else {
+            downloadFilePath = "F:\\Coding Projects\\Java\\CivitaiSQL Server\\server\\files\\download" + File.separator
+                    + downloadFilePath.replaceFirst("^/", "").replace("/", File.separator);
+
+            // Convert the file path to a URL format (using forward slashes)
+            String fileUrl = downloadFilePath.replace("\\", "/");
+            // Create an OSC 8 hyperlink for clickable output.
+            String clickableDownloadPath = "\033]8;;file:///" + fileUrl + "\033\\"
+                    + downloadFilePath
+                    + "\033]8;;\033\\";
+
+            System.out.println("downloadFilePath: " + clickableDownloadPath);
+
+        }
 
         // Validate null or empty
         if (category == null || category.isEmpty() || url == null || url == "") {
@@ -565,7 +584,8 @@ public class CivitaiSQL_Controller {
         }
 
         //Fetch the Civitai Model Data then create a new Models_DTO
-        Optional<Models_DTO> entityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
+        Optional<Models_DTO> entityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category,
+                downloadFilePath);
 
         if (entityOptional.isPresent()) {
             Models_DTO models_DTO = entityOptional.get();
@@ -626,7 +646,7 @@ public class CivitaiSQL_Controller {
         }
 
         //Fetch the Civitai Model Data then create a new Models_DTO
-        Optional<Models_DTO> newUpdateEntityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category);
+        Optional<Models_DTO> newUpdateEntityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category, null);
 
         //Find if the model exists in the database
         Optional<Models_Table_Entity> mySQLEntityOptional = civitaiSQL_Service.find_one_from_models_table(id);

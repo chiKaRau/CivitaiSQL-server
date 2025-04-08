@@ -73,7 +73,7 @@ public interface CivitaiSQL_Service {
         // Utils
         Models_DTO convertToDTO(Models_Table_Entity entity);
 
-        Optional<Models_DTO> create_models_DTO_by_Url(String url, String category);
+        Optional<Models_DTO> create_models_DTO_by_Url(String url, String category, String downloadFilePath);
 
         Optional<String> findFirstImageUrlByModelNumberAndVersionNumber(String modelNumber,
                         String versionNumber);
