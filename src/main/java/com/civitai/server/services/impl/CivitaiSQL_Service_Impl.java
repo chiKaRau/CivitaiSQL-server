@@ -932,6 +932,18 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 models_DTO.setModelNumber(tables_DTO.getModels_Table_Entitiy().getModelNumber());
                 models_DTO.setTriggerWords(JsonUtils.convertStringToObject(
                                 tables_DTO.getModels_Table_Entitiy().getTriggerWords(), List.class));
+                models_DTO.setLocalPath(tables_DTO.getModels_Table_Entitiy().getLocalPath());
+                String rawLocalTags = tables_DTO.getModels_Table_Entitiy().getLocalTags();
+                if (rawLocalTags != null) {
+                        List<?> tempList = JsonUtils.convertStringToObject(rawLocalTags, List.class);
+                        // Cast and filter if necessary, assuming all elements are strings:
+                        List<String> localTags = tempList.stream()
+                                        .map(Object::toString)
+                                        .collect(Collectors.toList());
+                        models_DTO.setLocalTags(localTags);
+                } else {
+                        models_DTO.setLocalTags(Collections.emptyList());
+                }
                 models_DTO.setUrl(tables_DTO.getModels_Urls_Table_Entity().getUrl());
                 models_DTO.setDescription(
                                 tables_DTO.getModels_Descriptions_Table_Entity().getDescription());

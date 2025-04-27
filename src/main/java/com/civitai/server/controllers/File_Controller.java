@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -274,6 +275,48 @@ public class File_Controller {
         fileService.add_pending_remove_tag(pendingRemoveTag);
 
         return ResponseEntity.ok(CustomResponse.success("Tag added successfully", null));
+    }
+
+    @PostMapping("/compare-combination-to-pending-remove-tags-list")
+    public ResponseEntity<CustomResponse<Map<String, List<List<String>>>>> compareCombinationToPendingRemoveTagsList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        @SuppressWarnings("unchecked")
+        List<List<String>> combinations = (List<List<String>>) requestBody.get("combinations");
+        if (combinations == null) {
+            combinations = Collections.emptyList();
+        }
+
+        // 2) Fetch your pending‐remove list
+        List<String> pendingRemove = fileService.get_pending_remove_tags_list();
+        // Normalize to lowercase for safe matching
+        List<String> removeLower = pendingRemove.stream()
+                .map(String::toLowerCase)
+                .collect(Collectors.toList());
+
+        // --- DEBUG LOGGING ---
+        // System.out.println("Pending-remove tags: " + removeLower);
+        // System.out.println("Incoming combinations (" + combinations.size() + "):");
+        // combinations.forEach(c -> System.out.println("  " + c));
+        // ---------------------
+
+        // 3) Filter: keep any combo where at least one element is in pendingRemove
+        // 3) Filter: **exclude** any combo that contains at least one pending-remove tag
+        List<List<String>> matched = combinations.stream()
+                .filter(combo -> combo.stream()
+                        .map(String::toLowerCase)
+                        .noneMatch(removeLower::contains) // <-- reversed here
+                )
+                .distinct()
+                .collect(Collectors.toList());
+
+        // --- DEBUG LOGGING ---
+        // System.out.println("Matched combinations (" + matched.size() + "):");
+        // matched.forEach(c -> System.out.println("  " + c));
+        // ---------------------
+
+        Map<String, List<List<String>>> payload = Collections.singletonMap("matchedCombinations", matched);
+        return ResponseEntity.ok(CustomResponse.success("Filtered combinations retrieved", payload));
     }
 
     @GetMapping("/get_error_model_list")

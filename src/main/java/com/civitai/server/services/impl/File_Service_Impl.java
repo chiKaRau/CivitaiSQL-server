@@ -200,6 +200,59 @@ public class File_Service_Impl implements File_Service {
 
     private static final Object JSON_WRITE_LOCK = new Object();
 
+    // Counter for update operations (either new entry or modified entry)
+    private static int updateCreatorUrlUpdateCount = 0;
+
+    /**
+     * Backs up the creator_url_list.json file by creating a copy with an incremental name.
+     *
+     * @return true if the backup was successful, false otherwise.
+     */
+    public boolean backupCreatorUrlList() {
+        String originalFilePath = "files/data/creator_url_list.json";
+        Path originalPath = Paths.get(originalFilePath);
+
+        synchronized (JSON_WRITE_LOCK) { // Ensure thread safety
+            try {
+                if (!Files.exists(originalPath)) {
+                    System.out.println("Original file does not exist. Backup not created.");
+                    return false;
+                }
+
+                // Define the backup directory path; using "creatorbackup" for this file
+                Path backupDir = originalPath.getParent().resolve("creatorbackup");
+
+                // Create the backup directory if it doesn't exist
+                if (!Files.exists(backupDir)) {
+                    Files.createDirectories(backupDir);
+                    System.out.println("Backup directory created at: " + backupDir.toString());
+                }
+
+                // Determine the backup file name
+                String baseName = "creator_url_list";
+                String extension = ".json";
+                int copyIndex = 1;
+                Path backupPath;
+
+                do {
+                    String backupFileName = String.format("%s copy %d%s", baseName, copyIndex, extension);
+                    backupPath = backupDir.resolve(backupFileName);
+                    copyIndex++;
+                } while (Files.exists(backupPath));
+
+                // Copy the file to the backup directory
+                Files.copy(originalPath, backupPath, StandardCopyOption.COPY_ATTRIBUTES);
+
+                System.out.println("Backup created at: " + backupPath.toString());
+                return true;
+
+            } catch (IOException e) {
+                System.out.println("Error while backing up the creator_url_list file: " + e.getMessage());
+                return false;
+            }
+        }
+    }
+
     // Method to update the offline_download_list.json
     @SuppressWarnings("unchecked")
     public void update_offline_download_list(
@@ -390,6 +443,13 @@ public class File_Service_Impl implements File_Service {
             // Write the updated list back to the file using pretty printing.
             byte[] updatedJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(list);
             Files.write(filePath, updatedJson, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+            // Increase update counter. If it's the 10th update (or a multiple of 10), create a backup.
+            updateCreatorUrlUpdateCount++;
+            if (updateCreatorUrlUpdateCount % 10 == 0) {
+                System.out.println("Update counter reached " + updateCreatorUrlUpdateCount + ". Creating a backup...");
+                backupCreatorUrlList();
+            }
 
         } catch (IOException e) {
             e.printStackTrace();
