@@ -387,73 +387,70 @@ public class File_Service_Impl implements File_Service {
     @SuppressWarnings("unchecked")
     @Override
     public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked) {
-        try {
-            // Path to the JSON file
-            Path filePath = Path.of("files/data/creator_url_list.json");
-            ObjectMapper mapper = new ObjectMapper();
-            List<Map<String, Object>> list = new ArrayList<>();
+        synchronized (JSON_WRITE_LOCK) {
+            try {
+                Path filePath = Paths.get("files/data/creator_url_list.json");
+                ObjectMapper mapper = new ObjectMapper();
+                List<Map<String, Object>> list = new ArrayList<>();
 
-            // Read file if it exists and is not empty
-            if (Files.exists(filePath)) {
-                String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
-                if (!jsonData.isEmpty()) {
-                    list = mapper.readValue(jsonData, new TypeReference<List<Map<String, Object>>>() {
-                    });
+                // read existing JSON if present
+                if (Files.exists(filePath)) {
+                    String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+                    if (!jsonData.isEmpty()) {
+                        list = mapper.readValue(jsonData, new TypeReference<>() {
+                        });
+                    }
                 }
-            }
 
-            // If lastChecked is true, ensure no other entry is marked as true.
-            if (lastChecked != null && lastChecked) {
-                for (Map<String, Object> entry : list) {
-                    if (Boolean.TRUE.equals(entry.get("lastChecked"))) {
+                // ensure only one "lastChecked"
+                if (Boolean.TRUE.equals(lastChecked)) {
+                    for (var entry : list) {
                         entry.put("lastChecked", false);
                     }
                 }
-            }
 
-            boolean found = false;
-            // Look for an entry with the matching creatorUrl
-            for (Map<String, Object> entry : list) {
-                if (creatorUrl.equals(entry.get("creatorUrl"))) {
-                    found = true;
-                    String currentStatus = String.valueOf(entry.get("status"));
-                    // Update if the current status is different (ignoring case)
-                    if (!status.equalsIgnoreCase(currentStatus)) {
-                        entry.put("status", status);
-                        entry.put("lastChecked", lastChecked);
-                        System.out.println("Updated entry: " + entry);
-                    } else {
-                        System.out.println("Entry for " + creatorUrl
-                                + " already has the same status; no update performed.");
+                // update or add entry...
+                boolean found = false;
+                for (var entry : list) {
+                    if (creatorUrl.equals(entry.get("creatorUrl"))) {
+                        found = true;
+                        if (!status.equalsIgnoreCase(String.valueOf(entry.get("status")))) {
+                            entry.put("status", status);
+                            entry.put("lastChecked", lastChecked);
+                            System.out.println("Updated entry: " + entry);
+                        } else {
+                            System.out.println("Entry for " + creatorUrl
+                                    + " already has the same status; no update performed.");
+                        }
+                        break;
                     }
-                    break;
                 }
+                if (!found) {
+                    var newEntry = Map.<String, Object>of(
+                            "creatorUrl", creatorUrl,
+                            "status", status,
+                            "lastChecked", lastChecked);
+                    list.add(newEntry);
+                    System.out.println("Added new entry: " + newEntry);
+                }
+
+                // write atomically
+                Path tmp = Files.createTempFile(filePath.getParent(), "creator_url_list", ".tmp");
+                mapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), list);
+                Files.move(tmp, filePath,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+
+                // backup every 10 changes
+                if (++updateCreatorUrlUpdateCount % 10 == 0) {
+                    System.out.println(
+                            "Update counter reached " + updateCreatorUrlUpdateCount + ". Creating a backup...");
+                    backupCreatorUrlList();
+                }
+
+            } catch (IOException e) {
+                throw new CustomException("Error updating creator URL list", e);
             }
-
-            // If not found, add a new entry with the provided values.
-            if (!found) {
-                Map<String, Object> newEntry = new HashMap<>();
-                newEntry.put("creatorUrl", creatorUrl);
-                newEntry.put("status", status);
-                newEntry.put("lastChecked", lastChecked);
-                list.add(newEntry);
-                System.out.println("Added new entry: " + newEntry);
-            }
-
-            // Write the updated list back to the file using pretty printing.
-            byte[] updatedJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(list);
-            Files.write(filePath, updatedJson, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
-            // Increase update counter. If it's the 10th update (or a multiple of 10), create a backup.
-            updateCreatorUrlUpdateCount++;
-            if (updateCreatorUrlUpdateCount % 10 == 0) {
-                System.out.println("Update counter reached " + updateCreatorUrlUpdateCount + ". Creating a backup...");
-                backupCreatorUrlList();
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new CustomException("Error updating creator URL list", e);
         }
     }
 

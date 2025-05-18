@@ -720,6 +720,9 @@ public class CivitaiSQL_Controller {
             if (fieldsToUpdate.contains("tags") && requestBody.get("tags") != null) {
                 models_DTO.setTags((List<String>) requestBody.get("tags"));
             }
+
+            System.out.println((List<String>) requestBody.get("localTags"));
+
             if (fieldsToUpdate.contains("localTags") && requestBody.get("localTags") != null) {
                 models_DTO.setLocalTags((List<String>) requestBody.get("localTags"));
             }
