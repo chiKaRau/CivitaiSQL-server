@@ -386,7 +386,7 @@ public class File_Service_Impl implements File_Service {
 
     @SuppressWarnings("unchecked")
     @Override
-    public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked) {
+    public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating) {
         synchronized (JSON_WRITE_LOCK) {
             try {
                 Path filePath = Paths.get("files/data/creator_url_list.json");
@@ -422,6 +422,17 @@ public class File_Service_Impl implements File_Service {
                             System.out.println("Entry for " + creatorUrl
                                     + " already has the same status; no update performed.");
                         }
+
+                        if (!"N/A".equals(rating)) {
+                            if (!rating.equals(String.valueOf(entry.get("rating")))) {
+                                entry.put("rating", rating);
+                                System.out.println("Updated entry: " + entry);
+                            } else {
+                                System.out.println("Entry for " + creatorUrl
+                                        + " already has the same rating; no update performed.");
+                            }
+                        }
+
                         break;
                     }
                 }
@@ -429,7 +440,9 @@ public class File_Service_Impl implements File_Service {
                     var newEntry = Map.<String, Object>of(
                             "creatorUrl", creatorUrl,
                             "status", status,
-                            "lastChecked", lastChecked);
+                            "lastChecked", lastChecked,
+                            "rating", rating);
+
                     list.add(newEntry);
                     System.out.println("Added new entry: " + newEntry);
                 }

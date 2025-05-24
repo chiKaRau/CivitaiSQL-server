@@ -66,7 +66,7 @@ public interface File_Service {
 
         public List<Map<String, Object>> get_creator_url_list();
 
-        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked);
+        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
 
         public void remove_creator_url(String creatorUrl);
 

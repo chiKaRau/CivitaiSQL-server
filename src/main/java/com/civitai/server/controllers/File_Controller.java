@@ -598,7 +598,7 @@ public class File_Controller {
         String creatorUrl = (String) requestBody.get("creatorUrl");
         String status = (String) requestBody.get("status");
         Boolean lastChecked = (Boolean) requestBody.get("lastChecked");
-
+        String rating = (String) requestBody.getOrDefault("rating", "N/A");
         // Validate null or empty
         if (creatorUrl == null || creatorUrl == "") {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
@@ -606,7 +606,7 @@ public class File_Controller {
 
         try {
 
-            fileService.update_creator_url_list(creatorUrl, status, lastChecked);
+            fileService.update_creator_url_list(creatorUrl, status, lastChecked, rating);
 
             return ResponseEntity.ok()
                     .body(CustomResponse.success("Success updating creator url list"));
