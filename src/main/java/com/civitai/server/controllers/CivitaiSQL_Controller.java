@@ -564,7 +564,7 @@ public class CivitaiSQL_Controller {
         if (downloadFilePath == "") {
             downloadFilePath = null;
         } else {
-            downloadFilePath = ("F:\\Coding Projects\\Java\\CivitaiSQL Server\\server\\files\\download" + File.separator
+            downloadFilePath = ("F:\\Coding Apps\\CivitaiSQL Server\\server\\files\\download" + File.separator
                     + downloadFilePath.replaceFirst("^/", "").replace("/", File.separator))
                     .replaceAll(java.util.regex.Pattern.quote(File.separator) + "$", "");
 

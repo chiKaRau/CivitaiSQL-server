@@ -1122,7 +1122,7 @@ public class File_Service_Impl implements File_Service {
 
             // Define the current date and the date one month ago
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime oneMonthAgo = now.minusMonths(1);
+            LocalDateTime oneMonthAgo = now.minusMonths(2);
 
             // Filter the tags that were added in the last month
             List<Map<String, Object>> recentMonthTags = filteredList.stream()
@@ -1168,6 +1168,14 @@ public class File_Service_Impl implements File_Service {
                     })
                     .limit(10)
                     .collect(Collectors.toList());
+
+                    // System.out.println("topTags");
+
+                    // System.out.println(topTags);
+
+                    // System.out.println("recentTags");
+
+                    // System.out.println(recentTags);
 
             // Return both lists in a map
             return Map.of("topTags", topTags, "recentTags", recentTags);
