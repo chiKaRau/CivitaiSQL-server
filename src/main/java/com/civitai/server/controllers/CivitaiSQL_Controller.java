@@ -49,20 +49,20 @@ public class CivitaiSQL_Controller {
         this.civitai_Service = civitai_Service;
     }
 
-    //Testing Api Route 
+    // Testing Api Route
     @GetMapping(path = "/testing")
     public ResponseEntity<?> findTesting() {
 
         return ResponseEntity.ok().body("Testing now");
     }
 
-    //Single Table
+    // Single Table
     @GetMapping(path = "/verify-connecting-database")
     public ResponseEntity<CustomResponse<Map<String, List<Models_Table_Entity>>>> verifyConnectingDatabase() {
         return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful"));
     }
 
-    //Single Table
+    // Single Table
     @GetMapping(path = "/find-all-models-table-entities")
     public ResponseEntity<CustomResponse<Map<String, List<Models_Table_Entity>>>> findAllFromModelsTable() {
         Optional<List<Models_Table_Entity>> entityOptional = civitaiSQL_Service.find_all_from_models_table();
@@ -100,7 +100,7 @@ public class CivitaiSQL_Controller {
         }
     }
 
-    //All Table
+    // All Table
     @GetMapping(path = "/find-all-entities-in-all-table")
     public ResponseEntity<CustomResponse<Map<String, List<Tables_DTO>>>> findAllEntitiesInAllTables() {
         Optional<List<Tables_DTO>> entityOptional = civitaiSQL_Service.find_all_from_all_tables();
@@ -319,11 +319,11 @@ public class CivitaiSQL_Controller {
         Optional<Map<String, Object>> modelOptional = civitai_Service
                 .findModelByModelID(modelID);
 
-        //GET LATEST FROM CIVITAI
+        // GET LATEST FROM CIVITAI
         Map<String, Object> model = modelOptional.get();
         String latestVersionNumber = null;
 
-        //Retriving the version list 
+        // Retriving the version list
         Optional<List<Map<String, Object>>> modelVersionList = Optional
                 .ofNullable(model)
                 .map(map -> (List<Map<String, Object>>) map
@@ -332,7 +332,7 @@ public class CivitaiSQL_Controller {
 
         if (modelOptional.isPresent()) {
 
-            //For Early Access
+            // For Early Access
             Boolean isEarlyAccess = false;
             try {
                 String availability = modelVersionList
@@ -350,7 +350,7 @@ public class CivitaiSQL_Controller {
                 isEarlyAccess = false;
             }
 
-            //For Version Number
+            // For Version Number
             Boolean isUpdateAvaliable = false;
 
             try {
@@ -381,7 +381,7 @@ public class CivitaiSQL_Controller {
                 latestVersionNumber = null;
             }
 
-            //GET LATEST FROM DB
+            // GET LATEST FROM DB
 
             if (versionListOptional.isPresent() && latestVersionNumber != null) {
                 List<String> entityList = versionListOptional.get();
@@ -447,7 +447,7 @@ public class CivitaiSQL_Controller {
         if (nameEntityOptional.isPresent()) {
             List<Models_DTO> entityList = nameEntityOptional.get();
             combinedList.addAll(entityList);
-            //System.out.println("name: " + entityList.size());
+            // System.out.println("name: " + entityList.size());
         }
 
         Optional<List<Models_DTO>> tagsEntityOptional = civitaiSQL_Service
@@ -455,7 +455,7 @@ public class CivitaiSQL_Controller {
         if (tagsEntityOptional.isPresent()) {
             List<Models_DTO> entityList = tagsEntityOptional.get();
             combinedList.addAll(entityList);
-            //System.out.println("tags: " + entityList.size());
+            // System.out.println("tags: " + entityList.size());
         }
 
         Optional<List<Models_DTO>> triggerWordsEntityOptional = civitaiSQL_Service
@@ -463,7 +463,7 @@ public class CivitaiSQL_Controller {
         if (triggerWordsEntityOptional.isPresent()) {
             List<Models_DTO> entityList = triggerWordsEntityOptional.get();
             combinedList.addAll(entityList);
-            //System.out.println("triggerWords: " + entityList.size());
+            // System.out.println("triggerWords: " + entityList.size());
         }
 
         Optional<List<Models_DTO>> urlEntityOptional = civitaiSQL_Service
@@ -471,7 +471,7 @@ public class CivitaiSQL_Controller {
         if (urlEntityOptional.isPresent()) {
             List<Models_DTO> entityList = urlEntityOptional.get();
             combinedList.addAll(entityList);
-            //System.out.println("url: " + entityList.size());
+            // System.out.println("url: " + entityList.size());
         }
 
         List<Models_DTO> distinctList = combinedList.stream()
@@ -523,7 +523,7 @@ public class CivitaiSQL_Controller {
         }
     }
 
-    //tempermonkey use only
+    // tempermonkey use only
     @CrossOrigin(origins = "https://civitai.com")
     @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-tagsList-tampermonkey")
     @SuppressWarnings("unchecked")
@@ -584,7 +584,7 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        //Fetch the Civitai Model Data then create a new Models_DTO
+        // Fetch the Civitai Model Data then create a new Models_DTO
         Optional<Models_DTO> entityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category,
                 downloadFilePath);
 
@@ -602,6 +602,45 @@ public class CivitaiSQL_Controller {
 
     }
 
+    @PostMapping("/create-record-to-all-tables-in-custom")
+    public ResponseEntity<CustomResponse<String>> createRecordToAllTablesInCustom(
+            @RequestBody Models_DTO modelsDTO) {
+
+        // Validate required fields
+        if (modelsDTO.getName() == null || modelsDTO.getName().isEmpty()
+                || modelsDTO.getMainModelName() == null || modelsDTO.getMainModelName().isEmpty()
+                || modelsDTO.getUrl() == null || modelsDTO.getUrl().isEmpty()
+                || modelsDTO.getCategory() == null || modelsDTO.getCategory().isEmpty()
+                || modelsDTO.getVersionNumber() == null || modelsDTO.getVersionNumber().isEmpty()
+                || modelsDTO.getModelNumber() == null || modelsDTO.getModelNumber().isEmpty()
+                || modelsDTO.getType() == null || modelsDTO.getType().isEmpty()
+                || modelsDTO.getBaseModel() == null || modelsDTO.getBaseModel().isEmpty()
+                || modelsDTO.getImageUrls() == null || modelsDTO.getImageUrls().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Missing required fields in request body."));
+        }
+
+        // Normalize download path if provided
+        String localPath = modelsDTO.getLocalPath();
+        if (localPath != null && !localPath.isEmpty()) {
+            String normalized = localPath.replaceFirst("^/", "");
+            String[] parts = normalized.split("/");
+            String base = "F:" + File.separator + "Coding Apps" + File.separator
+                    + "CivitaiSQL Server" + File.separator + "server" + File.separator
+                    + "files" + File.separator + "download";
+            for (String p : parts) {
+                base = base + File.separator + p;
+            }
+            modelsDTO.setLocalPath(base);
+            System.out.println("downloadFilePath: " + base);
+        }
+
+        // Delegate to service to insert into all tables
+        civitaiSQL_Service.create_record_to_all_tables(modelsDTO);
+
+        return ResponseEntity.ok(CustomResponse.success("Model created successfully"));
+    }
+
     @PostMapping("/update-local-path")
     public ResponseEntity<CustomResponse<String>> updateLocalPath(
             @RequestBody Map<String, Object> requestBody) {
@@ -617,7 +656,8 @@ public class CivitaiSQL_Controller {
     @PostMapping("/scan-local-files")
     public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> searchModels(
             @RequestBody Map<String, Object> requestBody) {
-        // Expecting the requestBody to contain "compositeList", a list of maps each with "modelID" and "versionID"
+        // Expecting the requestBody to contain "compositeList", a list of maps each
+        // with "modelID" and "versionID"
         List<Map<String, String>> compositeList = (List<Map<String, String>>) requestBody.get("compositeList");
         Optional<List<Models_DTO>> modelsOptional = civitaiSQL_Service
                 .findListOfModelsDTOByModelAndVersion(compositeList);
@@ -646,10 +686,10 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        //Fetch the Civitai Model Data then create a new Models_DTO
+        // Fetch the Civitai Model Data then create a new Models_DTO
         Optional<Models_DTO> newUpdateEntityOptional = civitaiSQL_Service.create_models_DTO_by_Url(url, category, null);
 
-        //Find if the model exists in the database
+        // Find if the model exists in the database
         Optional<Models_Table_Entity> mySQLEntityOptional = civitaiSQL_Service.find_one_from_models_table(id);
 
         if (newUpdateEntityOptional.isPresent() && mySQLEntityOptional.isPresent()) {
@@ -677,7 +717,7 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        //Find if the model exists in the database
+        // Find if the model exists in the database
         Optional<Models_Table_Entity> entityOptional = civitaiSQL_Service.find_one_from_models_table(id);
 
         if (entityOptional.isPresent()) {
@@ -795,7 +835,8 @@ public class CivitaiSQL_Controller {
             System.out.println("HELLO");
             System.out.println(models_DTO);
 
-            // Look up the record using modelId and versionId (i.e. modelNumber and versionNumber)
+            // Look up the record using modelId and versionId (i.e. modelNumber and
+            // versionNumber)
             Optional<Models_Table_Entity> mySQLEntityOptional = civitaiSQL_Service
                     .find_one_from_models_table_by_model_and_version(modelId, versionId);
 
