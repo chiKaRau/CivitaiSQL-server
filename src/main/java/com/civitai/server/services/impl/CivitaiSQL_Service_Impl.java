@@ -73,16 +73,17 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @PostConstruct
         public void civitaiSQL_Service_Startup() {
-                //System.out.println("civitaiSQL_Service_Startup");
-                //updateMainModelName2();
+                // System.out.println("civitaiSQL_Service_Startup");
+                // updateMainModelName2();
         }
 
         public void updateMainModelName2() {
 
-                //this one would find the database dto then call the civitai api 
-                //and update the MainModelName then save it
+                // this one would find the database dto then call the civitai api
+                // and update the MainModelName then save it
 
-                // Step 1: Get all model_number and ids where mainModelName is null, limited to the first 1000 records
+                // Step 1: Get all model_number and ids where mainModelName is null, limited to
+                // the first 1000 records
                 List<Object[]> results = models_Table_Repository.findModelNumberAndIdWhereMainModelNameIsNull();
 
                 // Process only the first 1000 records
@@ -144,11 +145,12 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         public void updateMainModelName1() {
 
-                //this one would find the database id then call the civitai api 
-                //then create a new dto
-                //and update the MainModelName only then save it
+                // this one would find the database id then call the civitai api
+                // then create a new dto
+                // and update the MainModelName only then save it
 
-                // Step 1: Get all model_number and ids where mainModelName is null, limited to the first 1000 records
+                // Step 1: Get all model_number and ids where mainModelName is null, limited to
+                // the first 1000 records
                 List<Object[]> results = models_Table_Repository.findModelNumberAndIdWhereMainModelNameIsNull();
 
                 // Process only the first 1000 records
@@ -227,7 +229,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         return Optional.empty();
                 }
 
-                //return Optional.ofNullable(categories); above if code is equipviemnt with this
+                // return Optional.ofNullable(categories); above if code is equipviemnt with
+                // this
         }
 
         @Override
@@ -289,57 +292,60 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         /*
-        @Override
-        public Optional<Map<String, List<Models_DTO>>> find_lastest_three_models_DTO_in_each_category_from_all_table() {
-                try {
-        
-                        List<String> categories = models_Table_Repository.findAllCategories();
-        
-                        Map<String, List<Models_DTO>> latestModelsDTOList = new HashMap<>();
-        
-                        PageRequest pageable = PageRequest.of(0, 3);
-        
-                        //Check if the category list is exist
-                        if (categories != null) {
-                                //Map through each category
-                                for (String category : categories) {
-                                        //Define an empty list for every loop
-                                        List<Models_DTO> modelsDTOList = new ArrayList<>();
-        
-                                        //Retrieve a list of id which contains the latest records for each category
-                                        List<Integer> idList = models_Table_Repository
-                                                        .findLastThreeAddedRecordsID(category, pageable);
-        
-                                        //Map through each id and retrive its Models_DTO
-                                        for (Integer id : idList) {
-                                                Optional<Models_DTO> entityOptional = find_one_models_DTO_from_all_tables(
-                                                                id);
-                                                if (entityOptional.isPresent()) {
-                                                        Models_DTO entity = entityOptional.get();
-                                                        //Add the Models_DTO into the list
-                                                        modelsDTOList.add(entity);
-                                                }
-                                        }
-        
-                                        //add the Models_DTO list into the hashObject
-                                        latestModelsDTOList.put(category, modelsDTOList);
-        
-                                }
-                        }
-        
-                        return latestModelsDTOList.isEmpty() ? Optional.empty() : Optional.of(latestModelsDTOList);
-        
-                } catch (DataAccessException e) {
-                        // Log and handle database-related exceptions
-                        log.error("Database error while finding the record from models_table", e);
-                        throw new CustomDatabaseException("An unexpected database error occurred", e);
-                } catch (Exception e) {
-                        // Log and handle other types of exceptions
-                        log.error("Unexpected error while finding the record from models_table", e);
-                        throw new CustomException("An unexpected error occurred", e);
-                }
-        }
-        */
+         * @Override
+         * public Optional<Map<String, List<Models_DTO>>>
+         * find_lastest_three_models_DTO_in_each_category_from_all_table() {
+         * try {
+         * 
+         * List<String> categories = models_Table_Repository.findAllCategories();
+         * 
+         * Map<String, List<Models_DTO>> latestModelsDTOList = new HashMap<>();
+         * 
+         * PageRequest pageable = PageRequest.of(0, 3);
+         * 
+         * //Check if the category list is exist
+         * if (categories != null) {
+         * //Map through each category
+         * for (String category : categories) {
+         * //Define an empty list for every loop
+         * List<Models_DTO> modelsDTOList = new ArrayList<>();
+         * 
+         * //Retrieve a list of id which contains the latest records for each category
+         * List<Integer> idList = models_Table_Repository
+         * .findLastThreeAddedRecordsID(category, pageable);
+         * 
+         * //Map through each id and retrive its Models_DTO
+         * for (Integer id : idList) {
+         * Optional<Models_DTO> entityOptional = find_one_models_DTO_from_all_tables(
+         * id);
+         * if (entityOptional.isPresent()) {
+         * Models_DTO entity = entityOptional.get();
+         * //Add the Models_DTO into the list
+         * modelsDTOList.add(entity);
+         * }
+         * }
+         * 
+         * //add the Models_DTO list into the hashObject
+         * latestModelsDTOList.put(category, modelsDTOList);
+         * 
+         * }
+         * }
+         * 
+         * return latestModelsDTOList.isEmpty() ? Optional.empty() :
+         * Optional.of(latestModelsDTOList);
+         * 
+         * } catch (DataAccessException e) {
+         * // Log and handle database-related exceptions
+         * log.error("Database error while finding the record from models_table", e);
+         * throw new CustomDatabaseException("An unexpected database error occurred",
+         * e);
+         * } catch (Exception e) {
+         * // Log and handle other types of exceptions
+         * log.error("Unexpected error while finding the record from models_table", e);
+         * throw new CustomException("An unexpected error occurred", e);
+         * }
+         * }
+         */
 
         @Override
         public Optional<Models_Table_Entity> find_one_from_models_table(Integer id) {
@@ -680,7 +686,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         .map(Models_Table_Entity::getVersionNumber)
                                         .collect(Collectors.toSet());
 
-                        // Add each version number in the request that exists in the existing version numbers
+                        // Add each version number in the request that exists in the existing version
+                        // numbers
                         for (String versionNumber : versionNumbers) {
                                 if (existingVersionNumbers.contains(versionNumber)) {
                                         existingVersionNumbersList.add(versionNumber);
@@ -697,7 +704,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return Optional.of(existingVersionNumbersList);
         }
 
-        //Transcation Actions
+        // Transcation Actions
         @Override
         @Transactional
         public void create_record_to_all_tables(Models_DTO dto) {
@@ -714,6 +721,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         .triggerWords(JsonUtils.convertObjectToString(dto.getTriggerWords()))
                                         .nsfw(dto.getNsfw())
                                         .flag(dto.getFlag())
+                                        .urlAccessable(dto.getUrlAccessable())
                                         .build();
 
                         models_Table_Entities = models_Table_Repository.save(models_Table_Entities);
@@ -900,7 +908,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
-        //Utils
+        // Utils
         @SuppressWarnings("unchecked")
         @Override
         public Models_DTO convertToDTO(Models_Table_Entity entity) {
@@ -986,13 +994,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         if (modelOptional.isPresent()) {
                                 Map<String, Object> model = modelOptional.get();
 
-                                //Retriving the version list 
+                                // Retriving the version list
                                 Optional<List<Map<String, Object>>> modelVersionList = Optional
                                                 .ofNullable(model)
                                                 .map(map -> (List<Map<String, Object>>) map.get("modelVersions"))
                                                 .filter(list -> !list.isEmpty());
 
-                                //For Version Number
+                                // For Version Number
                                 URI uri = new URI(url);
                                 String query = uri.getQuery();
 
@@ -1009,7 +1017,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                         .orElse(null);
                                 }
 
-                                //Retriving appropriate model from the version list
+                                // Retriving appropriate model from the version list
                                 final String final_versionId = versionNumber;
                                 List<Map<String, Object>> matchingVersionModel = Optional
                                                 .ofNullable(modelVersionList.orElse(Collections.emptyList()))
@@ -1022,34 +1030,34 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 })
                                                 .collect(Collectors.toList());
 
-                                //For main model Name
+                                // For main model Name
                                 mainModelName = Optional.ofNullable((String) model.get("name"))
                                                 .orElse(null);
 
-                                //For NSFW
+                                // For NSFW
                                 nsfw = Optional.ofNullable((Boolean) model.get("nsfw"))
                                                 .orElse(null);
 
-                                //For Tags
+                                // For Tags
                                 tags = Optional.ofNullable((List<String>) model.get("tags"))
                                                 .orElse(null);
 
-                                //For Trigger Words
+                                // For Trigger Words
                                 triggerWords = matchingVersionModel.stream()
                                                 .map(map -> (List<String>) map.get("trainedWords"))
                                                 .filter(obj -> obj instanceof List) // Ensure it's an instance of List
                                                 .map(obj -> (List<String>) obj) // Now we can safely cast
                                                 .findFirst().orElse(null);
 
-                                //For Description
+                                // For Description
                                 description = Optional.ofNullable((String) model.get("description"))
                                                 .orElse(null);
 
-                                //For Type
+                                // For Type
                                 type = Optional.ofNullable((String) model.get("type"))
                                                 .orElse(null);
 
-                                //For Stats
+                                // For Stats
                                 stats = matchingVersionModel.stream()
                                                 .map(map -> (Map<String, Object>) map.get("stats"))
                                                 .filter(data -> data != null)
@@ -1063,7 +1071,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 })
                                                 .orElse(null);
 
-                                //For Uploaded Date
+                                // For Uploaded Date
 
                                 String uploadedString = matchingVersionModel.stream()
                                                 .map(map -> (String) map.get("createdAt"))
@@ -1076,7 +1084,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 .atZone(ZoneId.of("UTC"))
                                                 .toLocalDate();
 
-                                //For Model Name
+                                // For Model Name
                                 name = matchingVersionModel.stream()
                                                 .map(map -> (List<Map<String, Object>>) map.get("files"))
                                                 .filter(files -> files != null)
@@ -1089,12 +1097,12 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                                 : modelName)
                                                 .orElse(null);
 
-                                //For Base Model
+                                // For Base Model
                                 baseModel = matchingVersionModel.stream()
                                                 .map(map -> (String) map.get("baseModel"))
                                                 .findFirst().orElse(null);
 
-                                //For Hash
+                                // For Hash
                                 hash = matchingVersionModel.stream()
                                                 .map(map -> (List<Map<String, Object>>) map.get("files"))
                                                 .filter(files -> files != null)
@@ -1116,12 +1124,12 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         flag = true;
                                 }
 
-                                //For Creator Name
+                                // For Creator Name
                                 creatorName = Optional.ofNullable((Map<String, Object>) model.get("creator"))
                                                 .map(creator -> (String) creator.get("username"))
                                                 .orElse(null);
 
-                                //For Images Urls
+                                // For Images Urls
 
                                 List<String> imagesArray = matchingVersionModel.stream()
                                                 .map(map -> (List<String>) map.get("images"))
@@ -1141,7 +1149,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         images.add(myHashObject);
                                 }
 
-                                //Create a Models_DTO
+                                // Create a Models_DTO
                                 Models_DTO dto = new Models_DTO();
                                 dto.setUrl(url);
                                 dto.setName(name);
@@ -1340,15 +1348,15 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 return Optional.empty();
                         }
 
-                        // The JSON structure was something like: 
+                        // The JSON structure was something like:
                         // [
-                        //   {
-                        //     "url" : "https://.../image1.jpg",
-                        //     "nsfw": "Soft",
-                        //     "width": 512,
-                        //     "height": 512
-                        //   },
-                        //   ...
+                        // {
+                        // "url" : "https://.../image1.jpg",
+                        // "nsfw": "Soft",
+                        // "width": 512,
+                        // "height": 512
+                        // },
+                        // ...
                         // ]
                         String firstImageUrl = (String) imageUrlsList.get(0).get("url");
                         return Optional.ofNullable(firstImageUrl);
@@ -1363,7 +1371,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         /**
-         * Bulk updates the localPath for each record matching the modelID and versionID pairs.
+         * Bulk updates the localPath for each record matching the modelID and versionID
+         * pairs.
          *
          * @param fileArray a list of maps each containing "modelID" and "versionID"
          * @param localPath the new localPath value to set
@@ -1381,11 +1390,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         /**
-        * Retrieves a list of Models_DTO by searching for records matching a list of composite key pairs.
-        *
-        * @param compositeList a list of maps, each containing "modelID" and "versionID"
-        * @return an Optional list of Models_DTO
-        */
+         * Retrieves a list of Models_DTO by searching for records matching a list of
+         * composite key pairs.
+         *
+         * @param compositeList a list of maps, each containing "modelID" and
+         *                      "versionID"
+         * @return an Optional list of Models_DTO
+         */
         @Override
         @Transactional(readOnly = true)
         public Optional<List<Models_DTO>> findListOfModelsDTOByModelAndVersion(
@@ -1477,7 +1488,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 Optional<Models_Urls_Table_Entity> entityOptional = models_Urls_Table_Repository.findById(id);
                 if (entityOptional.isPresent()) {
                         Models_Urls_Table_Entity entity = entityOptional.get();
-                        // Update URL if specified (even though URL is ignored at the controller level, you can update it here if needed)
+                        // Update URL if specified (even though URL is ignored at the controller level,
+                        // you can update it here if needed)
                         if (fieldsToUpdate.contains("url") && dto.getUrl() != null) {
                                 entity.setUrl(dto.getUrl());
                         }
@@ -1561,7 +1573,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 List<Map<String, Object>> result = new ArrayList<>();
                 for (Models_Table_Entity entity : entities) {
                         Map<String, Object> map = new HashMap<>();
-                        // Extract drive letter (assumes the first character of local_path is the drive letter)
+                        // Extract drive letter (assumes the first character of local_path is the drive
+                        // letter)
                         String drive = (entity.getLocalPath() != null && !entity.getLocalPath().isEmpty())
                                         ? entity.getLocalPath().substring(0, 1)
                                         : "";

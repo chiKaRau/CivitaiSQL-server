@@ -49,95 +49,100 @@ public class File_Controller {
 
     // @PostConstruct
     // public void createFileAtStartup() {
-    //     try {
-    //         Path downloadFolder = Paths
-    //                 .get("G:\\Start_Here_Mac.app\\Formats\\AI Tools\\Stable Diffusion\\BackUp\\Temp\\New folder");
-    //         updateAllPngs(downloadFolder);
-    //     } catch (Exception e) {
-    //         e.printStackTrace();
-    //     }
+    // try {
+    // Path downloadFolder = Paths
+    // .get("G:\\Start_Here_Mac.app\\Formats\\AI Tools\\Stable
+    // Diffusion\\BackUp\\Temp\\New folder");
+    // updateAllPngs(downloadFolder);
+    // } catch (Exception e) {
+    // e.printStackTrace();
+    // }
     // }
 
     // // ---------------------------------------------------------------
     // // The SINGLE METHOD that does the update process
     // // ---------------------------------------------------------------
-    // private void updateAllPngs(Path downloadFolder) throws InterruptedException, IOException {
+    // private void updateAllPngs(Path downloadFolder) throws InterruptedException,
+    // IOException {
 
-    //     // Regex to match:
-    //     //   {modelId}_{versionId}_{baseModel}_{someName}.preview.png
-    //     // Example: "1231563_51651_Pony_abcdef.preview.png"
-    //     Pattern FILENAME_PATTERN = Pattern.compile(
-    //             "^(\\d+)_(\\d+)_(\\w+)_(.+)\\.preview\\.png$");
+    // // Regex to match:
+    // // {modelId}_{versionId}_{baseModel}_{someName}.preview.png
+    // // Example: "1231563_51651_Pony_abcdef.preview.png"
+    // Pattern FILENAME_PATTERN = Pattern.compile(
+    // "^(\\d+)_(\\d+)_(\\w+)_(.+)\\.preview\\.png$");
 
-    //     // 1) Validate folder
-    //     if (!Files.exists(downloadFolder)) {
-    //         System.out.println("Folder does not exist: " + downloadFolder);
-    //         return;
-    //     }
+    // // 1) Validate folder
+    // if (!Files.exists(downloadFolder)) {
+    // System.out.println("Folder does not exist: " + downloadFolder);
+    // return;
+    // }
 
-    //     // 2) Gather *.png files (recursively)
-    //     List<Path> pngFiles;
-    //     try (Stream<Path> walk = Files.walk(downloadFolder)) {
-    //         pngFiles = walk
-    //                 .filter(Files::isRegularFile)
-    //                 .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".png"))
-    //                 .collect(Collectors.toList());
-    //     }
+    // // 2) Gather *.png files (recursively)
+    // List<Path> pngFiles;
+    // try (Stream<Path> walk = Files.walk(downloadFolder)) {
+    // pngFiles = walk
+    // .filter(Files::isRegularFile)
+    // .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".png"))
+    // .collect(Collectors.toList());
+    // }
 
-    //     if (pngFiles.isEmpty()) {
-    //         System.out.println("No PNG files found under: " + downloadFolder);
-    //         return;
-    //     }
+    // if (pngFiles.isEmpty()) {
+    // System.out.println("No PNG files found under: " + downloadFolder);
+    // return;
+    // }
 
-    //     // 3) Loop through each .png
-    //     for (Path pngFile : pngFiles) {
-    //         String fileName = pngFile.getFileName().toString();
-    //         Matcher matcher = FILENAME_PATTERN.matcher(fileName);
+    // // 3) Loop through each .png
+    // for (Path pngFile : pngFiles) {
+    // String fileName = pngFile.getFileName().toString();
+    // Matcher matcher = FILENAME_PATTERN.matcher(fileName);
 
-    //         // Skip if not matching your naming pattern
-    //         if (!matcher.matches()) {
-    //             System.out.println("Skipping file (no match): " + fileName);
-    //             continue;
-    //         }
+    // // Skip if not matching your naming pattern
+    // if (!matcher.matches()) {
+    // System.out.println("Skipping file (no match): " + fileName);
+    // continue;
+    // }
 
-    //         // Extract modelId, versionId, baseModel, etc.
-    //         String modelId = matcher.group(1); // e.g. "1231563"
-    //         String versionId = matcher.group(2); // e.g. "51651"
-    //         String baseModel = matcher.group(3); // e.g. "Pony"
-    //         String origName = matcher.group(4); // e.g. "abcdef"
+    // // Extract modelId, versionId, baseModel, etc.
+    // String modelId = matcher.group(1); // e.g. "1231563"
+    // String versionId = matcher.group(2); // e.g. "51651"
+    // String baseModel = matcher.group(3); // e.g. "Pony"
+    // String origName = matcher.group(4); // e.g. "abcdef"
 
-    //         System.out.println("\n=== Found PNG: " + fileName + " ===");
-    //         System.out.println("  modelId   = " + modelId);
-    //         System.out.println("  versionId = " + versionId);
-    //         System.out.println("  baseModel = " + baseModel);
-    //         System.out.println("  fileName  = " + origName);
+    // System.out.println("\n=== Found PNG: " + fileName + " ===");
+    // System.out.println(" modelId = " + modelId);
+    // System.out.println(" versionId = " + versionId);
+    // System.out.println(" baseModel = " + baseModel);
+    // System.out.println(" fileName = " + origName);
 
-    //         // 4) Retrieve the image URL from your database/service
-    //         //    Adjust to match your method signature:
-    //         //    findFirstImageUrlByModelNumberAndVersionNumber(String model, String version)
-    //         Optional<String> urlOpt = civitaiSQL_Service.findFirstImageUrlByModelNumberAndVersionNumber(modelId,
-    //                 versionId);
+    // // 4) Retrieve the image URL from your database/service
+    // // Adjust to match your method signature:
+    // // findFirstImageUrlByModelNumberAndVersionNumber(String model, String
+    // version)
+    // Optional<String> urlOpt =
+    // civitaiSQL_Service.findFirstImageUrlByModelNumberAndVersionNumber(modelId,
+    // versionId);
 
-    //         if (!urlOpt.isPresent() || urlOpt.get().isEmpty()) {
-    //             System.out.println("No image URL found in DB for " + modelId + "/" + versionId + "; skipping.");
-    //             continue;
-    //         }
+    // if (!urlOpt.isPresent() || urlOpt.get().isEmpty()) {
+    // System.out.println("No image URL found in DB for " + modelId + "/" +
+    // versionId + "; skipping.");
+    // continue;
+    // }
 
-    //         String remoteImageUrl = urlOpt.get();
-    //         System.out.println("  DB returned URL: " + remoteImageUrl);
+    // String remoteImageUrl = urlOpt.get();
+    // System.out.println(" DB returned URL: " + remoteImageUrl);
 
-    //         // 5) Download raw bytes from that URL & overwrite local .png
-    //         try {
-    //             downloadImage(remoteImageUrl, pngFile);
-    //             System.out.println("  Overwrote local PNG: " + pngFile);
-    //         } catch (Exception e) {
-    //             System.out.println("  Download/overwrite failed for file: " + fileName);
-    //             e.printStackTrace();
-    //         }
+    // // 5) Download raw bytes from that URL & overwrite local .png
+    // try {
+    // downloadImage(remoteImageUrl, pngFile);
+    // System.out.println(" Overwrote local PNG: " + pngFile);
+    // } catch (Exception e) {
+    // System.out.println(" Download/overwrite failed for file: " + fileName);
+    // e.printStackTrace();
+    // }
 
-    //         // 6) Delay 1 second to avoid spamming
-    //         Thread.sleep(2000);
-    //     }
+    // // 6) Delay 1 second to avoid spamming
+    // Thread.sleep(2000);
+    // }
     // }
 
     // ---------------------------------------------------------------
@@ -297,11 +302,12 @@ public class File_Controller {
         // --- DEBUG LOGGING ---
         // System.out.println("Pending-remove tags: " + removeLower);
         // System.out.println("Incoming combinations (" + combinations.size() + "):");
-        // combinations.forEach(c -> System.out.println("  " + c));
+        // combinations.forEach(c -> System.out.println(" " + c));
         // ---------------------
 
         // 3) Filter: keep any combo where at least one element is in pendingRemove
-        // 3) Filter: **exclude** any combo that contains at least one pending-remove tag
+        // 3) Filter: **exclude** any combo that contains at least one pending-remove
+        // tag
         List<List<String>> matched = combinations.stream()
                 .filter(combo -> combo.stream()
                         .map(String::toLowerCase)
@@ -312,7 +318,7 @@ public class File_Controller {
 
         // --- DEBUG LOGGING ---
         // System.out.println("Matched combinations (" + matched.size() + "):");
-        // matched.forEach(c -> System.out.println("  " + c));
+        // matched.forEach(c -> System.out.println(" " + c));
         // ---------------------
 
         Map<String, List<List<String>>> payload = Collections.singletonMap("matchedCombinations", matched);
@@ -389,17 +395,19 @@ public class File_Controller {
     @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server")
     public ResponseEntity<CustomResponse<String>> downloadFileServer(@RequestBody Map<String, Object> requestBody) {
-        /*{
-        "modelID": "123",
-        "loraFileName": "example.txt",
-        "versionID": "1.0",
-        "downloadFilePath": "/downloads",
-        "nameAndDownloadUrlArray": [
-        {"name": "file1", "downloadUrl": "https://example.com/file1"},
-        {"name": "file2", "downloadUrl": "https://example.com/file2"}
-        ],
-        "loraURL": "https://example.com/lora"
-        } */
+        /*
+         * {
+         * "modelID": "123",
+         * "loraFileName": "example.txt",
+         * "versionID": "1.0",
+         * "downloadFilePath": "/downloads",
+         * "nameAndDownloadUrlArray": [
+         * {"name": "file1", "downloadUrl": "https://example.com/file1"},
+         * {"name": "file2", "downloadUrl": "https://example.com/file2"}
+         * ],
+         * "loraURL": "https://example.com/lora"
+         * }
+         */
         String url = (String) requestBody.get("url");
         String name = ((String) requestBody.get("name")).split("\\.")[0];
         String modelID = (String) requestBody.get("modelID");
@@ -431,15 +439,16 @@ public class File_Controller {
         fileService.update_folder_list(downloadFilePath);
         fileService.update_cart_list(url);
         fileService.update_tags_list(downloadFilePath);
-        //fileService.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
+        // fileService.remove_from_offline_download_list(civitaiModelID,
+        // civitaiVersionID);
         return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
     /**
-    * Endpoint to backup the offline_download_list.json file.
-    *
-    * @return ResponseEntity with isBackedUp flag.
-    */
+     * Endpoint to backup the offline_download_list.json file.
+     *
+     * @return ResponseEntity with isBackedUp flag.
+     */
     @PostMapping("/backup_offline_download_list")
     public ResponseEntity<CustomResponse<Map<String, Boolean>>> backupOfflineDownloadList() {
         boolean isBackedUp = fileService.backupOfflineDownloadList();
@@ -738,13 +747,82 @@ public class File_Controller {
 
             fileService.update_error_model_list(modelName);
             // List<String> emptyList = new ArrayList<>();
-            // fileService.update_error_model_list_v2(civitaiFileName, civitaiModelFileList, downloadFilePath, modelObject,
-            //         civitaiModelID, civitaiVersionID, civitaiUrl, (String) modelVersionObject.get("baseModel"),
-            //         emptyList.toArray(new String[0]), "N/A", emptyList);
+            // fileService.update_error_model_list_v2(civitaiFileName, civitaiModelFileList,
+            // downloadFilePath, modelObject,
+            // civitaiModelID, civitaiVersionID, civitaiUrl, (String)
+            // modelVersionObject.get("baseModel"),
+            // emptyList.toArray(new String[0]), "N/A", emptyList);
 
             System.err.println("An error occurred while downloading " + civitaiModelID + "_" + civitaiVersionID + "_"
                     + civitaiFileName + "\n" + ex.getMessage());
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/download-file-server-v2-for-custom")
+    public ResponseEntity<CustomResponse<String>> downloadFileServerV2forCustom(
+            @RequestBody Map<String, Object> requestBody) {
+
+        // 1) Pull modelObject off the request
+        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
+        String civitaiFileName = (String) modelObject.get("civitaiFileName");
+        String downloadFilePath = (String) modelObject.get("downloadFilePath");
+        String civitaiUrl = (String) modelObject.get("civitaiUrl");
+        String civitaiModelID = (String) modelObject.get("civitaiModelID");
+        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+        String baseModel = (String) modelObject.get("baseModel");
+
+        // 2) Front end now passes an array of URL strings here:
+        @SuppressWarnings("unchecked")
+        List<String> imageUrlsList = (List<String>) modelObject.get("imageUrls");
+
+        // 3) And your single file’s download URL lives here:
+        String downloadUrl = (String) modelObject.get("downloadUrl");
+
+        // 4) Validate
+        if (downloadFilePath == null || downloadFilePath.isEmpty()
+                || civitaiModelID == null || civitaiModelID.isEmpty()
+                || civitaiVersionID == null || civitaiVersionID.isEmpty()
+                || baseModel == null || baseModel.isEmpty()
+                || downloadUrl == null || downloadUrl.isEmpty()
+                || imageUrlsList == null || imageUrlsList.isEmpty()) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+            // 5) Build the one‐entry download list
+            List<Map<String, Object>> civitaiModelFileList = new ArrayList<>();
+            Map<String, Object> fileEntry = new HashMap<>();
+            fileEntry.put("name", civitaiFileName);
+            fileEntry.put("downloadUrl", downloadUrl);
+            civitaiModelFileList.add(fileEntry);
+
+            // 6) Convert the List<String> into a String[] for previews
+            String[] imageUrlsArray = imageUrlsList.toArray(new String[0]);
+
+            // 7) Call your existing v2 download
+            fileService.download_file_by_server_v2(
+                    civitaiFileName,
+                    civitaiModelFileList,
+                    downloadFilePath,
+                    null, // skip modelVersionObject
+                    civitaiModelID,
+                    civitaiVersionID,
+                    civitaiUrl,
+                    baseModel,
+                    imageUrlsArray);
+
+            return ResponseEntity.ok(CustomResponse.success("Success download file"));
+        } catch (Exception ex) {
+            String modelName = civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName;
+            fileService.update_error_model_list(modelName);
+            ex.printStackTrace();
+            return ResponseEntity
+                    .status(500)
+                    .body(CustomResponse.failure("Server error: " + ex.getMessage()));
         }
     }
 
@@ -798,25 +876,30 @@ public class File_Controller {
     }
 
     // @CrossOrigin(origins = "https://civitai.com")
-    // @PostMapping(path = "/check-if-modelId-and-versionId-exist-in-database-tampermonkey")
+    // @PostMapping(path =
+    // "/check-if-modelId-and-versionId-exist-in-database-tampermonkey")
     // @SuppressWarnings("unchecked")
-    // public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkIfModelIdandVersionIdExistInDatabase(
-    //         @RequestBody Map<String, Object> requestBody) {
-    //     String url = (String) requestBody.get("url");
+    // public ResponseEntity<CustomResponse<Map<String, Boolean>>>
+    // checkIfModelIdandVersionIdExistInDatabase(
+    // @RequestBody Map<String, Object> requestBody) {
+    // String url = (String) requestBody.get("url");
 
-    //     // Validate null or empty
-    //     if (url == null || url == "") {
-    //         return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-    //     }
-    //     Boolean isSaved = civitaiSQL_Service.find_one_from_models_urls_table(url);
-    //     if (isSaved != null) {
-    //         Map<String, Boolean> payload = new HashMap<>();
-    //         payload.put("isSaved", isSaved);
+    // // Validate null or empty
+    // if (url == null || url == "") {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
+    // Boolean isSaved = civitaiSQL_Service.find_one_from_models_urls_table(url);
+    // if (isSaved != null) {
+    // Map<String, Boolean> payload = new HashMap<>();
+    // payload.put("isSaved", isSaved);
 
-    //         return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
-    //     } else {
-    //         return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
-    //     }
+    // return ResponseEntity.ok().body(CustomResponse.success("Model retrieval
+    // successful", payload));
+    // } else {
+    // return ResponseEntity.ok().body(CustomResponse.failure("Model not found in
+    // the Database"));
+    // }
     // }
 
     @CrossOrigin(origins = "*")
