@@ -733,6 +733,40 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    @PostMapping("/delete-record-by-model-version")
+    public ResponseEntity<CustomResponse<String>> deleteRecordByModelAndVersion(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelNumber = (String) requestBody.get("model_number"); // or "modelNumber" if you prefer camelCase in
+                                                                       // JSON
+        String versionNumber = (String) requestBody.get("version_number");
+
+        if (modelNumber == null || modelNumber.isBlank() ||
+                versionNumber == null || versionNumber.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: model_number and version_number are required"));
+        }
+
+        Optional<Models_Table_Entity> entityOpt = civitaiSQL_Service
+                .find_one_from_models_table_by_model_number_and_version_number(modelNumber,
+                        versionNumber);
+
+        if (entityOpt.isEmpty()) {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.failure("Model not found in the database"));
+        }
+
+        Models_Table_Entity entity = entityOpt.get();
+        civitaiSQL_Service.delete_record_to_all_table_by_id(entity.getId());
+
+        String name = (entity.getName() != null && !entity.getName().isBlank()) ? entity.getName() : "(no-name)";
+        System.out.println(
+                "Deleted model: name=\"" + name + "\", model_number=" + modelNumber +
+                        ", version_number=" + versionNumber + ", id=" + entity.getId());
+
+        return ResponseEntity.ok().body(CustomResponse.success("Model deleted successfully"));
+    }
+
     @PostMapping("/update-record-by-model-and-version")
     public ResponseEntity<CustomResponse<String>> updateRecordByModelAndVersion(
             @RequestBody Map<String, Object> requestBody) {

@@ -1606,4 +1606,19 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return Optional.of(directories);
         }
 
+        @Override
+        @Transactional()
+        public Optional<Models_Table_Entity> find_one_from_models_table_by_model_number_and_version_number(
+                        String modelNumber, String versionNumber) {
+                try {
+                        return models_Table_Repository.findByModelNumberAndVersionNumber(modelNumber, versionNumber);
+                } catch (DataAccessException e) {
+                        log.error("Database error while finding the record by model+version", e);
+                        throw new CustomDatabaseException("An unexpected database error occurred", e);
+                } catch (Exception e) {
+                        log.error("Unexpected error while finding the record by model+version", e);
+                        throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
 }

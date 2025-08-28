@@ -52,6 +52,8 @@ public interface CivitaiSQL_Service {
 
         Optional<List<String>> find_List_of_Version_Number_from_model_tables_by_Url(String modelID);
 
+        Optional<Models_Table_Entity> find_one_from_models_table_by_model_number_and_version_number(String modelNumber, String versionNumber);        
+
         //Transcation Actions
         // Add a record to all tables
         void create_record_to_all_tables(Models_DTO dto);
