@@ -7,11 +7,13 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,11 +35,13 @@ import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Descriptions_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Images_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Images_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.Models_Offline_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository_Specification;
 import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
@@ -66,6 +70,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Details_Table_Repository models_Details_Table_Repository;
         private final Models_Images_Table_Repository models_Images_Table_Repository;
         private final Models_Table_Repository_Specification models_Table_Repository_Specification;
+        private final Models_Offline_Table_Repository models_Offline_Table_Repository;
+        private final ObjectMapper objectMapper;
         private final Civitai_Service civitai_Service;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -207,15 +213,19 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Urls_Table_Repository models_Urls_Table_Repository,
                         Models_Details_Table_Repository models_Details_Table_Repository,
                         Models_Images_Table_Repository models_Images_Table_Repository,
+                        Models_Offline_Table_Repository models_Offline_Table_Repository,
                         Models_Table_Repository_Specification models_Table_Repository_Specification,
+                        ObjectMapper objectMapper,
                         Civitai_Service civitai_Service) {
                 this.models_Table_Repository = models_Table_Repository;
                 this.models_Descriptions_Table_Repository = models_Descriptions_Table_Repository;
                 this.models_Urls_Table_Repository = models_Urls_Table_Repository;
                 this.models_Details_Table_Repository = models_Details_Table_Repository;
                 this.models_Images_Table_Repository = models_Images_Table_Repository;
+                this.models_Offline_Table_Repository = models_Offline_Table_Repository;
                 this.models_Table_Repository_Specification = models_Table_Repository_Specification;
                 this.civitai_Service = civitai_Service;
+                this.objectMapper = objectMapper;
         }
 
         @Override
@@ -1618,6 +1628,492 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 } catch (Exception e) {
                         log.error("Unexpected error while finding the record by model+version", e);
                         throw new CustomException("An unexpected error occurred", e);
+                }
+        }
+
+        /**
+         * SQL-backed replacement for update_offline_download_list (no file I/O).
+         */
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public void update_offline_download_list(
+                        String civitaiFileName,
+                        List<Map<String, Object>> civitaiModelFileList,
+                        String downloadFilePath,
+                        Map<String, Object> modelVersionObject,
+                        String civitaiModelID,
+                        String civitaiVersionID,
+                        String civitaiUrl,
+                        String civitaiBaseModel,
+                        String[] imageUrlsArray,
+                        String selectedCategory,
+                        List<String> civitaiTags,
+                        Boolean isModifyMode) {
+
+                // parse first so we can log them in catch blocks
+                Long modelId = parseLongOrNull(civitaiModelID);
+                Long versionId = parseLongOrNull(civitaiVersionID);
+
+                // (optional) quick param dump
+                System.out.println("=== update_offline_download_list() ===");
+                System.out.println("modelId=" + modelId + ", versionId=" + versionId +
+                                ", modify=" + isModifyMode + ", fileName=" + civitaiFileName);
+
+                try {
+                        log.info("handling update_offline_download_list (SQL)");
+
+                        // find existing by (modelId, versionId)
+                        Optional<Models_Offline_Table_Entity> existingOpt = models_Offline_Table_Repository
+                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, versionId);
+
+                        if (existingOpt.isPresent()) {
+                                if (Boolean.TRUE.equals(isModifyMode)) {
+                                        // update existing (refresh all columns)
+                                        Models_Offline_Table_Entity e = existingOpt.get();
+                                        e.setCivitaiFileName(civitaiFileName);
+                                        e.setCivitaiBaseModel(civitaiBaseModel);
+                                        e.setSelectedCategory(selectedCategory);
+                                        e.setDownloadFilePath(downloadFilePath);
+                                        e.setCivitaiUrl(civitaiUrl);
+                                        e.setCivitaiModelID(modelId);
+                                        e.setCivitaiVersionID(versionId);
+                                        e.setCivitaiModelFileList(toJsonOrNull(civitaiModelFileList));
+                                        e.setModelVersionObject(toJsonOrNull(modelVersionObject));
+                                        e.setImageUrlsArray(toJsonOrNull(imageUrlsArray));
+                                        e.setCivitaiTags(toJsonOrNull(civitaiTags));
+                                        models_Offline_Table_Repository.save(e);
+                                }
+                                // not modify mode → no-op if exists
+                                return;
+                        }
+
+                        // create new row
+                        Models_Offline_Table_Entity e = Models_Offline_Table_Entity.builder()
+                                        .civitaiFileName(civitaiFileName)
+                                        .civitaiBaseModel(civitaiBaseModel)
+                                        .selectedCategory(selectedCategory)
+                                        .downloadFilePath(downloadFilePath)
+                                        .civitaiUrl(civitaiUrl)
+                                        .civitaiModelID(modelId)
+                                        .isError(false)
+                                        .civitaiVersionID(versionId)
+                                        .civitaiModelFileList(toJsonOrNull(civitaiModelFileList))
+                                        .modelVersionObject(toJsonOrNull(modelVersionObject))
+                                        .imageUrlsArray(toJsonOrNull(imageUrlsArray))
+                                        .civitaiTags(toJsonOrNull(civitaiTags))
+                                        .build();
+                        models_Offline_Table_Repository.save(e);
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error updating offline list (modelId={}, versionId={}): {}",
+                                        modelId, versionId, ex.getMessage(), ex);
+                        throw new CustomException(
+                                        "An unexpected error occurred while updating the offline download list.", ex);
+                }
+        }
+
+        private Long parseLongOrNull(String s) {
+                try {
+                        return (s == null || s.isBlank()) ? null : Long.parseLong(s.trim());
+                } catch (NumberFormatException ex) {
+                        log.warn("Failed to parse Long from '{}'", s);
+                        return null;
+                }
+        }
+
+        private String toJsonOrNull(Object obj) {
+                if (obj == null)
+                        return null;
+                try {
+                        return objectMapper.writeValueAsString(obj);
+                } catch (JsonProcessingException e) {
+                        // choose: either throw your CustomException, or log and return null
+                        log.error("JSON serialization failed", e);
+                        return null;
+                }
+        }
+
+        /** pretty JSON for console printing (falls back to String.valueOf on error) */
+        private String toPrettyJson(Object obj) {
+                if (obj == null)
+                        return "null";
+                try {
+                        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+                } catch (Exception e) {
+                        return String.valueOf(obj);
+                }
+        }
+
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID) {
+                // ---- print ALL params ----
+                System.out.println("=== remove_from_offline_download_list() params ===");
+                System.out.println("civitaiModelID   : " + civitaiModelID);
+                System.out.println("civitaiVersionID : " + civitaiVersionID);
+                System.out.println("==================================================");
+
+                Long modelId = parseLongOrNull(civitaiModelID);
+                Long versionId = parseLongOrNull(civitaiVersionID);
+
+                if (modelId == null || versionId == null) {
+                        System.out.println("Invalid IDs (null/NaN). Nothing removed.");
+                        return; // or throw new CustomException("Invalid IDs");
+                }
+
+                try {
+                        long deleted = models_Offline_Table_Repository
+                                        .deleteByCivitaiModelIDAndCivitaiVersionID(modelId, versionId);
+
+                        if (deleted > 0) {
+                                System.out.println("Successfully removed " + deleted + " matching row(s).");
+                        } else {
+                                System.out.println("No matching entry found. No changes made.");
+                        }
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error removing offline list (modelId={}, versionId={}): {}",
+                                        modelId, versionId, ex.getMessage(), ex);
+                        throw new CustomException("Unexpected error while removing from the offline download list.",
+                                        ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public long checkQuantityOfOfflineDownloadList(String civitaiModelID) {
+                System.out.println("=== checkQuantityOfOfflineDownloadList() ===");
+                System.out.println("civitaiModelID : " + civitaiModelID);
+                System.out.println("============================================");
+
+                Long modelId = parseLongOrNull(civitaiModelID);
+                if (modelId == null) {
+                        System.err.println("Invalid civitaiModelID (null/NaN). Returning 0.");
+                        return 0L;
+                }
+
+                try {
+                        long count = models_Offline_Table_Repository.countByCivitaiModelID(modelId);
+                        System.out.println("Count for modelId " + modelId + " = " + count);
+                        return count;
+
+                        // If you wanted distinct versions instead:
+                        // return
+                        // models_Offline_Table_Repository.countDistinctVersionByModelId(modelId);
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error counting offline rows (modelId={}): {}", modelId, ex.getMessage(),
+                                        ex);
+                        throw new CustomException("Unexpected error while counting the offline download list.", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public List<Map<String, Object>> get_offline_download_list() {
+                System.out.println("get_offline_download_list(): fetching from DB…");
+                try {
+                        // 1) fetch all rows
+                        List<Models_Offline_Table_Entity> rows = models_Offline_Table_Repository.findAll();
+                        System.out.println("DB returned rows: " + rows.size());
+
+                        // 2) map each row to the same Map shape the JSON file used
+                        List<Map<String, Object>> mapped = new ArrayList<>(rows.size());
+                        for (Models_Offline_Table_Entity e : rows) {
+                                Map<String, Object> m = new HashMap<>();
+                                m.put("civitaiFileName", e.getCivitaiFileName());
+                                m.put("downloadFilePath", e.getDownloadFilePath());
+                                m.put("civitaiUrl", e.getCivitaiUrl());
+                                m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                                m.put("selectedCategory", e.getSelectedCategory());
+                                // keep IDs as String to match old JSON structure
+                                m.put("civitaiModelID", e.getCivitaiModelID() == null ? null
+                                                : String.valueOf(e.getCivitaiModelID()));
+                                m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
+                                                : String.valueOf(e.getCivitaiVersionID()));
+
+                                // parse JSON columns (DB stores valid JSON; null-safe here)
+                                if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
+                                        m.put("civitaiModelFileList", objectMapper.readValue(
+                                                        e.getCivitaiModelFileList(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                                                        }));
+                                } else {
+                                        m.put("civitaiModelFileList", null);
+                                }
+
+                                if (e.getModelVersionObject() != null && !e.getModelVersionObject().isBlank()) {
+                                        m.put("modelVersionObject", objectMapper.readValue(
+                                                        e.getModelVersionObject(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                                                        }));
+                                } else {
+                                        m.put("modelVersionObject", null);
+                                }
+
+                                if (e.getCivitaiTags() != null && !e.getCivitaiTags().isBlank()) {
+                                        m.put("civitaiTags", objectMapper.readValue(
+                                                        e.getCivitaiTags(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+                                                        }));
+                                } else {
+                                        m.put("civitaiTags", null);
+                                }
+
+                                if (e.getImageUrlsArray() != null && !e.getImageUrlsArray().isBlank()) {
+                                        List<String> urls = objectMapper.readValue(
+                                                        e.getImageUrlsArray(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+                                                        });
+                                        m.put("imageUrlsArray", urls.toArray(new String[0]));
+                                } else {
+                                        m.put("imageUrlsArray", null);
+                                }
+
+                                mapped.add(m);
+                        }
+
+                        // 3) apply your same optional filter (remove entries with empty
+                        // civitaiBaseModel)
+                        List<Map<String, Object>> filtered = mapped.stream()
+                                        .filter(entry -> {
+                                                Object baseModel = entry.get("civitaiBaseModel");
+                                                return baseModel != null && !baseModel.toString().isEmpty();
+                                        })
+                                        .collect(java.util.stream.Collectors.toList());
+
+                        System.out.println("Returning " + filtered.size() + " entries from DB.");
+                        return filtered;
+
+                } catch (org.springframework.dao.DataAccessException | jakarta.persistence.PersistenceException dbEx) {
+                        log.error("DB error while retrieving offline download list: {}", dbEx.getMessage(), dbEx);
+                        throw new CustomException("Database error while retrieving the offline download list.", dbEx);
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving offline download list: {}", ex.getMessage(), ex);
+                        throw new CustomException(
+                                        "An unexpected error occurred while retrieving the offline download list.", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords) {
+                System.out.println("=== searchOfflineDownloads() ===");
+                try {
+                        // normalize keywords
+                        List<String> kw = (keywords == null ? Collections.<String>emptyList() : keywords).stream()
+                                        .filter(Objects::nonNull)
+                                        .map(s -> s.trim().toLowerCase())
+                                        .filter(s -> !s.isEmpty())
+                                        .collect(Collectors.toList());
+
+                        // 1) fetch all rows
+                        List<Models_Offline_Table_Entity> rows = models_Offline_Table_Repository.findAll();
+
+                        // 2) map each row to the same Map shape your JSON version returned
+                        List<Map<String, Object>> mapped = new ArrayList<>(rows.size());
+                        for (Models_Offline_Table_Entity e : rows) {
+                                Map<String, Object> m = new HashMap<>();
+                                m.put("civitaiFileName", e.getCivitaiFileName());
+                                m.put("downloadFilePath", e.getDownloadFilePath());
+                                m.put("civitaiUrl", e.getCivitaiUrl());
+                                m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                                m.put("selectedCategory", e.getSelectedCategory());
+                                // keep IDs as String like your old file
+                                m.put("civitaiModelID", e.getCivitaiModelID() == null ? null
+                                                : String.valueOf(e.getCivitaiModelID()));
+                                m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
+                                                : String.valueOf(e.getCivitaiVersionID()));
+
+                                // parse JSON columns inline
+                                List<Map<String, Object>> fileList = null;
+                                if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
+                                        fileList = objectMapper.readValue(e.getCivitaiModelFileList(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                                                        });
+                                }
+                                m.put("civitaiModelFileList", fileList);
+
+                                Map<String, Object> mvo = null;
+                                if (e.getModelVersionObject() != null && !e.getModelVersionObject().isBlank()) {
+                                        mvo = objectMapper.readValue(e.getModelVersionObject(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                                                        });
+                                }
+                                m.put("modelVersionObject", mvo);
+
+                                List<String> tags = null;
+                                if (e.getCivitaiTags() != null && !e.getCivitaiTags().isBlank()) {
+                                        tags = objectMapper.readValue(e.getCivitaiTags(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+                                                        });
+                                }
+                                m.put("civitaiTags", tags);
+
+                                List<String> images = null;
+                                if (e.getImageUrlsArray() != null && !e.getImageUrlsArray().isBlank()) {
+                                        images = objectMapper.readValue(e.getImageUrlsArray(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+                                                        });
+                                }
+                                m.put("imageUrlsArray", images == null ? null : images.toArray(new String[0]));
+
+                                mapped.add(m);
+                        }
+
+                        // 3) no keywords -> return everything
+                        if (kw.isEmpty())
+                                return mapped;
+
+                        // 4) filter: AND across keywords, OR across fields
+                        List<Map<String, Object>> filtered = new ArrayList<>();
+                        outer: for (Map<String, Object> entry : mapped) {
+                                for (String k : kw) {
+                                        if (k == null || k.isEmpty())
+                                                continue;
+                                        boolean found = false;
+
+                                        // (A) civitaiFileName
+                                        Object fn = entry.get("civitaiFileName");
+                                        if (fn != null && fn.toString().toLowerCase().contains(k))
+                                                found = true;
+
+                                        // (B) modelVersionObject.name / modelVersionObject.model.name
+                                        if (!found) {
+                                                @SuppressWarnings("unchecked")
+                                                Map<String, Object> mm = (Map<String, Object>) entry
+                                                                .get("modelVersionObject");
+                                                if (mm != null) {
+                                                        Object verName = mm.get("name");
+                                                        if (verName != null
+                                                                        && verName.toString().toLowerCase().contains(k))
+                                                                found = true;
+                                                        if (!found) {
+                                                                @SuppressWarnings("unchecked")
+                                                                Map<String, Object> model = (Map<String, Object>) mm
+                                                                                .get("model");
+                                                                if (model != null) {
+                                                                        Object modelName = model.get("name");
+                                                                        if (modelName != null && modelName.toString()
+                                                                                        .toLowerCase().contains(k))
+                                                                                found = true;
+                                                                }
+                                                        }
+                                                }
+                                        }
+
+                                        // (C) civitaiUrl
+                                        if (!found) {
+                                                Object url = entry.get("civitaiUrl");
+                                                if (url != null && url.toString().toLowerCase().contains(k))
+                                                        found = true;
+                                        }
+
+                                        // (D) civitaiTags
+                                        if (!found) {
+                                                @SuppressWarnings("unchecked")
+                                                List<String> t = (List<String>) entry.get("civitaiTags");
+                                                if (t != null) {
+                                                        for (String tag : t) {
+                                                                if (tag != null && tag.toLowerCase().contains(k)) {
+                                                                        found = true;
+                                                                        break;
+                                                                }
+                                                        }
+                                                }
+                                        }
+
+                                        if (!found)
+                                                continue outer; // this keyword not found -> reject entry
+                                }
+                                filtered.add(entry); // all keywords matched somewhere
+                        }
+
+                        return filtered;
+
+                } catch (Exception ex) {
+                        log.error("searchOfflineDownloads failed: {}", ex.getMessage(), ex);
+                        throw new CustomException("Unexpected error while searching offline downloads.", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID) {
+                System.out.println("=== getCivitaiVersionIds() ===");
+                System.out.println("civitaiModelID : " + civitaiModelID);
+                System.out.println("==============================");
+
+                Long modelId = parseLongOrNull(civitaiModelID);
+                if (modelId == null) {
+                        System.err.println("Invalid civitaiModelID (null/NaN). Returning empty list.");
+                        return Optional.of(Collections.emptyList());
+                }
+
+                try {
+                        List<Long> ids = models_Offline_Table_Repository.findVersionIdsByModelId(modelId);
+
+                        List<String> asStrings = (ids == null) ? Collections.emptyList()
+                                        : ids.stream()
+                                                        .filter(Objects::nonNull)
+                                                        .map(String::valueOf)
+                                                        .collect(Collectors.toList());
+
+                        // If you want DISTINCT behavior instead, just add `.distinct()` in the stream
+                        // above
+                        // or switch the repository call to the distinct query.
+
+                        return Optional.of(asStrings);
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error fetching version IDs (modelId={}): {}", modelId, ex.getMessage(),
+                                        ex);
+                        throw new CustomException("Unexpected error while retrieving version IDs.", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<String> get_error_model_list() {
+                List<Models_Offline_Table_Entity> rows = models_Offline_Table_Repository
+                                .findAllByIsErrorTrueOrderByIdAsc();
+
+                List<String> out = new ArrayList<>(rows.size());
+                for (Models_Offline_Table_Entity e : rows) {
+                        String modelId = e.getCivitaiModelID() == null ? "" : String.valueOf(e.getCivitaiModelID());
+                        String versionId = e.getCivitaiVersionID() == null ? ""
+                                        : String.valueOf(e.getCivitaiVersionID());
+                        String fileName = e.getCivitaiFileName() == null ? "" : e.getCivitaiFileName();
+                        out.add(modelId + "_" + versionId + "_" + fileName);
+                }
+                return out;
+        }
+
+        @Override
+        @Transactional
+        public void update_error_model_offline_list(String civitaiModelID, String civitaiVersionID, Boolean isError) {
+                System.out.println("=== update_error_model_list ===");
+                System.out.println("civitaiModelID   : " + civitaiModelID);
+                System.out.println("civitaiVersionID : " + civitaiVersionID);
+                System.out.println("isError          : " + isError);
+                System.out.println("===============================");
+
+                Long modelId = parseLongOrNull(civitaiModelID);
+                Long versionId = parseLongOrNull(civitaiVersionID);
+                if (modelId == null || versionId == null) {
+                        log.warn("Invalid IDs; nothing updated. modelId={}, versionId={}", modelId, versionId);
+                        return;
+                }
+
+                boolean flag = Boolean.TRUE.equals(isError); // default null -> false
+
+                int updated = models_Offline_Table_Repository
+                                .updateIsErrorByModelAndVersion(modelId, versionId, flag);
+
+                if (updated > 0) {
+                        log.info("is_error set to {} for modelId={}, versionId={}", flag, modelId, versionId);
+                } else {
+                        log.info("No matching row for modelId={}, versionId={} (nothing updated).", modelId, versionId);
                 }
         }
 

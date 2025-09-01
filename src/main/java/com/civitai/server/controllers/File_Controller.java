@@ -218,21 +218,25 @@ public class File_Controller {
         }
     }
 
-    @CrossOrigin(origins = "*")
-    @GetMapping("/get_offline_download_list")
-    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getOfflineDownloadList() {
-        List<Map<String, Object>> offlineDownloadList = fileService.get_offline_download_list();
+    // @CrossOrigin(origins = "*")
+    // @GetMapping("/get_offline_download_list")
+    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>>
+    // getOfflineDownloadList() {
+    // List<Map<String, Object>> offlineDownloadList =
+    // fileService.get_offline_download_list();
 
-        if (!offlineDownloadList.isEmpty()) {
-            Map<String, List<Map<String, Object>>> payload = new HashMap<>();
-            payload.put("offlineDownloadList", offlineDownloadList);
+    // if (!offlineDownloadList.isEmpty()) {
+    // Map<String, List<Map<String, Object>>> payload = new HashMap<>();
+    // payload.put("offlineDownloadList", offlineDownloadList);
 
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Offline Download List retrieval successful", payload));
-        } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("No offline downloads found"));
-        }
-    }
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Offline Download List retrieval successful",
+    // payload));
+    // } else {
+    // return ResponseEntity.ok().body(CustomResponse.failure("No offline downloads
+    // found"));
+    // }
+    // }
 
     @GetMapping("/get_folders_list")
     public ResponseEntity<CustomResponse<Map<String, List<String>>>> getFoldersList() {
@@ -325,19 +329,19 @@ public class File_Controller {
         return ResponseEntity.ok(CustomResponse.success("Filtered combinations retrieved", payload));
     }
 
-    @GetMapping("/get_error_model_list")
-    public ResponseEntity<CustomResponse<Map<String, List<String>>>> getErrorModelList() {
-        List<String> errorModelList = fileService.get_error_model_list();
+    // @GetMapping("/get_error_model_list")
+    // public ResponseEntity<CustomResponse<Map<String, List<String>>>> getErrorModelList() {
+    //     List<String> errorModelList = fileService.get_error_model_list();
 
-        if (!errorModelList.isEmpty()) {
-            Map<String, List<String>> payload = new HashMap<>();
-            payload.put("errorModelList", errorModelList);
+    //     if (!errorModelList.isEmpty()) {
+    //         Map<String, List<String>> payload = new HashMap<>();
+    //         payload.put("errorModelList", errorModelList);
 
-            return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList retrieval successful", payload));
-        } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
-        }
-    }
+    //         return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList retrieval successful", payload));
+    //     } else {
+    //         return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
+    //     }
+    // }
 
     @GetMapping("/get_creator_url_list")
     public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getCreatorUrlList() {
@@ -450,154 +454,161 @@ public class File_Controller {
      * @return ResponseEntity with isBackedUp flag.
      */
     @PostMapping("/backup_offline_download_list")
-    public ResponseEntity<CustomResponse<Map<String, Boolean>>> backupOfflineDownloadList() {
-        boolean isBackedUp = fileService.backupOfflineDownloadList();
+    public void backupOfflineDownloadList() {
+        // boolean isBackedUp = fileService.backupOfflineDownloadList();
 
-        Map<String, Boolean> payload = new HashMap<>();
-        payload.put("isBackedUp", isBackedUp);
-
-        if (isBackedUp) {
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Backup created successfully.", payload));
-        } else {
-            return ResponseEntity.status(500)
-                    .body(CustomResponse.failure("Backup failed. Please check server logs for details."));
-        }
+        // Map<String, Boolean> payload = new HashMap<>();
+        // payload.put("isBackedUp", isBackedUp);
     }
 
-    @SuppressWarnings("unchecked")
-    @PostMapping("/add-offline-download-file-into-offline-download-list")
-    public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadList(
-            @RequestBody Map<String, Object> requestBody) {
+    // @SuppressWarnings("unchecked")
+    // @PostMapping("/add-offline-download-file-into-offline-download-list")
+    // public ResponseEntity<CustomResponse<String>>
+    // addOfflineDownloadFileIntoOfflineDownloadList(
+    // @RequestBody Map<String, Object> requestBody) {
 
-        // Extract the input parameters
-        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
-        if (modelObject == null) {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
+    // // Extract the input parameters
+    // Map<String, Object> modelObject = (Map<String, Object>)
+    // requestBody.get("modelObject");
+    // if (modelObject == null) {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-        String civitaiFileName = (String) modelObject.get("civitaiFileName");
-        List<Map<String, Object>> civitaiModelFileList = (List<Map<String, Object>>) modelObject
-                .get("civitaiModelFileList");
-        String downloadFilePath = (String) modelObject.get("downloadFilePath");
-        String civitaiUrl = (String) modelObject.get("civitaiUrl");
-        String civitaiModelID = (String) modelObject.get("civitaiModelID");
-        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
-        String selectedCategory = (String) modelObject.get("selectedCategory");
-        Boolean isModifyMode = (Boolean) requestBody.get("isModifyMode");
-        List<String> civitaiTags = modelObject.get("civitaiTags") != null
-                ? (List<String>) modelObject.get("civitaiTags")
-                : new ArrayList<>();
+    // String civitaiFileName = (String) modelObject.get("civitaiFileName");
+    // List<Map<String, Object>> civitaiModelFileList = (List<Map<String, Object>>)
+    // modelObject
+    // .get("civitaiModelFileList");
+    // String downloadFilePath = (String) modelObject.get("downloadFilePath");
+    // String civitaiUrl = (String) modelObject.get("civitaiUrl");
+    // String civitaiModelID = (String) modelObject.get("civitaiModelID");
+    // String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+    // String selectedCategory = (String) modelObject.get("selectedCategory");
+    // Boolean isModifyMode = (Boolean) requestBody.get("isModifyMode");
+    // List<String> civitaiTags = modelObject.get("civitaiTags") != null
+    // ? (List<String>) modelObject.get("civitaiTags")
+    // : new ArrayList<>();
 
-        // Validate required parameters (using isEmpty() for String checks)
-        if (civitaiUrl == null || civitaiUrl.isEmpty() ||
-                downloadFilePath == null || downloadFilePath.isEmpty() ||
-                civitaiModelID == null || civitaiModelID.isEmpty() ||
-                civitaiVersionID == null || civitaiVersionID.isEmpty() ||
-                selectedCategory == null || selectedCategory.isEmpty() ||
-                civitaiModelFileList == null || civitaiModelFileList.isEmpty()) {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
+    // // Validate required parameters (using isEmpty() for String checks)
+    // if (civitaiUrl == null || civitaiUrl.isEmpty() ||
+    // downloadFilePath == null || downloadFilePath.isEmpty() ||
+    // civitaiModelID == null || civitaiModelID.isEmpty() ||
+    // civitaiVersionID == null || civitaiVersionID.isEmpty() ||
+    // selectedCategory == null || selectedCategory.isEmpty() ||
+    // civitaiModelFileList == null || civitaiModelFileList.isEmpty()) {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-        // Retry mechanism: try up to 5 times with 1-second delay between attempts.
-        final int maxAttempts = 5;
-        boolean success = false;
-        Exception lastException = null;
+    // // Retry mechanism: try up to 5 times with 1-second delay between attempts.
+    // final int maxAttempts = 5;
+    // boolean success = false;
+    // Exception lastException = null;
 
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                // Attempt to find the model by version ID.
-                Optional<Map<String, Object>> modelVersionOptional = civitai_Service
-                        .findModelByVersionID(civitaiVersionID);
-                if (!modelVersionOptional.isPresent()) {
-                    throw new Exception("Model version not found");
-                }
-                Map<String, Object> modelVersionObject = modelVersionOptional.get();
+    // for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+    // try {
+    // // Attempt to find the model by version ID.
+    // Optional<Map<String, Object>> modelVersionOptional = civitai_Service
+    // .findModelByVersionID(civitaiVersionID);
+    // if (!modelVersionOptional.isPresent()) {
+    // throw new Exception("Model version not found");
+    // }
+    // Map<String, Object> modelVersionObject = modelVersionOptional.get();
 
-                // Extract image URLs from the model version object.
-                String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
+    // // Extract image URLs from the model version object.
+    // String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
 
-                // Update the offline download list.
-                fileService.update_offline_download_list(
-                        civitaiFileName,
-                        civitaiModelFileList,
-                        downloadFilePath,
-                        modelVersionObject,
-                        civitaiModelID,
-                        civitaiVersionID,
-                        civitaiUrl,
-                        (String) modelVersionObject.get("baseModel"),
-                        imageUrlsArray,
-                        selectedCategory,
-                        civitaiTags,
-                        isModifyMode);
+    // // Update the offline download list.
+    // fileService.update_offline_download_list(
+    // civitaiFileName,
+    // civitaiModelFileList,
+    // downloadFilePath,
+    // modelVersionObject,
+    // civitaiModelID,
+    // civitaiVersionID,
+    // civitaiUrl,
+    // (String) modelVersionObject.get("baseModel"),
+    // imageUrlsArray,
+    // selectedCategory,
+    // civitaiTags,
+    // isModifyMode);
 
-                // Update the folder list.
-                fileService.update_folder_list(downloadFilePath);
+    // // Update the folder list.
+    // fileService.update_folder_list(downloadFilePath);
 
-                // Log success
-                System.out.println("Updated the offline List for: "
-                        + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
-                System.out.println("URL: " + civitaiUrl);
+    // // Log success
+    // System.out.println("Updated the offline List for: "
+    // + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
+    // System.out.println("URL: " + civitaiUrl);
 
-                // Mark the attempt as successful and exit the loop.
-                success = true;
-                break;
-            } catch (Exception ex) {
-                lastException = ex;
-                System.err.println("Attempt " + attempt + " failed for " + civitaiModelID + "_" + civitaiVersionID + "_"
-                        + civitaiFileName);
+    // // Mark the attempt as successful and exit the loop.
+    // success = true;
+    // break;
+    // } catch (Exception ex) {
+    // lastException = ex;
+    // System.err.println("Attempt " + attempt + " failed for " + civitaiModelID +
+    // "_" + civitaiVersionID + "_"
+    // + civitaiFileName);
 
-                // Wait 1 second before trying again (unless this was the last attempt)
-                if (attempt < maxAttempts) {
-                    try {
-                        Thread.sleep(1000); // Delay in milliseconds
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        // Optionally break out if the thread is interrupted
-                        break;
-                    }
-                }
-            }
-        }
+    // // Wait 1 second before trying again (unless this was the last attempt)
+    // if (attempt < maxAttempts) {
+    // try {
+    // Thread.sleep(1000); // Delay in milliseconds
+    // } catch (InterruptedException ie) {
+    // Thread.currentThread().interrupt();
+    // // Optionally break out if the thread is interrupted
+    // break;
+    // }
+    // }
+    // }
+    // }
 
-        if (!success) {
-            // Log final error message
-            System.err.println("Error - Failed Updating the offline List for: "
-                    + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
-            System.err.println("URL: " + civitaiUrl);
-            System.err
-                    .println("Final error: " + (lastException != null ? lastException.getMessage() : "Unknown error"));
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
+    // if (!success) {
+    // // Log final error message
+    // System.err.println("Error - Failed Updating the offline List for: "
+    // + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
+    // System.err.println("URL: " + civitaiUrl);
+    // System.err
+    // .println("Final error: " + (lastException != null ?
+    // lastException.getMessage() : "Unknown error"));
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-        return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
-    }
+    // return ResponseEntity.ok().body(CustomResponse.success("Success download
+    // file"));
+    // }
 
-    @SuppressWarnings("unchecked")
-    @PostMapping("/remove-offline-download-file-into-offline-download-list")
-    public ResponseEntity<CustomResponse<String>> removeOfflineDownloadFileIntoOfflineDownloadList(
-            @RequestBody Map<String, Object> requestBody) {
+    // @SuppressWarnings("unchecked")
+    // @PostMapping("/remove-offline-download-file-into-offline-download-list")
+    // public ResponseEntity<CustomResponse<String>>
+    // removeOfflineDownloadFileIntoOfflineDownloadList(
+    // @RequestBody Map<String, Object> requestBody) {
 
-        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
-        String civitaiModelID = (String) modelObject.get("civitaiModelID");
-        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
-        // Validate null or empty
-        if (civitaiModelID == null || civitaiModelID == "" ||
-                civitaiVersionID == null || civitaiVersionID == "") {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
+    // Map<String, Object> modelObject = (Map<String, Object>)
+    // requestBody.get("modelObject");
+    // String civitaiModelID = (String) modelObject.get("civitaiModelID");
+    // String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+    // // Validate null or empty
+    // if (civitaiModelID == null || civitaiModelID == "" ||
+    // civitaiVersionID == null || civitaiVersionID == "") {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-        try {
-            fileService.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Success remove download file from offline download list"));
+    // try {
+    // fileService.remove_from_offline_download_list(civitaiModelID,
+    // civitaiVersionID);
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Success remove download file from offline
+    // download list"));
 
-        } catch (Exception ex) {
-            System.err.println("An error occurred: " + ex.getMessage());
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
-    }
+    // } catch (Exception ex) {
+    // System.err.println("An error occurred: " + ex.getMessage());
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
+    // }
 
     @SuppressWarnings("unchecked")
     @PostMapping("/update_creator_url_list")
@@ -653,32 +664,36 @@ public class File_Controller {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    @PostMapping("/remove-from-error-model-list")
-    public ResponseEntity<CustomResponse<String>> removeFromErrorModelList(
-            @RequestBody Map<String, Object> requestBody) {
+    // @SuppressWarnings("unchecked")
+    // @PostMapping("/remove-from-error-model-list")
+    // public ResponseEntity<CustomResponse<String>> removeFromErrorModelList(
+    // @RequestBody Map<String, Object> requestBody) {
 
-        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
-        String civitaiModelID = (String) modelObject.get("civitaiModelID");
-        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
-        // Validate null or empty
-        if (civitaiModelID == null || civitaiModelID == "" ||
-                civitaiVersionID == null || civitaiVersionID == "") {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
+    // Map<String, Object> modelObject = (Map<String, Object>)
+    // requestBody.get("modelObject");
+    // String civitaiModelID = (String) modelObject.get("civitaiModelID");
+    // String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+    // // Validate null or empty
+    // if (civitaiModelID == null || civitaiModelID == "" ||
+    // civitaiVersionID == null || civitaiVersionID == "") {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-        System.out.println(civitaiModelID + "  " + civitaiVersionID);
+    // System.out.println(civitaiModelID + " " + civitaiVersionID);
 
-        try {
-            fileService.remove_from_error_model_list(civitaiModelID, civitaiVersionID);
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Success remove download file from offline download list"));
+    // try {
+    // fileService.remove_from_error_model_list(civitaiModelID, civitaiVersionID);
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Success remove download file from offline
+    // download list"));
 
-        } catch (Exception ex) {
-            System.err.println("An error occurred: " + ex.getMessage());
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
-    }
+    // } catch (Exception ex) {
+    // System.err.println("An error occurred: " + ex.getMessage());
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
+    // }
 
     @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server-v2")
@@ -716,7 +731,7 @@ public class File_Controller {
 
             // Map<String, Object> modelVersionObject = modelVersionOptional.get();
 
-            fileService.update_error_model_list(modelName);
+            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, true);
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
@@ -734,7 +749,9 @@ public class File_Controller {
                         (String) modelVersionObject.get("baseModel"), imageUrlsArray);
 
                 fileService.update_tags_list(downloadFilePath);
-                fileService.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
+                // fileService.remove_from_offline_download_list(civitaiModelID,
+                // civitaiVersionID);
+                civitaiSQL_Service.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
                 return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
             }
 
@@ -745,7 +762,7 @@ public class File_Controller {
 
             // Map<String, Object> modelVersionObject = modelVersionOptional.get();
 
-            fileService.update_error_model_list(modelName);
+            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, true);
             // List<String> emptyList = new ArrayList<>();
             // fileService.update_error_model_list_v2(civitaiFileName, civitaiModelFileList,
             // downloadFilePath, modelObject,
@@ -818,7 +835,7 @@ public class File_Controller {
             return ResponseEntity.ok(CustomResponse.success("Success download file"));
         } catch (Exception ex) {
             String modelName = civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName;
-            fileService.update_error_model_list(modelName);
+            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, true);
             ex.printStackTrace();
             return ResponseEntity
                     .status(500)
@@ -826,54 +843,63 @@ public class File_Controller {
         }
     }
 
-    @PostMapping(path = "/check-quantity-of-offlinedownload-list")
-    public ResponseEntity<CustomResponse<Map<String, Long>>> CheckQuantityOfOfflineDownloadList(
-            @RequestBody Map<String, Object> requestBody) {
-        String url = (String) requestBody.get("url");
-        String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
+    // @PostMapping(path = "/check-quantity-of-offlinedownload-list")
+    // public ResponseEntity<CustomResponse<Map<String, Long>>>
+    // CheckQuantityOfOfflineDownloadList(
+    // @RequestBody Map<String, Object> requestBody) {
+    // String url = (String) requestBody.get("url");
+    // String modelID = url.replaceAll(".*/models/(\\d+).*", "$1");
 
-        // Validate null or empty
-        if (url == null || url == "") {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
-        Long quantity = fileService.checkQuantityOfOfflineDownloadList(modelID);
+    // // Validate null or empty
+    // if (url == null || url == "") {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
+    // Long quantity = fileService.checkQuantityOfOfflineDownloadList(modelID);
 
-        Map<String, Long> payload = new HashMap<>();
-        payload.put("quantity", quantity);
+    // Map<String, Long> payload = new HashMap<>();
+    // payload.put("quantity", quantity);
 
-        return ResponseEntity.ok().body(CustomResponse.success("Model retrieval successful", payload));
-    }
+    // return ResponseEntity.ok().body(CustomResponse.success("Model retrieval
+    // successful", payload));
+    // }
 
-    @CrossOrigin(origins = "*")
-    @PostMapping(path = "/find-version-numbers-for-offlinedownloadlist-tampermonkey")
-    public ResponseEntity<CustomResponse<Map<String, List<String>>>> findVersionNumbersForOfflineDownloadList(
-            @RequestBody Map<String, Object> requestBody) {
+    // @CrossOrigin(origins = "*")
+    // @PostMapping(path =
+    // "/find-version-numbers-for-offlinedownloadlist-tampermonkey")
+    // public ResponseEntity<CustomResponse<Map<String, List<String>>>>
+    // findVersionNumbersForOfflineDownloadList(
+    // @RequestBody Map<String, Object> requestBody) {
 
-        String modelNumber = (String) requestBody.get("modelNumber");
-        List<String> versionNumbers = ((List<?>) requestBody.get("versionNumbers")).stream()
-                .map(Object::toString) // Ensures each element is treated as a String
-                .collect(Collectors.toList());
-        // Validate null or empty
-        if (modelNumber == null || modelNumber.isEmpty() || versionNumbers == null || versionNumbers.isEmpty()) {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
-        Optional<List<String>> versionExistenceMapOptional = fileService.getCivitaiVersionIds(modelNumber);
+    // String modelNumber = (String) requestBody.get("modelNumber");
+    // List<String> versionNumbers = ((List<?>)
+    // requestBody.get("versionNumbers")).stream()
+    // .map(Object::toString) // Ensures each element is treated as a String
+    // .collect(Collectors.toList());
+    // // Validate null or empty
+    // if (modelNumber == null || modelNumber.isEmpty() || versionNumbers == null ||
+    // versionNumbers.isEmpty()) {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
+    // Optional<List<String>> versionExistenceMapOptional =
+    // fileService.getCivitaiVersionIds(modelNumber);
 
-        Map<String, List<String>> payload = new HashMap<>();
-        if (versionExistenceMapOptional.isPresent()) {
+    // Map<String, List<String>> payload = new HashMap<>();
+    // if (versionExistenceMapOptional.isPresent()) {
 
-            List<String> versionExistenceMap = versionExistenceMapOptional.get();
-            payload.put("existedVersionsList", versionExistenceMap);
+    // List<String> versionExistenceMap = versionExistenceMapOptional.get();
+    // payload.put("existedVersionsList", versionExistenceMap);
 
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Version number check successful", payload));
-        } else {
-            // Return success with an empty list when no models are found
-            payload.put("existedVersionsList", new ArrayList<>());
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("No existing versions found", payload));
-        }
-    }
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Version number check successful", payload));
+    // } else {
+    // // Return success with an empty list when no models are found
+    // payload.put("existedVersionsList", new ArrayList<>());
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("No existing versions found", payload));
+    // }
+    // }
 
     // @CrossOrigin(origins = "https://civitai.com")
     // @PostMapping(path =
@@ -902,34 +928,38 @@ public class File_Controller {
     // }
     // }
 
-    @CrossOrigin(origins = "*")
-    @PostMapping(path = "/search_offline_downloads")
-    public ResponseEntity<CustomResponse<Map<String, Object>>> searchOfflineDownloads(
-            @RequestBody Map<String, Object> requestBody) {
+    // @CrossOrigin(origins = "*")
+    // @PostMapping(path = "/search_offline_downloads")
+    // public ResponseEntity<CustomResponse<Map<String, Object>>>
+    // searchOfflineDownloads(
+    // @RequestBody Map<String, Object> requestBody) {
 
-        List<String> keywords = (List<String>) requestBody.get("keywords");
+    // List<String> keywords = (List<String>) requestBody.get("keywords");
 
-        try {
-            // Call the service method and get the matching entries
-            List<Map<String, Object>> filteredList = fileService.searchOfflineDownloads(keywords);
+    // try {
+    // // Call the service method and get the matching entries
+    // List<Map<String, Object>> filteredList =
+    // fileService.searchOfflineDownloads(keywords);
 
-            if (filteredList.isEmpty()) {
-                // Return a "failure" response if nothing found
-                return ResponseEntity.ok()
-                        .body(CustomResponse.failure("No offline downloads found matching the given keywords."));
-            }
+    // if (filteredList.isEmpty()) {
+    // // Return a "failure" response if nothing found
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.failure("No offline downloads found matching the given
+    // keywords."));
+    // }
 
-            // Otherwise, wrap the results in your preferred response format
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("offlineDownloadList", filteredList);
+    // // Otherwise, wrap the results in your preferred response format
+    // Map<String, Object> payload = new HashMap<>();
+    // payload.put("offlineDownloadList", filteredList);
 
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Search results found", payload));
-        } catch (Exception ex) {
-            System.out.println(ex);
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Search results found", payload));
+    // } catch (Exception ex) {
+    // System.out.println(ex);
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-    }
+    // }
 
 }

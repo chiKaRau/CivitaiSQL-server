@@ -52,9 +52,10 @@ public interface CivitaiSQL_Service {
 
         Optional<List<String>> find_List_of_Version_Number_from_model_tables_by_Url(String modelID);
 
-        Optional<Models_Table_Entity> find_one_from_models_table_by_model_number_and_version_number(String modelNumber, String versionNumber);        
+        Optional<Models_Table_Entity> find_one_from_models_table_by_model_number_and_version_number(String modelNumber,
+                        String versionNumber);
 
-        //Transcation Actions
+        // Transcation Actions
         // Add a record to all tables
         void create_record_to_all_tables(Models_DTO dto);
 
@@ -94,5 +95,33 @@ public interface CivitaiSQL_Service {
         public Optional<List<Map<String, Object>>> findVirtualFiles(String path);
 
         public Optional<List<Map<String, String>>> findVirtualDirectoriesWithDrive(String path);
+
+        public void update_offline_download_list(
+                        String civitaiFileName,
+                        List<Map<String, Object>> civitaiModelFileList,
+                        String downloadFilePath,
+                        Map<String, Object> modelVersionObject,
+                        String civitaiModelID,
+                        String civitaiVersionID,
+                        String civitaiUrl,
+                        String civitaiBaseModel,
+                        String[] imageUrlsArray,
+                        String selectedCategory,
+                        List<String> civitaiTags,
+                        Boolean isModifyMode);
+
+        public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
+
+        public long checkQuantityOfOfflineDownloadList(String civitaiModelID);
+
+        public List<Map<String, Object>> get_offline_download_list();
+
+        public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords);
+
+        public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID);
+
+        public List<String> get_error_model_list();
+
+        public void update_error_model_offline_list(String civitaiModelID, String civitaiVersionID, Boolean isError);
 
 }

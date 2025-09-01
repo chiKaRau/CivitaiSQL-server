@@ -866,75 +866,75 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    @Override
-    public List<String> get_error_model_list() {
+    // @Override
+    // public List<String> get_error_model_list() {
 
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            List<String> dataList = objectMapper.readValue(
-                    Files.readAllBytes(Paths.get("files/data/error_model_list.json")),
-                    new TypeReference<List<String>>() {
-                    });
+    //     try {
+    //         ObjectMapper objectMapper = new ObjectMapper();
+    //         List<String> dataList = objectMapper.readValue(
+    //                 Files.readAllBytes(Paths.get("files/data/error_model_list.json")),
+    //                 new TypeReference<List<String>>() {
+    //                 });
 
-            // Check if dataList is null or empty
-            if (dataList == null || dataList.isEmpty()) {
-                return Collections.emptyList(); // Return an empty list
-            }
+    //         // Check if dataList is null or empty
+    //         if (dataList == null || dataList.isEmpty()) {
+    //             return Collections.emptyList(); // Return an empty list
+    //         }
 
-            return dataList.stream().collect(Collectors.toList());
-        } catch (IOException e) {
-            // Log and handle other types of exceptions
-            log.error("Unexpected error while retreving folder list", e);
-            throw new CustomException("An unexpected error occurred", e);
-        }
-    }
+    //         return dataList.stream().collect(Collectors.toList());
+    //     } catch (IOException e) {
+    //         // Log and handle other types of exceptions
+    //         log.error("Unexpected error while retreving folder list", e);
+    //         throw new CustomException("An unexpected error occurred", e);
+    //     }
+    // }
 
-    @Override
-    public void remove_from_error_model_list(String modelID, String versionID) {
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            Path filePath = Paths.get("files/data/error_model_list.json");
+    // @Override
+    // public void remove_from_error_model_list(String modelID, String versionID) {
+    //     try {
+    //         ObjectMapper objectMapper = new ObjectMapper();
+    //         Path filePath = Paths.get("files/data/error_model_list.json");
 
-            // Check if the file exists
-            if (!Files.exists(filePath)) {
-                log.warn("File {} does not exist. Nothing to remove.", "files/data/error_model_list.json");
-                return;
-            }
+    //         // Check if the file exists
+    //         if (!Files.exists(filePath)) {
+    //             log.warn("File {} does not exist. Nothing to remove.", "files/data/error_model_list.json");
+    //             return;
+    //         }
 
-            // Read the existing list from the JSON file
-            List<String> dataList = objectMapper.readValue(
-                    Files.readAllBytes(filePath),
-                    new TypeReference<List<String>>() {
-                    });
+    //         // Read the existing list from the JSON file
+    //         List<String> dataList = objectMapper.readValue(
+    //                 Files.readAllBytes(filePath),
+    //                 new TypeReference<List<String>>() {
+    //                 });
 
-            if (dataList == null || dataList.isEmpty()) {
-                log.warn("Error model list is empty. Nothing to remove.");
-                return;
-            }
+    //         if (dataList == null || dataList.isEmpty()) {
+    //             log.warn("Error model list is empty. Nothing to remove.");
+    //             return;
+    //         }
 
-            // Construct the prefix to match {modelID}_{versionID}_
-            String prefix = modelID + "_" + versionID + "_";
+    //         // Construct the prefix to match {modelID}_{versionID}_
+    //         String prefix = modelID + "_" + versionID + "_";
 
-            // Filter out the matching elements
-            List<String> updatedList = dataList.stream()
-                    .filter(item -> !item.startsWith(prefix))
-                    .collect(Collectors.toList());
+    //         // Filter out the matching elements
+    //         List<String> updatedList = dataList.stream()
+    //                 .filter(item -> !item.startsWith(prefix))
+    //                 .collect(Collectors.toList());
 
-            // Check if any element was removed
-            if (updatedList.size() == dataList.size()) {
-                log.info("No matching elements found for ModelID: {} and VersionID: {}", modelID, versionID);
-                return;
-            }
+    //         // Check if any element was removed
+    //         if (updatedList.size() == dataList.size()) {
+    //             log.info("No matching elements found for ModelID: {} and VersionID: {}", modelID, versionID);
+    //             return;
+    //         }
 
-            // Write the updated list back to the JSON file with pretty printing
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), updatedList);
+    //         // Write the updated list back to the JSON file with pretty printing
+    //         objectMapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), updatedList);
 
-            log.info("Successfully removed elements with ModelID: {} and VersionID: {}", modelID, versionID);
-        } catch (IOException e) {
-            log.error("Unexpected error while removing from error model list", e);
-            throw new CustomException("An unexpected error occurred while removing the model", e);
-        }
-    }
+    //         log.info("Successfully removed elements with ModelID: {} and VersionID: {}", modelID, versionID);
+    //     } catch (IOException e) {
+    //         log.error("Unexpected error while removing from error model list", e);
+    //         throw new CustomException("An unexpected error occurred while removing the model", e);
+    //     }
+    // }
 
     @Override
     public List<Map<String, String>> get_categories_prefix_list() {
@@ -982,58 +982,58 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    /**
-    * Retrieves the offline download list from offline_download_list.json.
-    *
-    * @return A list of maps representing each offline download entry.
-    */
-    @Override
-    public List<Map<String, Object>> get_offline_download_list() {
-        String offlineDownloadFile = "files/data/offline_download_list.json";
-        ObjectMapper objectMapper = new ObjectMapper();
+    // /**
+    // * Retrieves the offline download list from offline_download_list.json.
+    // *
+    // * @return A list of maps representing each offline download entry.
+    // */
+    // @Override
+    // public List<Map<String, Object>> get_offline_download_list() {
+    //     String offlineDownloadFile = "files/data/offline_download_list.json";
+    //     ObjectMapper objectMapper = new ObjectMapper();
 
-        try {
-            Path filePath = Paths.get(offlineDownloadFile);
+    //     try {
+    //         Path filePath = Paths.get(offlineDownloadFile);
 
-            // Check if the file exists
-            if (!Files.exists(filePath)) {
-                System.out.println("The file " + offlineDownloadFile + " does not exist. Returning an empty list.");
-                return Collections.emptyList();
-            }
+    //         // Check if the file exists
+    //         if (!Files.exists(filePath)) {
+    //             System.out.println("The file " + offlineDownloadFile + " does not exist. Returning an empty list.");
+    //             return Collections.emptyList();
+    //         }
 
-            // Read the content of offline_download_list.json
-            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+    //         // Read the content of offline_download_list.json
+    //         String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
 
-            // Parse the JSON data into a list of maps
-            List<Map<String, Object>> downloadList = objectMapper.readValue(
-                    data,
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
+    //         // Parse the JSON data into a list of maps
+    //         List<Map<String, Object>> downloadList = objectMapper.readValue(
+    //                 data,
+    //                 new TypeReference<List<Map<String, Object>>>() {
+    //                 });
 
-            // Check if downloadList is null or empty
-            if (downloadList == null || downloadList.isEmpty()) {
-                System.out.println("offline_download_list.json is empty. Returning an empty list.");
-                return Collections.emptyList();
-            }
+    //         // Check if downloadList is null or empty
+    //         if (downloadList == null || downloadList.isEmpty()) {
+    //             System.out.println("offline_download_list.json is empty. Returning an empty list.");
+    //             return Collections.emptyList();
+    //         }
 
-            // (Optional) Apply filtering if needed. For example, remove entries with specific criteria.
-            // Example: Filter out entries where 'civitaiBaseModel' is null or empty
-            List<Map<String, Object>> filteredList = downloadList.stream()
-                    .filter(entry -> {
-                        Object baseModel = entry.get("civitaiBaseModel");
-                        return baseModel != null && !baseModel.toString().isEmpty();
-                    })
-                    .collect(Collectors.toList());
+    //         // (Optional) Apply filtering if needed. For example, remove entries with specific criteria.
+    //         // Example: Filter out entries where 'civitaiBaseModel' is null or empty
+    //         List<Map<String, Object>> filteredList = downloadList.stream()
+    //                 .filter(entry -> {
+    //                     Object baseModel = entry.get("civitaiBaseModel");
+    //                     return baseModel != null && !baseModel.toString().isEmpty();
+    //                 })
+    //                 .collect(Collectors.toList());
 
-            System.out.println("Retrieved " + filteredList.size() + " entries from offline_download_list.json.");
-            return filteredList;
+    //         System.out.println("Retrieved " + filteredList.size() + " entries from offline_download_list.json.");
+    //         return filteredList;
 
-        } catch (IOException e) {
-            // Log and handle exceptions appropriately
-            System.out.println("Unexpected error while retrieving offline download list" + e);
-            throw new CustomException("An unexpected error occurred while retrieving the offline download list.", e);
-        }
-    }
+    //     } catch (IOException e) {
+    //         // Log and handle exceptions appropriately
+    //         System.out.println("Unexpected error while retrieving offline download list" + e);
+    //         throw new CustomException("An unexpected error occurred while retrieving the offline download list.", e);
+    //     }
+    // }
 
     /**
     * Backs up the offline_download_list.json file by creating a copy with an incremental name.
@@ -3017,88 +3017,88 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    @Override
-    public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords) {
-        // 1. Get the full list from JSON
-        List<Map<String, Object>> offlineDownloadList = get_offline_download_list();
+    // @Override
+    // public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords) {
+    //     // 1. Get the full list from JSON
+    //     List<Map<String, Object>> offlineDownloadList = get_offline_download_list();
 
-        // 2. If no keywords, return everything (or handle however you prefer)
-        if (keywords == null || keywords.isEmpty()) {
-            return offlineDownloadList;
-        }
+    //     // 2. If no keywords, return everything (or handle however you prefer)
+    //     if (keywords == null || keywords.isEmpty()) {
+    //         return offlineDownloadList;
+    //     }
 
-        // 3. Filter by matching all keywords (AND), but in any field (OR).
-        return offlineDownloadList.stream()
-                .filter(entry -> {
-                    // For each entry, ensure that **each** keyword is found in at least one field
-                    for (String keyword : keywords) {
-                        if (keyword == null || keyword.trim().isEmpty()) {
-                            // Skip empty keywords or handle as needed
-                            continue;
-                        }
+    //     // 3. Filter by matching all keywords (AND), but in any field (OR).
+    //     return offlineDownloadList.stream()
+    //             .filter(entry -> {
+    //                 // For each entry, ensure that **each** keyword is found in at least one field
+    //                 for (String keyword : keywords) {
+    //                     if (keyword == null || keyword.trim().isEmpty()) {
+    //                         // Skip empty keywords or handle as needed
+    //                         continue;
+    //                     }
 
-                        String lowerKeyword = keyword.toLowerCase();
-                        boolean foundKeyword = false;
+    //                     String lowerKeyword = keyword.toLowerCase();
+    //                     boolean foundKeyword = false;
 
-                        // --- (A) Check civitaiFileName ---
-                        String fileName = (String) entry.get("civitaiFileName");
-                        if (containsIgnoreCase(fileName, lowerKeyword)) {
-                            foundKeyword = true;
-                        }
+    //                     // --- (A) Check civitaiFileName ---
+    //                     String fileName = (String) entry.get("civitaiFileName");
+    //                     if (containsIgnoreCase(fileName, lowerKeyword)) {
+    //                         foundKeyword = true;
+    //                     }
 
-                        // --- (B) Check modelVersionObject.name and modelVersionObject.model.name ---
-                        if (!foundKeyword) {
-                            Map<String, Object> modelVersionObject = (Map<String, Object>) entry
-                                    .get("modelVersionObject");
-                            if (modelVersionObject != null) {
-                                // modelVersionObject.name
-                                String versionName = (String) modelVersionObject.get("name");
-                                if (containsIgnoreCase(versionName, lowerKeyword)) {
-                                    foundKeyword = true;
-                                } else {
-                                    // modelVersionObject.model.name
-                                    Map<String, Object> model = (Map<String, Object>) modelVersionObject.get("model");
-                                    if (model != null) {
-                                        String modelName = (String) model.get("name");
-                                        if (containsIgnoreCase(modelName, lowerKeyword)) {
-                                            foundKeyword = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+    //                     // --- (B) Check modelVersionObject.name and modelVersionObject.model.name ---
+    //                     if (!foundKeyword) {
+    //                         Map<String, Object> modelVersionObject = (Map<String, Object>) entry
+    //                                 .get("modelVersionObject");
+    //                         if (modelVersionObject != null) {
+    //                             // modelVersionObject.name
+    //                             String versionName = (String) modelVersionObject.get("name");
+    //                             if (containsIgnoreCase(versionName, lowerKeyword)) {
+    //                                 foundKeyword = true;
+    //                             } else {
+    //                                 // modelVersionObject.model.name
+    //                                 Map<String, Object> model = (Map<String, Object>) modelVersionObject.get("model");
+    //                                 if (model != null) {
+    //                                     String modelName = (String) model.get("name");
+    //                                     if (containsIgnoreCase(modelName, lowerKeyword)) {
+    //                                         foundKeyword = true;
+    //                                     }
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
 
-                        // --- (C) Check civitaiUrl ---
-                        if (!foundKeyword) {
-                            String civitaiUrl = (String) entry.get("civitaiUrl");
-                            if (containsIgnoreCase(civitaiUrl, lowerKeyword)) {
-                                foundKeyword = true;
-                            }
-                        }
+    //                     // --- (C) Check civitaiUrl ---
+    //                     if (!foundKeyword) {
+    //                         String civitaiUrl = (String) entry.get("civitaiUrl");
+    //                         if (containsIgnoreCase(civitaiUrl, lowerKeyword)) {
+    //                             foundKeyword = true;
+    //                         }
+    //                     }
 
-                        // --- (D) Check civitaiTags (List<String>) ---
-                        if (!foundKeyword) {
-                            List<String> tags = (List<String>) entry.get("civitaiTags");
-                            if (tags != null) {
-                                for (String tag : tags) {
-                                    if (containsIgnoreCase(tag, lowerKeyword)) {
-                                        foundKeyword = true;
-                                        break; // no need to check other tags once found
-                                    }
-                                }
-                            }
-                        }
+    //                     // --- (D) Check civitaiTags (List<String>) ---
+    //                     if (!foundKeyword) {
+    //                         List<String> tags = (List<String>) entry.get("civitaiTags");
+    //                         if (tags != null) {
+    //                             for (String tag : tags) {
+    //                                 if (containsIgnoreCase(tag, lowerKeyword)) {
+    //                                     foundKeyword = true;
+    //                                     break; // no need to check other tags once found
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
 
-                        // If the current keyword wasn't found in ANY field, exclude this entry
-                        if (!foundKeyword) {
-                            return false;
-                        }
-                    }
-                    // If we passed all keywords, keep this entry
-                    return true;
-                })
-                .collect(Collectors.toList());
-    }
+    //                     // If the current keyword wasn't found in ANY field, exclude this entry
+    //                     if (!foundKeyword) {
+    //                         return false;
+    //                     }
+    //                 }
+    //                 // If we passed all keywords, keep this entry
+    //                 return true;
+    //             })
+    //             .collect(Collectors.toList());
+    // }
 
     /**
      * Checks whether 'source' contains 'keyword' in a case-insensitive way.

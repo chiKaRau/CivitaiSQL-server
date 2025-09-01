@@ -16,9 +16,9 @@ public interface File_Service {
 
         public void add_pending_remove_tag(String pendingRemoveTag);
 
-        public List<String> get_error_model_list();
+        // public List<String> get_error_model_list();
 
-        public void remove_from_error_model_list(String ModelID, String versionID);
+        // public void remove_from_error_model_list(String ModelID, String versionID);
 
         public Map<String, List<Map<String, Object>>> get_tags_list(String prefix);
 
@@ -36,11 +36,11 @@ public interface File_Service {
                         List<String> civitaiTags,
                         Boolean isModifyMode);
 
-        public boolean backupOfflineDownloadList();
+        public boolean backupOfflineDownloadList(); //ignore if you move from txt to sql
 
-        public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
+        // public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
 
-        public long checkQuantityOfOfflineDownloadList(String civitaiModelID);
+        // public long checkQuantityOfOfflineDownloadList(String civitaiModelID);
 
         public void update_folder_list(String downloadFilePath);
 
@@ -60,7 +60,7 @@ public interface File_Service {
 
         public void create_tags_list();
 
-        public List<Map<String, Object>> get_offline_download_list();
+        // public List<Map<String, Object>> get_offline_download_list();
 
         public void update_tags_list(String inputTag);
 
@@ -82,7 +82,7 @@ public interface File_Service {
                         String downloadFilePath, Map<String, Object> modelVersionObject, String civitaiModelID,
                         String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray);
 
-        public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords);
+        // public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords);
 
         public void updateAllPngs(Path downloadFolder) throws IOException, InterruptedException;
 }
