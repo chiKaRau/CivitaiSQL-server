@@ -124,4 +124,10 @@ public interface CivitaiSQL_Service {
 
         public void update_error_model_offline_list(String civitaiModelID, String civitaiVersionID, Boolean isError);
 
+        public List<Map<String, Object>> get_creator_url_list();
+
+        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
+
+        public void remove_creator_url(String creatorUrl);
+
 }

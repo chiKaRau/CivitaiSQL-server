@@ -22,21 +22,21 @@ public interface File_Service {
 
         public Map<String, List<Map<String, Object>>> get_tags_list(String prefix);
 
-        public void update_offline_download_list(
-                        String civitaiFileName,
-                        List<Map<String, Object>> civitaiModelFileList,
-                        String downloadFilePath,
-                        Map<String, Object> modelVersionObject,
-                        String civitaiModelID,
-                        String civitaiVersionID,
-                        String civitaiUrl,
-                        String civitaiBaseModel,
-                        String[] imageUrlsArray,
-                        String selectedCategory,
-                        List<String> civitaiTags,
-                        Boolean isModifyMode);
+        // public void update_offline_download_list(
+        //                 String civitaiFileName,
+        //                 List<Map<String, Object>> civitaiModelFileList,
+        //                 String downloadFilePath,
+        //                 Map<String, Object> modelVersionObject,
+        //                 String civitaiModelID,
+        //                 String civitaiVersionID,
+        //                 String civitaiUrl,
+        //                 String civitaiBaseModel,
+        //                 String[] imageUrlsArray,
+        //                 String selectedCategory,
+        //                 List<String> civitaiTags,
+        //                 Boolean isModifyMode);
 
-        public boolean backupOfflineDownloadList(); //ignore if you move from txt to sql
+        // public boolean backupOfflineDownloadList(); //ignore if you move from txt to sql
 
         // public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
 
@@ -44,7 +44,7 @@ public interface File_Service {
 
         public void update_folder_list(String downloadFilePath);
 
-        public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID);
+        // public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID);
 
         public void empty_cart_list();
 
@@ -54,7 +54,7 @@ public interface File_Service {
 
         public void update_must_add_list(String url);
 
-        public void update_error_model_list(String url);
+        // public void update_error_model_list(String url);
 
         public void open_download_directory();
 
@@ -64,11 +64,11 @@ public interface File_Service {
 
         public void update_tags_list(String inputTag);
 
-        public List<Map<String, Object>> get_creator_url_list();
+        // public List<Map<String, Object>> get_creator_url_list();
 
-        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
+        // public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
 
-        public void remove_creator_url(String creatorUrl);
+        // public void remove_creator_url(String creatorUrl);
 
         public List<Map<String, String>> get_categories_prefix_list();
 

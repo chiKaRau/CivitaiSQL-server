@@ -1200,4 +1200,68 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    @GetMapping("/get_creator_url_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getCreatorUrlList() {
+        List<Map<String, Object>> creatorUrlList = civitaiSQL_Service.get_creator_url_list();
+
+        Map<String, List<Map<String, Object>>> payload = new HashMap<>();
+        payload.put("creatorUrlList", creatorUrlList);
+
+        return ResponseEntity.ok().body(CustomResponse.success("creatorUrlList retrieval successful", payload));
+    }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/update_creator_url_list")
+    public ResponseEntity<CustomResponse<String>> updateCreatorUrlList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String creatorUrl = (String) requestBody.get("creatorUrl");
+        String status = (String) requestBody.get("status");
+        Boolean lastChecked = (Boolean) requestBody.get("lastChecked");
+        String rating = (String) requestBody.getOrDefault("rating", "N/A");
+        // Validate null or empty
+        if (creatorUrl == null || creatorUrl == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+
+            civitaiSQL_Service.update_creator_url_list(creatorUrl, status, lastChecked, rating);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Success updating creator url list"));
+
+        } catch (Exception ex) {
+            System.err.println("Error - " + creatorUrl + " : "
+                    + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/remove_from_creator_url_list")
+    public ResponseEntity<CustomResponse<String>> removeFromCreatorUrlList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String creatorUrl = (String) requestBody.get("creatorUrl");
+
+        // Validate null or empty
+        if (creatorUrl == null || creatorUrl == "") {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+
+            civitaiSQL_Service.remove_creator_url(creatorUrl);
+
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Success removing creator url from list"));
+
+        } catch (Exception ex) {
+            System.err.println("Error - " + creatorUrl + " : "
+                    + ex.getMessage());
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+    }
+
 }

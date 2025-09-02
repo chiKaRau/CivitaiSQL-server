@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,12 +33,14 @@ import com.civitai.server.exception.CustomDatabaseException;
 import com.civitai.server.exception.CustomException;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
+import com.civitai.server.models.entities.civitaiSQL.Creator_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Descriptions_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Images_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.repositories.civitaiSQL.Creator_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Images_Table_Repository;
@@ -71,6 +74,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Images_Table_Repository models_Images_Table_Repository;
         private final Models_Table_Repository_Specification models_Table_Repository_Specification;
         private final Models_Offline_Table_Repository models_Offline_Table_Repository;
+        private final Creator_Table_Repository creator_Table_Repository;
         private final ObjectMapper objectMapper;
         private final Civitai_Service civitai_Service;
 
@@ -214,6 +218,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Details_Table_Repository models_Details_Table_Repository,
                         Models_Images_Table_Repository models_Images_Table_Repository,
                         Models_Offline_Table_Repository models_Offline_Table_Repository,
+                        Creator_Table_Repository creator_Table_Repository,
                         Models_Table_Repository_Specification models_Table_Repository_Specification,
                         ObjectMapper objectMapper,
                         Civitai_Service civitai_Service) {
@@ -223,6 +228,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.models_Details_Table_Repository = models_Details_Table_Repository;
                 this.models_Images_Table_Repository = models_Images_Table_Repository;
                 this.models_Offline_Table_Repository = models_Offline_Table_Repository;
+                this.creator_Table_Repository = creator_Table_Repository;
                 this.models_Table_Repository_Specification = models_Table_Repository_Specification;
                 this.civitai_Service = civitai_Service;
                 this.objectMapper = objectMapper;
@@ -2114,6 +2120,132 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         log.info("is_error set to {} for modelId={}, versionId={}", flag, modelId, versionId);
                 } else {
                         log.info("No matching row for modelId={}, versionId={} (nothing updated).", modelId, versionId);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<Map<String, Object>> get_creator_url_list() {
+                try {
+                        // CHANGED: do NOT use updatedAt desc
+                        List<Creator_Table_Entity> rows = creator_Table_Repository.findAllByOrderByIdAsc();
+
+                        if (rows.isEmpty())
+                                return Collections.emptyList();
+
+                        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+                        for (Creator_Table_Entity e : rows) {
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("creatorUrl", e.getCivitaiUrl());
+                                m.put("lastChecked", e.getLastChecked());
+                                m.put("status", e.getStatus());
+                                if (e.getRating() != null)
+                                        m.put("rating", e.getRating());
+                                if (e.getMessage() != null)
+                                        m.put("message", e.getMessage());
+                                out.add(m);
+                        }
+                        return out;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving creator URL list (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating) {
+                if (creatorUrl == null || creatorUrl.isBlank()) {
+                        throw new CustomException("creatorUrl is required");
+                }
+
+                log.info("[creator-url] INPUT >> url='{}', status='{}', lastChecked={}, rating='{}'",
+                                creatorUrl, status, lastChecked, rating);
+
+                try {
+                        if (Boolean.TRUE.equals(lastChecked)) {
+                                int cleared = creator_Table_Repository.clearLastCheckedForAll();
+                                log.info("[creator-url] cleared lastChecked=true on {} rows", cleared);
+                        }
+
+                        var existing = creator_Table_Repository.findFirstByCivitaiUrl(creatorUrl);
+                        Creator_Table_Entity e = existing
+                                        .orElseGet(() -> Creator_Table_Entity.builder().civitaiUrl(creatorUrl).build());
+
+                        boolean changed = false;
+
+                        // 1) Status: update only if changed
+                        if (status != null) {
+                                String cur = e.getStatus();
+                                if (cur == null || !cur.equalsIgnoreCase(status)) {
+                                        log.info("[creator-url] status changed: '{}' -> '{}' (lastChecked={})",
+                                                        cur, status, lastChecked);
+                                        e.setStatus(status);
+                                        e.setLastChecked(lastChecked);
+                                        changed = true;
+                                } else {
+                                        log.info("[creator-url] status unchanged ('{}')", status);
+                                }
+                        }
+
+                        // 2) Rating:
+                        // - If incoming rating is "N/A", treat it as NO-OP (do not overwrite an
+                        // existing rating).
+                        // - Only set to "N/A" if there was no rating yet (null).
+                        // - If rating is a real value (EX/SSS/.../A/B/.../F), update when changed.
+                        if (rating != null) {
+                                String curRating = e.getRating();
+                                if ("N/A".equalsIgnoreCase(rating)) {
+                                        if (curRating == null) {
+                                                e.setRating("N/A");
+                                                changed = true;
+                                                log.info("[creator-url] rating set from <null> -> 'N/A'");
+                                        } else {
+                                                log.info("[creator-url] incoming 'N/A' → keep existing rating '{}'",
+                                                                curRating);
+                                        }
+                                } else { // real rating
+                                        if (curRating == null || !curRating.equalsIgnoreCase(rating)) {
+                                                log.info("[creator-url] rating changed: '{}' -> '{}'", curRating,
+                                                                rating);
+                                                e.setRating(rating);
+                                                changed = true;
+                                        } else {
+                                                log.info("[creator-url] rating unchanged ('{}')", rating);
+                                        }
+                                }
+                        }
+
+                        if (changed || existing.isEmpty()) {
+                                creator_Table_Repository.save(e);
+                                log.info("[creator-url] SAVED id={} url='{}'", e.getId(), creatorUrl);
+                        } else {
+                                log.info("[creator-url] NO CHANGE id={} url='{}' → skip save", e.getId(), creatorUrl);
+                        }
+
+                } catch (Exception ex) {
+                        log.error("[creator-url] update failed for {}: {}", creatorUrl, ex.getMessage(), ex);
+                        throw new CustomException("Error updating creator URL list", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public void remove_creator_url(String creatorUrl) {
+                if (creatorUrl == null || creatorUrl.isBlank()) {
+                        throw new CustomException("creatorUrl is required");
+                }
+
+                try {
+                        long deleted = creator_Table_Repository.deleteByCivitaiUrl(creatorUrl);
+                        if (deleted > 0) {
+                                log.info("[creator-url] deleted {} row(s) for url='{}'", deleted, creatorUrl);
+                        } else {
+                                log.info("[creator-url] no rows deleted for url='{}'", creatorUrl);
+                        }
+                } catch (Exception ex) {
+                        log.error("[creator-url] delete failed for {}: {}", creatorUrl, ex.getMessage(), ex);
+                        throw new CustomException("Error removing creator URL", ex);
                 }
         }
 

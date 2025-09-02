@@ -362,219 +362,219 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    @Override
-    public List<Map<String, Object>> get_creator_url_list() {
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            List<Map<String, Object>> creatorUrlList = objectMapper.readValue(
-                    Files.readAllBytes(Paths.get("files/data/creator_url_list.json")),
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
+    // @Override
+    // public List<Map<String, Object>> get_creator_url_list() {
+    //     try {
+    //         ObjectMapper objectMapper = new ObjectMapper();
+    //         List<Map<String, Object>> creatorUrlList = objectMapper.readValue(
+    //                 Files.readAllBytes(Paths.get("files/data/creator_url_list.json")),
+    //                 new TypeReference<List<Map<String, Object>>>() {
+    //                 });
 
-            // Check if the list is null or empty, and return an empty list if so.
-            if (creatorUrlList == null || creatorUrlList.isEmpty()) {
-                return Collections.emptyList();
-            }
+    //         // Check if the list is null or empty, and return an empty list if so.
+    //         if (creatorUrlList == null || creatorUrlList.isEmpty()) {
+    //             return Collections.emptyList();
+    //         }
 
-            return creatorUrlList;
-        } catch (IOException e) {
-            // Log and handle the exception as needed
-            log.error("Unexpected error while retrieving creator URL list", e);
-            throw new CustomException("An unexpected error occurred", e);
-        }
-    }
+    //         return creatorUrlList;
+    //     } catch (IOException e) {
+    //         // Log and handle the exception as needed
+    //         log.error("Unexpected error while retrieving creator URL list", e);
+    //         throw new CustomException("An unexpected error occurred", e);
+    //     }
+    // }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating) {
-        synchronized (JSON_WRITE_LOCK) {
-            try {
-                Path filePath = Paths.get("files/data/creator_url_list.json");
-                ObjectMapper mapper = new ObjectMapper();
-                List<Map<String, Object>> list = new ArrayList<>();
+    // @SuppressWarnings("unchecked")
+    // @Override
+    // public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating) {
+    //     synchronized (JSON_WRITE_LOCK) {
+    //         try {
+    //             Path filePath = Paths.get("files/data/creator_url_list.json");
+    //             ObjectMapper mapper = new ObjectMapper();
+    //             List<Map<String, Object>> list = new ArrayList<>();
 
-                // read existing JSON if present
-                if (Files.exists(filePath)) {
-                    String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
-                    if (!jsonData.isEmpty()) {
-                        list = mapper.readValue(jsonData, new TypeReference<>() {
-                        });
-                    }
-                }
+    //             // read existing JSON if present
+    //             if (Files.exists(filePath)) {
+    //                 String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+    //                 if (!jsonData.isEmpty()) {
+    //                     list = mapper.readValue(jsonData, new TypeReference<>() {
+    //                     });
+    //                 }
+    //             }
 
-                // ensure only one "lastChecked"
-                if (Boolean.TRUE.equals(lastChecked)) {
-                    for (var entry : list) {
-                        entry.put("lastChecked", false);
-                    }
-                }
+    //             // ensure only one "lastChecked"
+    //             if (Boolean.TRUE.equals(lastChecked)) {
+    //                 for (var entry : list) {
+    //                     entry.put("lastChecked", false);
+    //                 }
+    //             }
 
-                // update or add entry...
-                boolean found = false;
-                for (var entry : list) {
-                    if (creatorUrl.equals(entry.get("creatorUrl"))) {
-                        found = true;
-                        if (!status.equalsIgnoreCase(String.valueOf(entry.get("status")))) {
-                            entry.put("status", status);
-                            entry.put("lastChecked", lastChecked);
-                            System.out.println("Updated entry: " + entry);
-                        } else {
-                            System.out.println("Entry for " + creatorUrl
-                                    + " already has the same status; no update performed.");
-                        }
+    //             // update or add entry...
+    //             boolean found = false;
+    //             for (var entry : list) {
+    //                 if (creatorUrl.equals(entry.get("creatorUrl"))) {
+    //                     found = true;
+    //                     if (!status.equalsIgnoreCase(String.valueOf(entry.get("status")))) {
+    //                         entry.put("status", status);
+    //                         entry.put("lastChecked", lastChecked);
+    //                         System.out.println("Updated entry: " + entry);
+    //                     } else {
+    //                         System.out.println("Entry for " + creatorUrl
+    //                                 + " already has the same status; no update performed.");
+    //                     }
 
-                        if (!"N/A".equals(rating)) {
-                            if (!rating.equals(String.valueOf(entry.get("rating")))) {
-                                entry.put("rating", rating);
-                                System.out.println("Updated entry: " + entry);
-                            } else {
-                                System.out.println("Entry for " + creatorUrl
-                                        + " already has the same rating; no update performed.");
-                            }
-                        }
+    //                     if (!"N/A".equals(rating)) {
+    //                         if (!rating.equals(String.valueOf(entry.get("rating")))) {
+    //                             entry.put("rating", rating);
+    //                             System.out.println("Updated entry: " + entry);
+    //                         } else {
+    //                             System.out.println("Entry for " + creatorUrl
+    //                                     + " already has the same rating; no update performed.");
+    //                         }
+    //                     }
 
-                        break;
-                    }
-                }
-                if (!found) {
-                    var newEntry = Map.<String, Object>of(
-                            "creatorUrl", creatorUrl,
-                            "status", status,
-                            "lastChecked", lastChecked,
-                            "rating", rating);
+    //                     break;
+    //                 }
+    //             }
+    //             if (!found) {
+    //                 var newEntry = Map.<String, Object>of(
+    //                         "creatorUrl", creatorUrl,
+    //                         "status", status,
+    //                         "lastChecked", lastChecked,
+    //                         "rating", rating);
 
-                    list.add(newEntry);
-                    System.out.println("Added new entry: " + newEntry);
-                }
+    //                 list.add(newEntry);
+    //                 System.out.println("Added new entry: " + newEntry);
+    //             }
 
-                // write atomically
-                Path tmp = Files.createTempFile(filePath.getParent(), "creator_url_list", ".tmp");
-                mapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), list);
-                Files.move(tmp, filePath,
-                        StandardCopyOption.ATOMIC_MOVE,
-                        StandardCopyOption.REPLACE_EXISTING);
+    //             // write atomically
+    //             Path tmp = Files.createTempFile(filePath.getParent(), "creator_url_list", ".tmp");
+    //             mapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), list);
+    //             Files.move(tmp, filePath,
+    //                     StandardCopyOption.ATOMIC_MOVE,
+    //                     StandardCopyOption.REPLACE_EXISTING);
 
-                // backup every 10 changes
-                if (++updateCreatorUrlUpdateCount % 10 == 0) {
-                    System.out.println(
-                            "Update counter reached " + updateCreatorUrlUpdateCount + ". Creating a backup...");
-                    backupCreatorUrlList();
-                }
+    //             // backup every 10 changes
+    //             if (++updateCreatorUrlUpdateCount % 10 == 0) {
+    //                 System.out.println(
+    //                         "Update counter reached " + updateCreatorUrlUpdateCount + ". Creating a backup...");
+    //                 backupCreatorUrlList();
+    //             }
 
-            } catch (IOException e) {
-                throw new CustomException("Error updating creator URL list", e);
-            }
-        }
-    }
+    //         } catch (IOException e) {
+    //             throw new CustomException("Error updating creator URL list", e);
+    //         }
+    //     }
+    // }
 
-    /**
-     * Removes an entry with the given creatorUrl from the JSON file.
-     *
-     * @param creatorUrl The creator URL to remove.
-     */
-    @SuppressWarnings("unchecked")
-    @Override
-    public void remove_creator_url(String creatorUrl) {
-        try {
-            // Path to the JSON file
-            Path filePath = Path.of("files/data/creator_url_list.json");
-            ObjectMapper mapper = new ObjectMapper();
-            List<Map<String, Object>> list = new ArrayList<>();
+    // /**
+    //  * Removes an entry with the given creatorUrl from the JSON file.
+    //  *
+    //  * @param creatorUrl The creator URL to remove.
+    //  */
+    // @SuppressWarnings("unchecked")
+    // @Override
+    // public void remove_creator_url(String creatorUrl) {
+    //     try {
+    //         // Path to the JSON file
+    //         Path filePath = Path.of("files/data/creator_url_list.json");
+    //         ObjectMapper mapper = new ObjectMapper();
+    //         List<Map<String, Object>> list = new ArrayList<>();
 
-            // Read file if it exists and is not empty
-            if (Files.exists(filePath)) {
-                String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
-                if (!jsonData.isEmpty()) {
-                    list = mapper.readValue(jsonData, new TypeReference<List<Map<String, Object>>>() {
-                    });
-                }
-            }
+    //         // Read file if it exists and is not empty
+    //         if (Files.exists(filePath)) {
+    //             String jsonData = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+    //             if (!jsonData.isEmpty()) {
+    //                 list = mapper.readValue(jsonData, new TypeReference<List<Map<String, Object>>>() {
+    //                 });
+    //             }
+    //         }
 
-            // Remove entries matching the creatorUrl
-            boolean removed = list.removeIf(entry -> creatorUrl.equals(entry.get("creatorUrl")));
+    //         // Remove entries matching the creatorUrl
+    //         boolean removed = list.removeIf(entry -> creatorUrl.equals(entry.get("creatorUrl")));
 
-            if (removed) {
-                byte[] updatedJson = mapper.writerWithDefaultPrettyPrinter()
-                        .writeValueAsBytes(list);
-                Files.write(filePath, updatedJson, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                System.out.println("Creator URL " + creatorUrl + " removed successfully.");
-            } else {
-                System.out.println("Creator URL " + creatorUrl + " not found in the list.");
-            }
+    //         if (removed) {
+    //             byte[] updatedJson = mapper.writerWithDefaultPrettyPrinter()
+    //                     .writeValueAsBytes(list);
+    //             Files.write(filePath, updatedJson, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+    //             System.out.println("Creator URL " + creatorUrl + " removed successfully.");
+    //         } else {
+    //             System.out.println("Creator URL " + creatorUrl + " not found in the list.");
+    //         }
 
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new CustomException("Error removing creator URL", e);
-        }
-    }
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //         throw new CustomException("Error removing creator URL", e);
+    //     }
+    // }
 
-    /**
-     * Removes entries from offline_download_list.json based on civitaiModelID and civitaiVersionID.
-     *
-     * @param civitaiModelID   The ID of the model to remove.
-     * @param civitaiVersionID The version ID of the model to remove.
-     */
-    public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID) {
-        String offlineDownloadFile = "files/data/offline_download_list.json";
-        ObjectMapper objectMapper = new ObjectMapper();
+    // /**
+    //  * Removes entries from offline_download_list.json based on civitaiModelID and civitaiVersionID.
+    //  *
+    //  * @param civitaiModelID   The ID of the model to remove.
+    //  * @param civitaiVersionID The version ID of the model to remove.
+    //  */
+    // public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID) {
+    //     String offlineDownloadFile = "files/data/offline_download_list.json";
+    //     ObjectMapper objectMapper = new ObjectMapper();
 
-        synchronized (JSON_WRITE_LOCK) { // <--- Use a lock if multi-threaded
-            try {
-                Path filePath = Paths.get(offlineDownloadFile);
+    //     synchronized (JSON_WRITE_LOCK) { // <--- Use a lock if multi-threaded
+    //         try {
+    //             Path filePath = Paths.get(offlineDownloadFile);
 
-                if (!Files.exists(filePath)) {
-                    System.out.println("File does not exist. Nothing to remove.");
-                    return;
-                }
+    //             if (!Files.exists(filePath)) {
+    //                 System.out.println("File does not exist. Nothing to remove.");
+    //                 return;
+    //             }
 
-                // Read existing JSON data
-                String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
-                if (data.trim().isEmpty()) {
-                    System.out.println("File is empty. Nothing to remove.");
-                    return;
-                }
+    //             // Read existing JSON data
+    //             String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+    //             if (data.trim().isEmpty()) {
+    //                 System.out.println("File is empty. Nothing to remove.");
+    //                 return;
+    //             }
 
-                List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
-                        data, new TypeReference<List<Map<String, Object>>>() {
-                        });
+    //             List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
+    //                     data, new TypeReference<List<Map<String, Object>>>() {
+    //                     });
 
-                // Filter out the matching entries
-                List<Map<String, Object>> updatedList = new ArrayList<>();
-                boolean removed = false;
+    //             // Filter out the matching entries
+    //             List<Map<String, Object>> updatedList = new ArrayList<>();
+    //             boolean removed = false;
 
-                for (Map<String, Object> item : offlineDownloadList) {
-                    String currentModelID = (String) item.get("civitaiModelID");
-                    String currentVersionID = (String) item.get("civitaiVersionID");
+    //             for (Map<String, Object> item : offlineDownloadList) {
+    //                 String currentModelID = (String) item.get("civitaiModelID");
+    //                 String currentVersionID = (String) item.get("civitaiVersionID");
 
-                    if (Objects.equals(currentModelID, civitaiModelID) &&
-                            Objects.equals(currentVersionID, civitaiVersionID)) {
-                        removed = true;
-                    } else {
-                        updatedList.add(item);
-                    }
-                }
+    //                 if (Objects.equals(currentModelID, civitaiModelID) &&
+    //                         Objects.equals(currentVersionID, civitaiVersionID)) {
+    //                     removed = true;
+    //                 } else {
+    //                     updatedList.add(item);
+    //                 }
+    //             }
 
-                if (removed) {
-                    // Serialize and write updated list atomically
-                    String updatedJson = objectMapper
-                            .writerWithDefaultPrettyPrinter()
-                            .writeValueAsString(updatedList);
+    //             if (removed) {
+    //                 // Serialize and write updated list atomically
+    //                 String updatedJson = objectMapper
+    //                         .writerWithDefaultPrettyPrinter()
+    //                         .writeValueAsString(updatedList);
 
-                    writeJsonAtomically(filePath, updatedJson);
+    //                 writeJsonAtomically(filePath, updatedJson);
 
-                    System.out.println("Successfully removed the specified entry.");
-                } else {
-                    System.out.println("No matching entry found. No changes made.");
-                }
+    //                 System.out.println("Successfully removed the specified entry.");
+    //             } else {
+    //                 System.out.println("No matching entry found. No changes made.");
+    //             }
 
-            } catch (IOException e) {
-                System.out.println("Unexpected error while removing from offline_download_list " + e);
-                throw new CustomException(
-                        "An unexpected error occurred while removing from the offline download list.",
-                        e);
-            }
-        }
-    }
+    //         } catch (IOException e) {
+    //             System.out.println("Unexpected error while removing from offline_download_list " + e);
+    //             throw new CustomException(
+    //                     "An unexpected error occurred while removing from the offline download list.",
+    //                     e);
+    //         }
+    //     }
+    // }
 
     private void writeJsonAtomically(Path targetFilePath, String jsonContent) throws IOException {
         // Create a temp file in the same directory
@@ -1035,56 +1035,56 @@ public class File_Service_Impl implements File_Service {
     //     }
     // }
 
-    /**
-    * Backs up the offline_download_list.json file by creating a copy with an incremental name.
-    *
-    * @return true if the backup was successful, false otherwise.
-    */
-    public boolean backupOfflineDownloadList() {
-        String originalFilePath = "files/data/offline_download_list.json";
-        Path originalPath = Paths.get(originalFilePath);
+    // /**
+    // * Backs up the offline_download_list.json file by creating a copy with an incremental name.
+    // *
+    // * @return true if the backup was successful, false otherwise.
+    // */
+    // public boolean backupOfflineDownloadList() {
+    //     String originalFilePath = "files/data/offline_download_list.json";
+    //     Path originalPath = Paths.get(originalFilePath);
 
-        synchronized (JSON_WRITE_LOCK) { // Ensure thread safety
-            try {
-                if (!Files.exists(originalPath)) {
-                    System.out.println("Original file does not exist. Backup not created.");
-                    return false;
-                }
+    //     synchronized (JSON_WRITE_LOCK) { // Ensure thread safety
+    //         try {
+    //             if (!Files.exists(originalPath)) {
+    //                 System.out.println("Original file does not exist. Backup not created.");
+    //                 return false;
+    //             }
 
-                // Define the backup directory path
-                Path backupDir = originalPath.getParent().resolve("offlinebackup");
+    //             // Define the backup directory path
+    //             Path backupDir = originalPath.getParent().resolve("offlinebackup");
 
-                // Create the backup directory if it doesn't exist
-                if (!Files.exists(backupDir)) {
-                    Files.createDirectories(backupDir);
-                    System.out.println("Backup directory created at: " + backupDir.toString());
-                }
+    //             // Create the backup directory if it doesn't exist
+    //             if (!Files.exists(backupDir)) {
+    //                 Files.createDirectories(backupDir);
+    //                 System.out.println("Backup directory created at: " + backupDir.toString());
+    //             }
 
-                // Determine the backup file name
-                String baseName = "offline_download_list";
-                String extension = ".json";
-                int copyIndex = 1;
-                Path backupPath;
+    //             // Determine the backup file name
+    //             String baseName = "offline_download_list";
+    //             String extension = ".json";
+    //             int copyIndex = 1;
+    //             Path backupPath;
 
-                do {
-                    String backupFileName = String.format("%s copy %d%s", baseName, copyIndex, extension);
-                    backupPath = backupDir.resolve(backupFileName);
-                    copyIndex++;
-                } while (Files.exists(backupPath));
+    //             do {
+    //                 String backupFileName = String.format("%s copy %d%s", baseName, copyIndex, extension);
+    //                 backupPath = backupDir.resolve(backupFileName);
+    //                 copyIndex++;
+    //             } while (Files.exists(backupPath));
 
-                // Copy the file to the backup directory
-                Files.copy(originalPath, backupPath, StandardCopyOption.COPY_ATTRIBUTES);
+    //             // Copy the file to the backup directory
+    //             Files.copy(originalPath, backupPath, StandardCopyOption.COPY_ATTRIBUTES);
 
-                System.out.println("Backup created at: " + backupPath.toString());
-                return true;
+    //             System.out.println("Backup created at: " + backupPath.toString());
+    //             return true;
 
-            } catch (IOException e) {
-                System.out.println("Error while backing up the file: " + e.getMessage());
-                // Optionally, log the error or rethrow as a custom exception
-                return false;
-            }
-        }
-    }
+    //         } catch (IOException e) {
+    //             System.out.println("Error while backing up the file: " + e.getMessage());
+    //             // Optionally, log the error or rethrow as a custom exception
+    //             return false;
+    //         }
+    //     }
+    // }
 
     @Override
     public Map<String, List<Map<String, Object>>> get_tags_list(String prefix) {
@@ -1373,43 +1373,43 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public void update_error_model_list(String modelName) {
-        try {
+    // @SuppressWarnings("unchecked")
+    // @Override
+    // public void update_error_model_list(String modelName) {
+    //     try {
 
-            Path filePath = Path.of("files/data/error_model_list.json");
+    //         Path filePath = Path.of("files/data/error_model_list.json");
 
-            // Read the content of folder_list.json
-            String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+    //         // Read the content of folder_list.json
+    //         String data = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
 
-            // Parse the JSON data into a list
-            ObjectMapper objectMapper = new ObjectMapper();
-            List<String> errorModelList = objectMapper.readValue(data, List.class);
+    //         // Parse the JSON data into a list
+    //         ObjectMapper objectMapper = new ObjectMapper();
+    //         List<String> errorModelList = objectMapper.readValue(data, List.class);
 
-            // Check if the URL is already in the list
-            if (!errorModelList.contains(modelName)) {
-                // Add the new URL to the list
-                errorModelList.add(modelName);
+    //         // Check if the URL is already in the list
+    //         if (!errorModelList.contains(modelName)) {
+    //             // Add the new URL to the list
+    //             errorModelList.add(modelName);
 
-                // Convert the updated list back to a JSON string
-                String updatedErrorModelListJson = objectMapper.writerWithDefaultPrettyPrinter()
-                        .writeValueAsString(errorModelList);
+    //             // Convert the updated list back to a JSON string
+    //             String updatedErrorModelListJson = objectMapper.writerWithDefaultPrettyPrinter()
+    //                     .writeValueAsString(errorModelList);
 
-                // Write the updated JSON string back to the file
-                Files.write(filePath, updatedErrorModelListJson.getBytes(StandardCharsets.UTF_8));
-                System.out.println("Added \"" + modelName + "\" to error_model_list.json.");
-            } else {
-                // Do nothing if download path already existed.
-                System.out.println("\"" + modelName + "\" is already in error_model_list.json. No duplicates allowed.");
-            }
+    //             // Write the updated JSON string back to the file
+    //             Files.write(filePath, updatedErrorModelListJson.getBytes(StandardCharsets.UTF_8));
+    //             System.out.println("Added \"" + modelName + "\" to error_model_list.json.");
+    //         } else {
+    //             // Do nothing if download path already existed.
+    //             System.out.println("\"" + modelName + "\" is already in error_model_list.json. No duplicates allowed.");
+    //         }
 
-        } catch (IOException e) {
-            // Log and handle other types of exceptions
-            log.error("Unexpected error while updating cart list", e);
-            throw new CustomException("An unexpected error occurred", e);
-        }
-    }
+    //     } catch (IOException e) {
+    //         // Log and handle other types of exceptions
+    //         log.error("Unexpected error while updating cart list", e);
+    //         throw new CustomException("An unexpected error occurred", e);
+    //     }
+    // }
 
     @Override
     @SuppressWarnings("unchecked")
@@ -2518,65 +2518,65 @@ public class File_Service_Impl implements File_Service {
     //     }
     // }
 
-    @SuppressWarnings("unchecked")
-    public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID) {
-        String offlineDownloadFile = "files/data/offline_download_list.json";
-        ObjectMapper objectMapper = new ObjectMapper();
-        List<String> civitaiVersionIds = new ArrayList<>();
+    // @SuppressWarnings("unchecked")
+    // public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID) {
+    //     String offlineDownloadFile = "files/data/offline_download_list.json";
+    //     ObjectMapper objectMapper = new ObjectMapper();
+    //     List<String> civitaiVersionIds = new ArrayList<>();
 
-        try {
-            Path filePath = Paths.get(offlineDownloadFile);
+    //     try {
+    //         Path filePath = Paths.get(offlineDownloadFile);
 
-            // Check if parent directories exist
-            if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
-                System.err.println("Parent directories do not exist for the file: " + offlineDownloadFile);
-                return Optional.of(civitaiVersionIds); // Return empty list
-            }
+    //         // Check if parent directories exist
+    //         if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
+    //             System.err.println("Parent directories do not exist for the file: " + offlineDownloadFile);
+    //             return Optional.of(civitaiVersionIds); // Return empty list
+    //         }
 
-            if (!Files.exists(filePath)) {
-                // File does not exist
-                System.err.println("The file does not exist: " + offlineDownloadFile);
-                return Optional.of(civitaiVersionIds); // Return empty list
-            }
+    //         if (!Files.exists(filePath)) {
+    //             // File does not exist
+    //             System.err.println("The file does not exist: " + offlineDownloadFile);
+    //             return Optional.of(civitaiVersionIds); // Return empty list
+    //         }
 
-            // Read all bytes from the file
-            byte[] fileBytes = Files.readAllBytes(filePath);
-            String data = new String(fileBytes, StandardCharsets.UTF_8).trim();
+    //         // Read all bytes from the file
+    //         byte[] fileBytes = Files.readAllBytes(filePath);
+    //         String data = new String(fileBytes, StandardCharsets.UTF_8).trim();
 
-            if (data.isEmpty()) {
-                // File is empty
-                System.err.println("The file is empty: " + offlineDownloadFile);
-                return Optional.of(civitaiVersionIds); // Return empty list
-            }
+    //         if (data.isEmpty()) {
+    //             // File is empty
+    //             System.err.println("The file is empty: " + offlineDownloadFile);
+    //             return Optional.of(civitaiVersionIds); // Return empty list
+    //         }
 
-            // Deserialize JSON array into List<Map<String, Object>>
-            List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
-                    data, new TypeReference<List<Map<String, Object>>>() {
-                    });
+    //         // Deserialize JSON array into List<Map<String, Object>>
+    //         List<Map<String, Object>> offlineDownloadList = objectMapper.readValue(
+    //                 data, new TypeReference<List<Map<String, Object>>>() {
+    //                 });
 
-            // Iterate through the list and collect civitaiVersionIDs where civitaiModelID matches
-            for (Map<String, Object> item : offlineDownloadList) {
-                if (civitaiModelID.equals(item.get("civitaiModelID"))) {
-                    Object versionIdObj = item.get("civitaiVersionID");
-                    if (versionIdObj instanceof String) {
-                        civitaiVersionIds.add((String) versionIdObj);
-                    } else {
-                        // Handle cases where civitaiVersionID is not a string or is missing
-                        System.err.println("Invalid or missing civitaiVersionID in item: " + item);
-                    }
-                }
-            }
+    //         // Iterate through the list and collect civitaiVersionIDs where civitaiModelID matches
+    //         for (Map<String, Object> item : offlineDownloadList) {
+    //             if (civitaiModelID.equals(item.get("civitaiModelID"))) {
+    //                 Object versionIdObj = item.get("civitaiVersionID");
+    //                 if (versionIdObj instanceof String) {
+    //                     civitaiVersionIds.add((String) versionIdObj);
+    //                 } else {
+    //                     // Handle cases where civitaiVersionID is not a string or is missing
+    //                     System.err.println("Invalid or missing civitaiVersionID in item: " + item);
+    //                 }
+    //             }
+    //         }
 
-            return Optional.of(civitaiVersionIds);
+    //         return Optional.of(civitaiVersionIds);
 
-        } catch (IOException e) {
-            // Log the exception to standard error
-            System.err.println("Unexpected error while retrieving civitaiVersionIDs from offline_download_list: "
-                    + e.getMessage());
-            //log.error("Unexpected error while downloading file", e);
-            throw new CustomException("An unexpected error occurred", e);
-        }
-    }
+    //     } catch (IOException e) {
+    //         // Log the exception to standard error
+    //         System.err.println("Unexpected error while retrieving civitaiVersionIDs from offline_download_list: "
+    //                 + e.getMessage());
+    //         //log.error("Unexpected error while downloading file", e);
+    //         throw new CustomException("An unexpected error occurred", e);
+    //     }
+    // }
 
     @Override
     public void download_file_by_server_v2(String civitaiFileName,

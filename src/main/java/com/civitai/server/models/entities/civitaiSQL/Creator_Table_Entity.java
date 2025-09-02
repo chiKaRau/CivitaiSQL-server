@@ -22,8 +22,8 @@ public class Creator_Table_Entity {
     @Column(length = 500)
     private String message;
 
-    @Column(length = 500)
-    private String categories;
+    @Column(name = "rating", length = 500)
+    private String rating;
 
     @Column(columnDefinition = "TEXT")
     private String civitaiUrl;
