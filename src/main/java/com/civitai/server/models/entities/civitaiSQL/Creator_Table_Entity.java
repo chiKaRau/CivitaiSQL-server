@@ -30,6 +30,9 @@ public class Creator_Table_Entity {
 
     private Boolean lastChecked;
 
+    @Column(name = "last_checked_date")
+    private LocalDateTime lastCheckedDate;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

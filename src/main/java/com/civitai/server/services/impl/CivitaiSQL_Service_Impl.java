@@ -3,6 +3,7 @@ package com.civitai.server.services.impl;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -1689,7 +1690,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         e.setCivitaiTags(toJsonOrNull(civitaiTags));
                                         models_Offline_Table_Repository.save(e);
                                 }
-                                // not modify mode → no-op if exists
+                                // not modify mode -> no-op if exists
                                 return;
                         }
 
@@ -1788,9 +1789,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         @Transactional(readOnly = true, rollbackFor = Exception.class)
         public long checkQuantityOfOfflineDownloadList(String civitaiModelID) {
-                System.out.println("=== checkQuantityOfOfflineDownloadList() ===");
-                System.out.println("civitaiModelID : " + civitaiModelID);
-                System.out.println("============================================");
+                // System.out.println("=== checkQuantityOfOfflineDownloadList() ===");
+                // System.out.println("civitaiModelID : " + civitaiModelID);
+                // System.out.println("============================================");
 
                 Long modelId = parseLongOrNull(civitaiModelID);
                 if (modelId == null) {
@@ -1800,7 +1801,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                 try {
                         long count = models_Offline_Table_Repository.countByCivitaiModelID(modelId);
-                        System.out.println("Count for modelId " + modelId + " = " + count);
+                        // System.out.println("Count for modelId " + modelId + " = " + count);
                         return count;
 
                         // If you wanted distinct versions instead:
@@ -2138,6 +2139,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 Map<String, Object> m = new LinkedHashMap<>();
                                 m.put("creatorUrl", e.getCivitaiUrl());
                                 m.put("lastChecked", e.getLastChecked());
+                                if (e.getLastCheckedDate() != null) {
+                                        m.put("lastCheckedDate", e.getLastCheckedDate()); // ← NEW
+                                }
                                 m.put("status", e.getStatus());
                                 if (e.getRating() != null)
                                         m.put("rating", e.getRating());
@@ -2188,6 +2192,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 }
                         }
 
+                        // ✅ Always handle the lastChecked flag & timestamp when true,
+                        // regardless of whether status changed
+                        if (Boolean.TRUE.equals(lastChecked)) {
+                                e.setLastChecked(true);
+                                e.setLastCheckedDate(LocalDateTime.now());
+                                changed = true; // ensure we persist the timestamp
+                        }
+
                         // 2) Rating:
                         // - If incoming rating is "N/A", treat it as NO-OP (do not overwrite an
                         // existing rating).
@@ -2201,7 +2213,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 changed = true;
                                                 log.info("[creator-url] rating set from <null> -> 'N/A'");
                                         } else {
-                                                log.info("[creator-url] incoming 'N/A' → keep existing rating '{}'",
+                                                log.info("[creator-url] incoming 'N/A' -> keep existing rating '{}'",
                                                                 curRating);
                                         }
                                 } else { // real rating
@@ -2220,7 +2232,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 creator_Table_Repository.save(e);
                                 log.info("[creator-url] SAVED id={} url='{}'", e.getId(), creatorUrl);
                         } else {
-                                log.info("[creator-url] NO CHANGE id={} url='{}' → skip save", e.getId(), creatorUrl);
+                                log.info("[creator-url] NO CHANGE id={} url='{}' -> skip save", e.getId(), creatorUrl);
                         }
 
                 } catch (Exception ex) {
