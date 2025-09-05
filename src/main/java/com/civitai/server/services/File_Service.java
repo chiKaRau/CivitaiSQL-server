@@ -57,6 +57,7 @@ public interface File_Service {
         // public void update_error_model_list(String url);
 
         public void open_download_directory();
+        public void open_model_downloaded_directory(String modelDownloadPath);
 
         public void create_tags_list();
 

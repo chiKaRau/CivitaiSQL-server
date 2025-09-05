@@ -1500,6 +1500,39 @@ public class File_Service_Impl implements File_Service {
     }
 
     @Override
+    public void open_model_downloaded_directory(String modelDownloadPath) {
+        try {
+            String downloadFolderPath = "files/download" + "/" + modelDownloadPath; // Adjust the path accordingly
+
+            File file = new File(downloadFolderPath);
+
+            if (!file.exists()) {
+                System.out.println("Directory does not exist");
+                return;
+            }
+
+            String os = System.getProperty("os.name").toLowerCase();
+
+            if (os.contains("win")) {
+                // For Windows
+                ProcessBuilder processBuilder = new ProcessBuilder("explorer.exe", file.getAbsolutePath());
+                processBuilder.start();
+            } else if (os.contains("nix") || os.contains("nux") || os.contains("mac")) {
+                // For Linux or macOS
+                ProcessBuilder processBuilder = new ProcessBuilder("xdg-open", file.getAbsolutePath());
+                processBuilder.start();
+            } else {
+                System.out.println("Unsupported operating system: " + os);
+            }
+
+        } catch (Exception e) {
+            // Log and handle other types of exceptions
+            log.error("Unexpected error while opening download directory", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
     public void download_file_by_server(String name, String modelID, String versionID, String downloadFilePath,
             List<Map<String, Object>> filesList, String url) {
 

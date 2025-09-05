@@ -180,6 +180,14 @@ public class File_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("Success open directory."));
     }
 
+    @PostMapping("/open-model-download-directory")
+    public ResponseEntity<CustomResponse<String>> openModelDownloadDirectory(
+            @RequestBody Map<String, Object> requestBody) {
+        String modelDownloadPath = (String) requestBody.get("modelDownloadPath");
+        fileService.open_model_downloaded_directory(modelDownloadPath);
+        return ResponseEntity.ok().body(CustomResponse.success("Success open directory."));
+    }
+
     @GetMapping("/clear-cart-list")
     public ResponseEntity<CustomResponse<String>> clearCartList() {
         fileService.empty_cart_list();
@@ -330,27 +338,33 @@ public class File_Controller {
     }
 
     // @GetMapping("/get_error_model_list")
-    // public ResponseEntity<CustomResponse<Map<String, List<String>>>> getErrorModelList() {
-    //     List<String> errorModelList = fileService.get_error_model_list();
+    // public ResponseEntity<CustomResponse<Map<String, List<String>>>>
+    // getErrorModelList() {
+    // List<String> errorModelList = fileService.get_error_model_list();
 
-    //     if (!errorModelList.isEmpty()) {
-    //         Map<String, List<String>> payload = new HashMap<>();
-    //         payload.put("errorModelList", errorModelList);
+    // if (!errorModelList.isEmpty()) {
+    // Map<String, List<String>> payload = new HashMap<>();
+    // payload.put("errorModelList", errorModelList);
 
-    //         return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList retrieval successful", payload));
-    //     } else {
-    //         return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
-    //     }
+    // return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList
+    // retrieval successful", payload));
+    // } else {
+    // return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the
+    // database"));
+    // }
     // }
 
     // @GetMapping("/get_creator_url_list")
-    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getCreatorUrlList() {
-    //     List<Map<String, Object>> creatorUrlList = fileService.get_creator_url_list();
+    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>>
+    // getCreatorUrlList() {
+    // List<Map<String, Object>> creatorUrlList =
+    // fileService.get_creator_url_list();
 
-    //     Map<String, List<Map<String, Object>>> payload = new HashMap<>();
-    //     payload.put("creatorUrlList", creatorUrlList);
+    // Map<String, List<Map<String, Object>>> payload = new HashMap<>();
+    // payload.put("creatorUrlList", creatorUrlList);
 
-    //     return ResponseEntity.ok().body(CustomResponse.success("creatorUrlList retrieval successful", payload));
+    // return ResponseEntity.ok().body(CustomResponse.success("creatorUrlList
+    // retrieval successful", payload));
     // }
 
     @GetMapping("/get_tags_list")
@@ -613,55 +627,59 @@ public class File_Controller {
     // @SuppressWarnings("unchecked")
     // @PostMapping("/update_creator_url_list")
     // public ResponseEntity<CustomResponse<String>> updateCreatorUrlList(
-    //         @RequestBody Map<String, Object> requestBody) {
+    // @RequestBody Map<String, Object> requestBody) {
 
-    //     String creatorUrl = (String) requestBody.get("creatorUrl");
-    //     String status = (String) requestBody.get("status");
-    //     Boolean lastChecked = (Boolean) requestBody.get("lastChecked");
-    //     String rating = (String) requestBody.getOrDefault("rating", "N/A");
-    //     // Validate null or empty
-    //     if (creatorUrl == null || creatorUrl == "") {
-    //         return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-    //     }
+    // String creatorUrl = (String) requestBody.get("creatorUrl");
+    // String status = (String) requestBody.get("status");
+    // Boolean lastChecked = (Boolean) requestBody.get("lastChecked");
+    // String rating = (String) requestBody.getOrDefault("rating", "N/A");
+    // // Validate null or empty
+    // if (creatorUrl == null || creatorUrl == "") {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-    //     try {
+    // try {
 
-    //         fileService.update_creator_url_list(creatorUrl, status, lastChecked, rating);
+    // fileService.update_creator_url_list(creatorUrl, status, lastChecked, rating);
 
-    //         return ResponseEntity.ok()
-    //                 .body(CustomResponse.success("Success updating creator url list"));
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Success updating creator url list"));
 
-    //     } catch (Exception ex) {
-    //         System.err.println("Error - " + creatorUrl + " : "
-    //                 + ex.getMessage());
-    //         return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-    //     }
+    // } catch (Exception ex) {
+    // System.err.println("Error - " + creatorUrl + " : "
+    // + ex.getMessage());
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
     // }
 
     // @SuppressWarnings("unchecked")
     // @PostMapping("/remove_from_creator_url_list")
     // public ResponseEntity<CustomResponse<String>> removeFromCreatorUrlList(
-    //         @RequestBody Map<String, Object> requestBody) {
+    // @RequestBody Map<String, Object> requestBody) {
 
-    //     String creatorUrl = (String) requestBody.get("creatorUrl");
+    // String creatorUrl = (String) requestBody.get("creatorUrl");
 
-    //     // Validate null or empty
-    //     if (creatorUrl == null || creatorUrl == "") {
-    //         return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-    //     }
+    // // Validate null or empty
+    // if (creatorUrl == null || creatorUrl == "") {
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
 
-    //     try {
+    // try {
 
-    //         fileService.remove_creator_url(creatorUrl);
+    // fileService.remove_creator_url(creatorUrl);
 
-    //         return ResponseEntity.ok()
-    //                 .body(CustomResponse.success("Success removing creator url from list"));
+    // return ResponseEntity.ok()
+    // .body(CustomResponse.success("Success removing creator url from list"));
 
-    //     } catch (Exception ex) {
-    //         System.err.println("Error - " + creatorUrl + " : "
-    //                 + ex.getMessage());
-    //         return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-    //     }
+    // } catch (Exception ex) {
+    // System.err.println("Error - " + creatorUrl + " : "
+    // + ex.getMessage());
+    // return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid
+    // input"));
+    // }
     // }
 
     // @SuppressWarnings("unchecked")
