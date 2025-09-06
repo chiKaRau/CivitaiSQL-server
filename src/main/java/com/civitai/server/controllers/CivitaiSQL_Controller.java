@@ -1268,7 +1268,7 @@ public class CivitaiSQL_Controller {
     }
 
     @PostMapping(path = "/find-full-record-from-all-tables-by-modelID-and-version")
-    public ResponseEntity<CustomResponse<Map<String, List<FullModelRecordDTO>>>> findFullRecordByModelIdAndVersion(
+    public ResponseEntity<CustomResponse<FullModelRecordDTO>> findFullRecordByModelIdAndVersion(
             @RequestBody Map<String, Object> requestBody) {
 
         String modelID = (String) requestBody.get("modelID");
@@ -1289,7 +1289,7 @@ public class CivitaiSQL_Controller {
         payload.put("payload", Collections.singletonList(fullOpt.get()));
 
         return ResponseEntity.ok()
-                .body(CustomResponse.success("Model retrieval successful", payload));
+                .body(CustomResponse.success("Model retrieval successful", fullOpt.get()));
     }
 
 }
