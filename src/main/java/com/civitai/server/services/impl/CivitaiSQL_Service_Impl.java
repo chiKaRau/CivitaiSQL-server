@@ -32,6 +32,7 @@ import org.springframework.web.client.HttpClientErrorException;
 
 import com.civitai.server.exception.CustomDatabaseException;
 import com.civitai.server.exception.CustomException;
+import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Creator_Table_Entity;
@@ -2259,6 +2260,45 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         log.error("[creator-url] delete failed for {}: {}", creatorUrl, ex.getMessage(), ex);
                         throw new CustomException("Error removing creator URL", ex);
                 }
+        }
+
+        /**
+         * Returns a single aggregated object containing rows from all 5 tables,
+         * identified by (modelNumber, versionNumber).
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public Optional<FullModelRecordDTO> findFullByModelAndVersion(String modelNumber, String versionNumber) {
+
+                Optional<Models_Table_Entity> modelOpt = models_Table_Repository
+                                .findByModelNumberAndVersionNumber(modelNumber, versionNumber);
+
+                if (modelOpt.isEmpty()) {
+                        return Optional.empty();
+                }
+
+                Models_Table_Entity model = modelOpt.get();
+                int id = model.getId();
+
+                // Each of these can be absent; fetch defensively.
+                Optional<Models_Descriptions_Table_Entity> descriptionOpt = models_Descriptions_Table_Repository
+                                .findById(id);
+
+                Optional<Models_Urls_Table_Entity> urlOpt = models_Urls_Table_Repository.findById(id);
+
+                Optional<Models_Details_Table_Entity> detailsOpt = models_Details_Table_Repository.findById(id);
+
+                Optional<Models_Images_Table_Entity> imagesOpt = models_Images_Table_Repository.findById(id);
+
+                FullModelRecordDTO dto = FullModelRecordDTO.builder()
+                                .model(model)
+                                .description(descriptionOpt.orElse(null))
+                                .url(urlOpt.orElse(null))
+                                .details(detailsOpt.orElse(null))
+                                .images(imagesOpt.orElse(null))
+                                .build();
+
+                return Optional.of(dto);
         }
 
 }

@@ -4,6 +4,7 @@ import java.io.File;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
@@ -1262,6 +1265,31 @@ public class CivitaiSQL_Controller {
                     + ex.getMessage());
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
+    }
+
+    @PostMapping(path = "/find-full-record-from-all-tables-by-modelID-and-version")
+    public ResponseEntity<CustomResponse<Map<String, List<FullModelRecordDTO>>>> findFullRecordByModelIdAndVersion(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelID = (String) requestBody.get("modelID");
+        String versionID = (String) requestBody.get("versionID");
+
+        if (modelID == null || modelID.trim().isEmpty()
+                || versionID == null || versionID.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        Optional<FullModelRecordDTO> fullOpt = civitaiSQL_Service.findFullByModelAndVersion(modelID, versionID);
+
+        if (!fullOpt.isPresent()) {
+            return ResponseEntity.ok().body(CustomResponse.failure("Model not found in the Database"));
+        }
+
+        Map<String, List<FullModelRecordDTO>> payload = new HashMap<>();
+        payload.put("payload", Collections.singletonList(fullOpt.get()));
+
+        return ResponseEntity.ok()
+                .body(CustomResponse.success("Model retrieval successful", payload));
     }
 
 }

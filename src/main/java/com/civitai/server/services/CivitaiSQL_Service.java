@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import javax.swing.text.html.Option;
 
+import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
@@ -129,5 +130,7 @@ public interface CivitaiSQL_Service {
         public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
 
         public void remove_creator_url(String creatorUrl);
+
+        Optional<FullModelRecordDTO> findFullByModelAndVersion(String modelNumber, String versionNumber);
 
 }
