@@ -27,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -42,6 +43,7 @@ import com.civitai.server.models.entities.civitaiSQL.Models_Images_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.Creator_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
@@ -50,6 +52,7 @@ import com.civitai.server.repositories.civitaiSQL.Models_Offline_Table_Repositor
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository_Specification;
 import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.VisitedPath_Table_Repository;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.specification.civitaiSQL.Models_Table_Specification;
@@ -77,6 +80,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Table_Repository_Specification models_Table_Repository_Specification;
         private final Models_Offline_Table_Repository models_Offline_Table_Repository;
         private final Creator_Table_Repository creator_Table_Repository;
+        private final VisitedPath_Table_Repository visitedPath_Table_Repository;
         private final ObjectMapper objectMapper;
         private final Civitai_Service civitai_Service;
 
@@ -222,6 +226,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Offline_Table_Repository models_Offline_Table_Repository,
                         Creator_Table_Repository creator_Table_Repository,
                         Models_Table_Repository_Specification models_Table_Repository_Specification,
+                        VisitedPath_Table_Repository visitedPath_Table_Repository,
                         ObjectMapper objectMapper,
                         Civitai_Service civitai_Service) {
                 this.models_Table_Repository = models_Table_Repository;
@@ -232,6 +237,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.models_Offline_Table_Repository = models_Offline_Table_Repository;
                 this.creator_Table_Repository = creator_Table_Repository;
                 this.models_Table_Repository_Specification = models_Table_Repository_Specification;
+                this.visitedPath_Table_Repository = visitedPath_Table_Repository;
                 this.civitai_Service = civitai_Service;
                 this.objectMapper = objectMapper;
         }
@@ -2301,4 +2307,63 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return Optional.of(dto);
         }
 
+        /**
+         * Record a visit:
+         * - If row exists for {@code path} -> update last_accessed_at to NOW and
+         * increment access_count.
+         * - If row does not exist -> insert a new row (timestamps are DB-managed).
+         *
+         * @param path       canonical full path (normalized)
+         * @param parentPath canonical parent (normalized)
+         * @param drive      drive letter/root (e.g. "F", "G", "\\\\", "/") or null
+         * @param context    fs | virtual
+         */
+        @Override
+        @Transactional
+        public void pathVisited(String path,
+                        String parentPath,
+                        String drive) {
+
+                // 1) Fast-path: update if exists
+                if (visitedPath_Table_Repository.existsByPath(path)) {
+                        // touch() sets last_accessed_at = CURRENT_TIMESTAMP and access_count =
+                        // access_count + 1
+                        int updated = visitedPath_Table_Repository.touch(path);
+
+                        // In rare race conditions, existsByPath could be true but the row just
+                        // disappeared.
+                        // Fallback to an upsert to be safe.
+                        if (updated == 0) {
+                                visitedPath_Table_Repository.upsertVisit(path, parentPath, drive);
+                        }
+                        return;
+                }
+
+                // 2) Insert new row (first_accessed_at/last_accessed_at are DB-managed)
+                VisitedPath_Table_Entity entity = VisitedPath_Table_Entity.builder()
+                                .path(path)
+                                .parentPath(parentPath)
+                                .drive(drive)
+                                .accessCount(1)
+                                .build();
+
+                visitedPath_Table_Repository.save(entity);
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<VisitedPath_Table_Entity> getChildren(String parentPath) {
+                System.out.println("Calling getChildren");
+                String normalized = normalizeParent(parentPath);
+                return visitedPath_Table_Repository.findByParentPath(normalized);
+        }
+
+        private String normalizeParent(String p) {
+                if (p == null)
+                        return null;
+                String s = p.replace('/', '\\').trim();
+                if (!s.endsWith("\\") && !s.endsWith("/"))
+                        s = s + "\\";
+                return s;
+        }
 }

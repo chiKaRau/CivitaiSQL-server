@@ -30,6 +30,7 @@ import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.services.File_Service;
@@ -1290,6 +1291,87 @@ public class CivitaiSQL_Controller {
 
         return ResponseEntity.ok()
                 .body(CustomResponse.success("Model retrieval successful", fullOpt.get()));
+    }
+
+    @PostMapping(path = "/path-visited")
+    public ResponseEntity<CustomResponse<Void>> pathVisited(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String rawPath = (String) requestBody.get("path");
+        if (rawPath == null || rawPath.isBlank()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+            // Normalize to backslashes for Windows-style paths
+            String normalized = rawPath.replace('/', '\\').trim();
+
+            // Extract drive
+            String drive = null;
+            if (normalized.startsWith("\\\\")) {
+                drive = "\\\\";
+            } else if (normalized.length() >= 2 && normalized.charAt(1) == ':') {
+                drive = String.valueOf(Character.toUpperCase(normalized.charAt(0)));
+            } else if (normalized.startsWith("/")) {
+                drive = "/"; // POSIX
+            }
+
+            // Extract parentPath (keep trailing backslash if present)
+            int lastSep = Math.max(normalized.lastIndexOf('\\'), normalized.lastIndexOf('/'));
+            String parentPath = (lastSep > 0) ? normalized.substring(0, lastSep + 1) : null;
+
+            civitaiSQL_Service.pathVisited(normalized, parentPath, drive);
+
+            return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
+
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+
+        }
+    }
+
+    @PostMapping("/get-visited-paths-children")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getChildren(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String parentPath = (String) requestBody.get("parentPath");
+        if (parentPath == null || parentPath.isBlank()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("parent is required"));
+        }
+
+        try {
+            // Normalize to match how you stored it (Windows-style + trailing backslash)
+            String normalizedParent = parentPath.replace('/', '\\').trim();
+            if (!normalizedParent.endsWith("\\") && !normalizedParent.endsWith("/")) {
+                normalizedParent = normalizedParent + "\\";
+            }
+
+            List<VisitedPath_Table_Entity> children = civitaiSQL_Service.getChildren(normalizedParent);
+
+            // Convert entities to a list of maps (no DTOs)
+            List<Map<String, Object>> rows = children.stream().map(v -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("path", v.getPath());
+                m.put("parentPath", v.getParentPath());
+                m.put("drive", v.getDrive());
+                m.put("accessCount", v.getAccessCount());
+                m.put("firstAccessedAt", v.getFirstAccessedAt());
+                m.put("lastAccessedAt", v.getLastAccessedAt());
+                return m;
+            }).toList();
+
+            Map<String, List<Map<String, Object>>> payload = new HashMap<>();
+            payload.put("payload", rows);
+
+            return ResponseEntity.ok().body(
+                    CustomResponse.success("visited paths retrieval successful", payload));
+
+        } catch (Exception e) {
+            e.printStackTrace(); // so you actually see the error
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(CustomResponse.failure("Unexpected error: " + e.getMessage()));
+        }
     }
 
 }

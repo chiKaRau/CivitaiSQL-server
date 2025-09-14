@@ -11,6 +11,7 @@ import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 
 public interface CivitaiSQL_Service {
         // Single Tables only //
@@ -130,6 +131,10 @@ public interface CivitaiSQL_Service {
         public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
 
         public void remove_creator_url(String creatorUrl);
+
+        public void pathVisited(String path, String parentPath, String drive);
+
+        public List<VisitedPath_Table_Entity> getChildren(String parentPath);
 
         Optional<FullModelRecordDTO> findFullByModelAndVersion(String modelNumber, String versionNumber);
 
