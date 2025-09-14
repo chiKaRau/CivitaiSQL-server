@@ -2353,7 +2353,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         @Transactional(readOnly = true)
         public List<VisitedPath_Table_Entity> getChildren(String parentPath) {
-                System.out.println("Calling getChildren");
                 String normalized = normalizeParent(parentPath);
                 return visitedPath_Table_Repository.findByParentPath(normalized);
         }
