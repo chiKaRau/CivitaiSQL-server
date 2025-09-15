@@ -11,6 +11,7 @@ import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 
 public interface CivitaiSQL_Service {
@@ -137,5 +138,11 @@ public interface CivitaiSQL_Service {
         public List<VisitedPath_Table_Entity> getChildren(String parentPath);
 
         Optional<FullModelRecordDTO> findFullByModelAndVersion(String modelNumber, String versionNumber);
+
+        public Recycle_Table_Entity add_to_recycle(Recycle_Table_Entity e);
+
+        public boolean delete_from_recycle(String id);
+
+        public List<Recycle_Table_Entity> fetch_recycle();
 
 }

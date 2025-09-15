@@ -2,11 +2,17 @@ package com.civitai.server.controllers;
 
 import java.io.File;
 import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,6 +36,7 @@ import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
@@ -1369,6 +1376,149 @@ public class CivitaiSQL_Controller {
 
         } catch (Exception e) {
             e.printStackTrace(); // so you actually see the error
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(CustomResponse.failure("Unexpected error: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/add-recycle-record")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> addRecycleRecord(
+            @RequestBody Map<String, Object> requestBody) {
+        try {
+            // --- inline parsing/validation ---
+            String typeRaw = requestBody.get("type") == null ? null : String.valueOf(requestBody.get("type"));
+            String originalPath = requestBody.get("originalPath") == null ? null
+                    : String.valueOf(requestBody.get("originalPath"));
+            String deletedFromPath = requestBody.get("deletedFromPath") == null ? null
+                    : String.valueOf(requestBody.get("deletedFromPath"));
+
+            if (typeRaw == null || typeRaw.isBlank()) {
+                return ResponseEntity.badRequest().body(CustomResponse.failure("type is required"));
+            }
+            if (originalPath == null || originalPath.isBlank()) {
+                return ResponseEntity.badRequest().body(CustomResponse.failure("originalPath is required"));
+            }
+
+            Recycle_Table_Entity.RecordType type;
+            try {
+                type = Recycle_Table_Entity.RecordType.valueOf(typeRaw.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body(CustomResponse.failure("type must be 'set' or 'directory'"));
+            }
+
+            LocalDateTime deletedDate = null;
+            Object dd = requestBody.get("deletedDate");
+            if (dd instanceof String s) {
+                try {
+                    deletedDate = OffsetDateTime.parse(s).toLocalDateTime();
+                } catch (DateTimeParseException ignore1) {
+                    try {
+                        deletedDate = LocalDateTime.parse(s);
+                    } catch (DateTimeParseException ignore2) {
+                        /* keep null */ }
+                }
+            } else if (dd instanceof Number n) {
+                deletedDate = LocalDateTime.ofInstant(Instant.ofEpochMilli(n.longValue()), ZoneId.systemDefault());
+            }
+
+            List<String> files = new ArrayList<>();
+            Object filesObj = requestBody.get("files");
+            if (filesObj instanceof List<?> raw) {
+                for (Object it : raw)
+                    if (it != null)
+                        files.add(String.valueOf(it));
+            } else if (filesObj instanceof String s && !s.isBlank()) {
+                files.add(s);
+            }
+
+            // --- build entity & save ---
+            Recycle_Table_Entity entity = Recycle_Table_Entity.builder()
+                    .type(type)
+                    .originalPath(originalPath)
+                    .deletedFromPath(deletedFromPath)
+                    .deletedDate(deletedDate) // service will default to now if null
+                    .files(files)
+                    .build();
+
+            Recycle_Table_Entity saved = civitaiSQL_Service.add_to_recycle(entity);
+
+            // --- payload ---
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", saved.getId());
+            row.put("type", saved.getType() != null ? saved.getType().name().toLowerCase(Locale.ROOT) : null);
+            row.put("originalPath", saved.getOriginalPath());
+            row.put("deletedFromPath", saved.getDeletedFromPath());
+            row.put("deletedDate", saved.getDeletedDate());
+            row.put("files", saved.getFiles() != null ? saved.getFiles() : List.of());
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("payload", row);
+            return ResponseEntity.ok(CustomResponse.success("recycle record created", payload));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(CustomResponse.failure("Unexpected error: " + e.getMessage()));
+        }
+    }
+
+    // POST /api/delete-recycle-record
+    @PostMapping("/delete-recycle-record")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> deleteRecycleRecord(
+            @RequestBody Map<String, Object> requestBody) {
+        try {
+            String id = requestBody.get("id") == null ? null : String.valueOf(requestBody.get("id"));
+            if (id == null || id.isBlank()) {
+                return ResponseEntity.badRequest().body(CustomResponse.failure("id is required"));
+            }
+
+            boolean ok = civitaiSQL_Service.delete_from_recycle(id);
+            if (!ok) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(CustomResponse.failure("record not found: " + id));
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("deleted", true);
+            result.put("id", id);
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("payload", result);
+
+            return ResponseEntity.ok(CustomResponse.success("recycle record deleted", payload));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(CustomResponse.failure("Unexpected error: " + e.getMessage()));
+        }
+    }
+
+    // GET /api/get-recyclelist
+    @GetMapping("/get-recyclelist")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> getRecycleList() {
+        try {
+            List<Recycle_Table_Entity> rows = civitaiSQL_Service.fetch_recycle();
+
+            List<Map<String, Object>> mapped = new ArrayList<>(rows.size());
+            for (Recycle_Table_Entity e : rows) {
+                Map<String, Object> m = new HashMap<>();
+                m.put("id", e.getId());
+                m.put("type", e.getType() != null ? e.getType().name().toLowerCase(Locale.ROOT) : null);
+                m.put("originalPath", e.getOriginalPath());
+                m.put("deletedFromPath", e.getDeletedFromPath());
+                m.put("deletedDate", e.getDeletedDate());
+                m.put("files", e.getFiles() != null ? e.getFiles() : List.of());
+                mapped.add(m);
+            }
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("payload", mapped);
+
+            return ResponseEntity.ok(CustomResponse.success("recycle list retrieved", payload));
+
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(CustomResponse.failure("Unexpected error: " + e.getMessage()));
         }
