@@ -538,7 +538,7 @@ public class CivitaiSQL_Controller {
     }
 
     // tempermonkey use only
-    @CrossOrigin(origins = "https://civitai.com")
+    @CrossOrigin(origins = "*")
     @PostMapping(path = "/find-list-of-models-dto-from-all-table-by-tagsList-tampermonkey")
     @SuppressWarnings("unchecked")
     public ResponseEntity<CustomResponse<Map<String, List<Models_DTO>>>> findListofModelsDTOfromAllTableByTagsListForTamperMonkey(
