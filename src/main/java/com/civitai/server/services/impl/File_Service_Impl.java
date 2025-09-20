@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -2783,50 +2784,17 @@ public class File_Service_Impl implements File_Service {
                     continue;
                 }
 
-                // Download the file
-                URL downloadUrl;
-                URLConnection connection;
-                long totalSize;
                 Path filePath = uniqueDirectory.resolve(fileName);
+                int maxRetries = 4;
 
-                try {
-                    downloadUrl = new URL(prepareUrl);
-                    connection = downloadUrl.openConnection();
-                    totalSize = connection.getContentLengthLong();
+                System.out.println("Starting download: " + prepareUrl + " -> " + filePath);
+                boolean ok = httpDownloadWithResume(prepareUrl, filePath, fileName, maxRetries);
 
-                    System.out.println("Starting download: " + downloadUrl + " to " + filePath);
-
-                    // Retry mechanism for ensuring complete download
-                    int maxRetries = 3;
-                    boolean success = false;
-                    for (int attempt = 1; attempt <= maxRetries && !success; attempt++) {
-                        try (InputStream inputStream = downloadUrl.openStream()) {
-                            // Perform the file download with a progress indicator
-                            ProgressBarUtils.copyInputStreamWithProgress(inputStream, filePath, totalSize, fileName);
-                        }
-
-                        long downloadedSize = Files.size(filePath);
-                        if (downloadedSize != totalSize) {
-                            System.err.println("Attempt " + attempt + ": Incomplete download. Expected "
-                                    + totalSize + " bytes, but got " + downloadedSize + " bytes.");
-                            if (attempt == maxRetries) {
-                                // After max attempts, throw a CustomException to abort the process
-                                throw new CustomException("Incomplete download after " + attempt
-                                        + " attempts for file: " + fileName, null);
-                            }
-                            // Delete the incomplete file before retrying
-                            Files.deleteIfExists(filePath);
-                            System.out.println("Retrying download (attempt " + (attempt + 1) + ")...");
-                        } else {
-                            success = true;
-                            System.out.println("Downloaded file: " + filePath);
-                            anyFileDownloaded = true;
-                        }
-                    }
-                } catch (IOException e) {
-                    System.err.println("Failed to download file: " + prepareUrl);
-                    e.printStackTrace();
-                    // skip to next file
+                if (ok) {
+                    System.out.println("\nDownloaded file: " + filePath);
+                    anyFileDownloaded = true;
+                } else {
+                    System.err.println("Failed to download after retries: " + prepareUrl);
                     continue;
                 }
 
@@ -3157,6 +3125,182 @@ public class File_Service_Impl implements File_Service {
             });
             return total[0];
         }
+    }
+
+    // ---- networking constants ----
+    private static final int CONNECT_TIMEOUT_MS = 20_000;
+    private static final int READ_TIMEOUT_MS = 60_000;
+    private static final String USER_AGENT = "CivitaiSQL/1.0 (+java)";
+    private static final int HTTP_PARTIAL_CODE = HttpURLConnection.HTTP_PARTIAL; // 206
+    private static final int HTTP_OK_CODE = HttpURLConnection.HTTP_OK; // 200
+    private static final int HTTP_RANGE_NOT_SAT = 416; // Requested Range Not Satisfiable
+
+    // Robust downloader: redirects, timeouts, exact bytes (identity), Range resume,
+    // and tail-probe when size is unknown to guarantee completeness.
+    private boolean httpDownloadWithResume(String urlStr, Path filePath, String fileName, int maxRetries) {
+        int attempt = 0;
+        long backoffMs = 1000;
+
+        while (++attempt <= maxRetries) {
+            HttpURLConnection conn = null;
+            try {
+                long existing = java.nio.file.Files.exists(filePath) ? java.nio.file.Files.size(filePath) : 0L;
+
+                URL url = URI.create(urlStr).toURL(); // avoids URL(String) deprecation on Java 20+
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(true);
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", USER_AGENT);
+                conn.setRequestProperty("Accept-Encoding", "identity"); // exact bytes; no auto-gzip
+
+                if (existing > 0) {
+                    conn.setRequestProperty("Range", "bytes=" + existing + "-");
+                }
+
+                int code = conn.getResponseCode();
+
+                // If server ignored Range, start fresh
+                if (existing > 0 && code == HTTP_OK_CODE) {
+                    java.nio.file.Files.deleteIfExists(filePath);
+                    existing = 0L;
+                }
+
+                if (code != HTTP_OK_CODE && code != HTTP_PARTIAL_CODE) {
+                    throw new java.io.IOException("HTTP " + code + " for " + urlStr);
+                }
+
+                long contentLen = conn.getContentLengthLong(); // -1 if unknown
+                long expectedTotal = (code == HTTP_PARTIAL_CODE && contentLen >= 0)
+                        ? existing + contentLen
+                        : (contentLen >= 0 ? contentLen : -1);
+
+                try (java.io.InputStream in = new java.io.BufferedInputStream(conn.getInputStream());
+                        java.io.OutputStream out = java.nio.file.Files.newOutputStream(
+                                filePath,
+                                existing > 0
+                                        ? new java.nio.file.OpenOption[] { StandardOpenOption.APPEND }
+                                        : new java.nio.file.OpenOption[] { StandardOpenOption.CREATE,
+                                                StandardOpenOption.TRUNCATE_EXISTING })) {
+
+                    byte[] buf = new byte[8192];
+                    long written = existing;
+                    int n;
+                    while ((n = in.read(buf)) != -1) {
+                        out.write(buf, 0, n);
+                        written += n;
+                        if (expectedTotal > 0) {
+                            ProgressBarUtils.updateProgressBar(written, expectedTotal, fileName);
+                        }
+                    }
+                    out.flush();
+
+                    if (expectedTotal > 0) {
+                        // size known → require full
+                        if (written < expectedTotal)
+                            throw new java.io.EOFException("Early EOF: " + written + " / " + expectedTotal);
+                        return true;
+                    } else {
+                        // size unknown → tail-probe until EOF is proven
+                        long w = written;
+                        while (true) {
+                            int tail = tailProbeAppend(urlStr, filePath, w);
+                            if (tail == 0) {
+                                return true; // confirmed EOF
+                            } else if (tail > 0) {
+                                w += tail; // appended more; keep probing
+                            } else {
+                                throw new java.io.EOFException("Tail probe failed; retrying");
+                            }
+                        }
+                    }
+                }
+            } catch (java.io.IOException ex) {
+                // Keep partial for resume; delete only if tiny junk
+                try {
+                    if (java.nio.file.Files.exists(filePath) && java.nio.file.Files.size(filePath) < 1024) {
+                        java.nio.file.Files.deleteIfExists(filePath);
+                    }
+                } catch (java.io.IOException ignore) {
+                }
+
+                if (attempt >= maxRetries)
+                    return false;
+
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                backoffMs = Math.min(backoffMs * 2, 8000);
+                System.out.println("Retrying (" + (attempt + 1) + "/" + maxRetries + ") with resume if supported...");
+            } finally {
+                if (conn != null)
+                    conn.disconnect();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Tail probe to prove EOF or fetch remaining tail.
+     * 
+     * @return >0 bytes appended, 0 = confirmed EOF, <0 = probe failed (retry)
+     */
+    private int tailProbeAppend(String urlStr, Path filePath, long written) {
+        HttpURLConnection probe = null;
+        try {
+            URL probeUrl = URI.create(urlStr).toURL(); // avoids URL(String) deprecation
+            probe = (HttpURLConnection) probeUrl.openConnection();
+            probe.setInstanceFollowRedirects(true);
+            probe.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            probe.setReadTimeout(READ_TIMEOUT_MS);
+            probe.setRequestMethod("GET");
+            probe.setRequestProperty("User-Agent", USER_AGENT);
+            probe.setRequestProperty("Accept-Encoding", "identity");
+            probe.setRequestProperty("Range", "bytes=" + written + "-");
+
+            int code = probe.getResponseCode();
+
+            if (code == HTTP_RANGE_NOT_SAT) {
+                // 416 => beyond EOF → complete
+                return 0;
+            }
+            if (code == HTTP_PARTIAL_CODE) { // 206
+                try (java.io.InputStream in = new java.io.BufferedInputStream(probe.getInputStream());
+                        java.io.OutputStream out = java.nio.file.Files.newOutputStream(filePath,
+                                StandardOpenOption.APPEND)) {
+                    byte[] buf = new byte[8192];
+                    int n, total = 0;
+                    while ((n = in.read(buf)) != -1) {
+                        out.write(buf, 0, n);
+                        total += n;
+                    }
+                    return total;
+                }
+            }
+            if (code == HTTP_OK_CODE) { // 200, server ignored Range
+                return -1;
+            }
+            return -1;
+        } catch (java.io.IOException e) {
+            return -1;
+        } finally {
+            if (probe != null)
+                probe.disconnect();
+        }
+    }
+
+    // Optional tiny logger for debugging CDN behavior
+    private void logResponse(String label, HttpURLConnection conn) throws java.io.IOException {
+        System.out.println(label + " " + conn.getURL() + " -> " + conn.getResponseCode());
+        System.out.println("  Content-Length: " + conn.getContentLengthLong());
+        System.out.println("  Transfer-Encoding: " + conn.getHeaderField("Transfer-Encoding"));
+        System.out.println("  Content-Encoding: " + conn.getHeaderField("Content-Encoding"));
+        System.out.println("  Accept-Ranges: " + conn.getHeaderField("Accept-Ranges"));
+        System.out.println("  Server: " + conn.getHeaderField("Server"));
+        System.out.println("  Via/X-Cache: " + conn.getHeaderField("Via") + " / " + conn.getHeaderField("X-Cache"));
     }
 
     // @Override
