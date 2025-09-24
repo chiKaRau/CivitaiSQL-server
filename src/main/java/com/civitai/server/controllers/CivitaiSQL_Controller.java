@@ -982,23 +982,97 @@ public class CivitaiSQL_Controller {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                // Attempt to find the model by version ID.
-                Optional<Map<String, Object>> modelVersionOptional = civitai_Service
-                        .findModelByVersionID(civitaiVersionID);
-                if (!modelVersionOptional.isPresent()) {
-                    throw new Exception("Model version not found");
+                // 1) Fetch the full model using the MODEL ID
+                Optional<Map<String, Object>> modelOptional = civitai_Service.findModelByModelID(civitaiModelID);
+                if (!modelOptional.isPresent()) {
+                    throw new Exception("Model not found for modelID=" + civitaiModelID);
                 }
-                Map<String, Object> modelVersionObject = modelVersionOptional.get();
+                Map<String, Object> fetchedModel = modelOptional.get(); // <-- renamed
 
-                // Extract image URLs from the model version object.
+                // 2) Pull out the modelVersions array from the fetched model
+                Object versionsRaw = fetchedModel.get("modelVersions"); // <-- use fetchedModel
+                if (!(versionsRaw instanceof List)) {
+                    throw new Exception("Model has no modelVersions array (modelID=" + civitaiModelID + ")");
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> modelVersions = (List<Map<String, Object>>) versionsRaw;
+
+                if (modelVersions.isEmpty()) {
+                    throw new Exception("Model has an empty modelVersions array (modelID=" + civitaiModelID + ")");
+                }
+
+                // 3) Find the specific version whose id matches civitaiVersionID
+                Map<String, Object> modelVersionObject = modelVersions.stream()
+                        .filter(v -> civitaiVersionID.equals(String.valueOf(v.get("id"))))
+                        .findFirst()
+                        .orElseThrow(() -> new Exception(
+                                "Version " + civitaiVersionID + " not found in model " + civitaiModelID));
+
+                // Ensure the version map is mutable
+                if (!(modelVersionObject instanceof java.util.LinkedHashMap)) {
+                    try {
+                        modelVersionObject.put("_check_mutable", Boolean.TRUE);
+                        modelVersionObject.remove("_check_mutable");
+                    } catch (UnsupportedOperationException uoe) {
+                        modelVersionObject = new java.util.LinkedHashMap<>(modelVersionObject);
+                    }
+                }
+
+                // Build compact model summary from the top-level model
+                Map<String, Object> modelSummary = new java.util.LinkedHashMap<>();
+                modelSummary.put("id", fetchedModel.get("id")); // optional, handy later
+                modelSummary.put("poi", fetchedModel.get("poi"));
+                modelSummary.put("name", fetchedModel.get("name"));
+                modelSummary.put("nsfw", fetchedModel.get("nsfw"));
+                modelSummary.put("type", fetchedModel.get("type"));
+
+                // Attach at the SAME LEVEL on the version object
+                modelVersionObject.put("model", modelSummary);
+
+                // Copy top-level creator onto the version object as a sibling of "model"
+                Object creatorObj = fetchedModel.get("creator");
+                if (creatorObj instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> creatorMap = (Map<String, Object>) creatorObj;
+                    modelVersionObject.put("creator", creatorMap);
+                } else {
+                    // Still create the key for consistency, even if null
+                    modelVersionObject.put("creator", null);
+                }
+
+                // Add modelId at the same level (prefer top-level fetchedModel.id; fallback to
+                // civitaiModelID)
+                Object modelIdValue = fetchedModel.get("id"); // could be Integer/Long/String depending on parser
+                if (modelIdValue == null) {
+                    // Fallback: try to parse civitaiModelID into a number; if it fails, keep it as
+                    // String
+                    try {
+                        modelIdValue = Long.valueOf(civitaiModelID);
+                    } catch (NumberFormatException nfe) {
+                        modelIdValue = civitaiModelID; // keep as String
+                    }
+                }
+
+                // If you don't want to overwrite an existing key, use putIfAbsent; otherwise
+                // use put
+                if (modelVersionObject instanceof java.util.concurrent.ConcurrentMap) {
+                    ((java.util.concurrent.ConcurrentMap<String, Object>) modelVersionObject)
+                            .putIfAbsent("modelId", modelIdValue);
+                } else {
+                    // Safe "put if absent" emulation for regular maps
+                    if (!modelVersionObject.containsKey("modelId")) {
+                        modelVersionObject.put("modelId", modelIdValue);
+                    }
+                }
+
+                // 4) Proceed exactly like before using the selected version object
                 String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
 
-                // Update the offline download list.
                 civitaiSQL_Service.update_offline_download_list(
                         civitaiFileName,
                         civitaiModelFileList,
                         downloadFilePath,
-                        modelVersionObject,
+                        modelVersionObject, // <- still the version object
                         civitaiModelID,
                         civitaiVersionID,
                         civitaiUrl,
@@ -1008,29 +1082,24 @@ public class CivitaiSQL_Controller {
                         civitaiTags,
                         isModifyMode);
 
-                // Update the folder list.
                 fileService.update_folder_list(downloadFilePath);
 
-                // Log success
                 System.out.println("Updated the offline List for: "
                         + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName);
                 System.out.println("URL: " + civitaiUrl);
 
-                // Mark the attempt as successful and exit the loop.
                 success = true;
                 break;
             } catch (Exception ex) {
                 lastException = ex;
-                System.err.println("Attempt " + attempt + " failed for " + civitaiModelID + "_" + civitaiVersionID + "_"
-                        + civitaiFileName);
-
-                // Wait 1 second before trying again (unless this was the last attempt)
+                System.err.println("Attempt " + attempt + " failed for "
+                        + civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName
+                        + " | reason: " + ex.getMessage());
                 if (attempt < maxAttempts) {
                     try {
-                        Thread.sleep(1000); // Delay in milliseconds
+                        Thread.sleep(1000);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        // Optionally break out if the thread is interrupted
                         break;
                     }
                 }
