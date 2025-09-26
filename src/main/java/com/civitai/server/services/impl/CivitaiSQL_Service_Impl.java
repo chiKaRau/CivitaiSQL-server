@@ -55,6 +55,7 @@ import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository_Specif
 import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Recycle_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.VisitedPath_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.impl.ModelsRepositoryFTS;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.specification.civitaiSQL.Models_Table_Specification;
@@ -83,6 +84,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Offline_Table_Repository models_Offline_Table_Repository;
         private final Creator_Table_Repository creator_Table_Repository;
         private final VisitedPath_Table_Repository visitedPath_Table_Repository;
+        private final ModelsRepositoryFTS modelsRepositoryFTS;
         private final Recycle_Table_Repository recycle_Table_Repository;
         private final ObjectMapper objectMapper;
         private final Civitai_Service civitai_Service;
@@ -231,6 +233,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Table_Repository_Specification models_Table_Repository_Specification,
                         VisitedPath_Table_Repository visitedPath_Table_Repository,
                         Recycle_Table_Repository recycle_Table_Repository,
+                        ModelsRepositoryFTS modelsRepositoryFTS,
                         ObjectMapper objectMapper,
                         Civitai_Service civitai_Service) {
                 this.models_Table_Repository = models_Table_Repository;
@@ -245,6 +248,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.recycle_Table_Repository = recycle_Table_Repository;
                 this.civitai_Service = civitai_Service;
                 this.objectMapper = objectMapper;
+                this.modelsRepositoryFTS = modelsRepositoryFTS;
         }
 
         @Override
@@ -678,24 +682,60 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        // Put near your service class
+        private String buildBooleanQueryForLikeEquivalence(List<String> keywords) {
+                // Emulate old LIKE '%kw%' feel:
+                // - AND semantics with '+' prefix
+                // - Phrase support when a kw has spaces
+                // - Suffix wildcard * for broader match (MySQL FTS: only suffix allowed)
+                // - Skip wildcard for very short tokens (<3) due to ft_min_token_size default
+                return keywords.stream()
+                                .map(k -> {
+                                        String kw = k.trim();
+                                        boolean phrase = kw.contains(" ");
+                                        String term = phrase ? "\"" + kw + "\"" : kw;
+                                        // add * only for single-word terms with length >=3
+                                        if (!phrase && kw.length() >= 3)
+                                                term = term + "*";
+                                        return "+" + term;
+                                })
+                                .reduce((a, b) -> a + " " + b)
+                                .orElse("");
+        }
+
+        boolean useFts = Boolean.parseBoolean(System.getenv().getOrDefault("SEARCH_MODE_FTS", "true"));
+
         @Override
-        @SuppressWarnings("null")
         public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tagsList(
                         List<String> tagsList) {
+                List<Models_Table_Entity> entityList;
 
-                Specification<Models_Table_Entity> spec = Models_Table_Specification.findByTagsList(tagsList);
+                if (useFts) {
+                        String booleanQuery = buildBooleanQueryForLikeEquivalence(tagsList);
 
-                List<Models_Table_Entity> entityList = models_Table_Repository_Specification.findAll(spec);
+                        // 1) Fast path: FTS
+                        List<Models_Table_Entity> fts = modelsRepositoryFTS.searchAllByBooleanFTS(booleanQuery);
 
-                if (entityList != null && !entityList.isEmpty()) {
-                        List<Models_DTO> modelsDTOList = entityList.stream()
-                                        .map(this::convertToDTO)
-                                        .collect(Collectors.toList());
-
-                        return Optional.of(modelsDTOList);
+                        // 2) Fallback/top-up: old Specification (to keep behavior identical)
+                        // Use it only if FTS is empty OR you want to preserve any edge cases (short
+                        // tokens, non-token substrings).
+                        if (fts.isEmpty()) {
+                                Specification<Models_Table_Entity> spec = Models_Table_Specification
+                                                .findByTagsList(tagsList);
+                                entityList = models_Table_Repository_Specification.findAll(spec);
+                        } else {
+                                entityList = fts;
+                        }
                 } else {
-                        return Optional.empty();
+                        // Original behavior
+                        Specification<Models_Table_Entity> spec = Models_Table_Specification.findByTagsList(tagsList);
+                        entityList = models_Table_Repository_Specification.findAll(spec);
                 }
+
+                if (entityList.isEmpty())
+                        return Optional.empty();
+
+                return Optional.of(entityList.stream().map(this::convertToDTO).collect(Collectors.toList()));
         }
 
         @Override
