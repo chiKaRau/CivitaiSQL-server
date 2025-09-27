@@ -149,4 +149,6 @@ public interface CivitaiSQL_Service {
         Optional<Models_Offline_Table_Entity> getOfflineRecordByModelAndVersion(String civitaiModelID,
                         String civitaiVersionID);
 
+        Models_Table_Entity updateMyRatingByModelAndVersion(String modelNumber, String versionNumber, int rating);
+
 }

@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -2468,6 +2469,27 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         log.error("Unexpected error fetching offline record (modelId={}, versionId={}): {}",
                                         modelId, versionId, ex.getMessage(), ex);
                         throw new CustomException("Unexpected error while retrieving the offline record.", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public Models_Table_Entity updateMyRatingByModelAndVersion(String modelNumber, String versionNumber,
+                        int rating) {
+                validateRating(rating);
+                Models_Table_Entity entity = models_Table_Repository
+                                .findByModelNumberAndVersionNumber(modelNumber, versionNumber)
+                                .orElseThrow(() -> new NoSuchElementException(
+                                                "Model not found for modelNumber=" + modelNumber + ", versionNumber="
+                                                                + versionNumber));
+
+                entity.setMyRating(rating);
+                return models_Table_Repository.save(entity);
+        }
+
+        private static void validateRating(Integer rating) {
+                if (rating == null || rating < 0 || rating > 20) {
+                        throw new IllegalArgumentException("myRating must be between 0 and 20");
                 }
         }
 }

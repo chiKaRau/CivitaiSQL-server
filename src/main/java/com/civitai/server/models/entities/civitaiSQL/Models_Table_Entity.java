@@ -66,8 +66,19 @@ public class Models_Table_Entity {
     @Column(name = "updated_at")
     private Timestamp updatedAt;
 
-    @OneToOne(mappedBy = "modelsTableEntity") //class name instead of table name
-    private Models_Urls_Table_Entity modelsUrlsTable; //this will be use in Models_Table_Specification join attribute name
+    @Column(name = "my_rating")
+    private Integer myRating; // nullable
+
+    public void setMyRating(Integer myRating) {
+        if (myRating != null && (myRating < 0 || myRating > 20)) {
+            throw new IllegalArgumentException("myRating must be between 0 and 20");
+        }
+        this.myRating = myRating;
+    }
+
+    @OneToOne(mappedBy = "modelsTableEntity") // class name instead of table name
+    private Models_Urls_Table_Entity modelsUrlsTable; // this will be use in Models_Table_Specification join attribute
+                                                      // name
 
     @PrePersist
     protected void onCreate() {

@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -1617,6 +1618,55 @@ public class CivitaiSQL_Controller {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(CustomResponse.failure("Unexpected error: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/update-myrating-by-modelId-and-versionId")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> updateMyRatingByModelIdAndVersionId(
+            @RequestBody Map<String, Object> body) {
+
+        // accept either (modelID, versionID) or (modelNumber, versionNumber)
+        String modelNumber = (String) (body.get("modelNumber") != null ? body.get("modelNumber") : body.get("modelID"));
+        String versionNumber = (String) (body.get("versionNumber") != null ? body.get("versionNumber")
+                : body.get("versionID"));
+        Integer rating = toIntOrNull(body.get("rating"));
+
+        if (modelNumber == null || versionNumber == null || rating == null) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse
+                            .failure("Required: modelID/modelNumber, versionID/versionNumber, rating(0..20)"));
+        }
+
+        try {
+            Models_Table_Entity updated = civitaiSQL_Service
+                    .updateMyRatingByModelAndVersion(modelNumber, versionNumber, rating);
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("id", updated.getId());
+            payload.put("modelNumber", updated.getModelNumber());
+            payload.put("versionNumber", updated.getVersionNumber());
+            payload.put("myRating", updated.getMyRating());
+            payload.put("updatedAt", updated.getUpdatedAt());
+
+            return ResponseEntity.ok(CustomResponse.success("Rating updated", payload));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure(ex.getMessage()));
+        } catch (NoSuchElementException ex) {
+            return ResponseEntity.ok().body(CustomResponse.failure(ex.getMessage())); // 200 + failure msg (matches your
+                                                                                      // pattern)
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError()
+                    .body(CustomResponse.failure("Update failed: " + ex.getMessage()));
+        }
+    }
+
+    private static Integer toIntOrNull(Object v) {
+        if (v instanceof Number)
+            return ((Number) v).intValue();
+        try {
+            return v != null ? Integer.parseInt(v.toString()) : null;
+        } catch (Exception e) {
+            return null;
         }
     }
 
