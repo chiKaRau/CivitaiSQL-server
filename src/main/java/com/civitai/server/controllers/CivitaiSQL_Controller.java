@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
+import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
@@ -1168,6 +1169,31 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    @CrossOrigin(origins = "*")
+    @PostMapping(path = "/get-offline-record-by-model-and-version")
+    public ResponseEntity<CustomResponse<Models_Offline_Table_Entity>> getOfflineRecordByModelAndVersionEndpoint(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelNumber = requestBody.get("modelNumber") != null ? requestBody.get("modelNumber").toString() : null;
+        String versionNumber = requestBody.get("versionNumber") != null ? requestBody.get("versionNumber").toString()
+                : null;
+
+        if (modelNumber == null || modelNumber.isBlank() || versionNumber == null || versionNumber.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: modelNumber/versionNumber required"));
+        }
+
+        Optional<Models_Offline_Table_Entity> recordOpt = civitaiSQL_Service
+                .getOfflineRecordByModelAndVersion(modelNumber, versionNumber);
+
+        if (recordOpt.isPresent()) {
+            return ResponseEntity.ok(CustomResponse.success("Record retrieved", recordOpt.get()));
+        } else {
+            // Keep your existing “success with null” pattern; switch to 404 if you prefer.
+            return ResponseEntity.ok(CustomResponse.success("No record found for given model/version", null));
+        }
+    }
+
     @SuppressWarnings("unchecked")
     @PostMapping("/remove-offline-download-file-into-offline-download-list")
     public ResponseEntity<CustomResponse<String>> removeOfflineDownloadFileIntoOfflineDownloadList(
@@ -1344,6 +1370,7 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    @CrossOrigin(origins = "*")
     @PostMapping(path = "/find-full-record-from-all-tables-by-modelID-and-version")
     public ResponseEntity<CustomResponse<FullModelRecordDTO>> findFullRecordByModelIdAndVersion(
             @RequestBody Map<String, Object> requestBody) {

@@ -9,6 +9,7 @@ import javax.swing.text.html.Option;
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.Tables_DTO;
+import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
@@ -144,5 +145,8 @@ public interface CivitaiSQL_Service {
         public boolean delete_from_recycle(String id);
 
         public List<Recycle_Table_Entity> fetch_recycle();
+
+        Optional<Models_Offline_Table_Entity> getOfflineRecordByModelAndVersion(String civitaiModelID,
+                        String civitaiVersionID);
 
 }

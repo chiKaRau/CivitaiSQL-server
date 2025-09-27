@@ -2443,4 +2443,31 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         public java.util.List<Recycle_Table_Entity> fetch_recycle() {
                 return recycle_Table_Repository.findAllByOrderByDeletedDateDesc();
         }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public Optional<Models_Offline_Table_Entity> getOfflineRecordByModelAndVersion(
+                        String civitaiModelID, String civitaiVersionID) {
+
+                System.out.println("=== getOfflineRecordByModelAndVersion() ===");
+                System.out.println("civitaiModelID  : " + civitaiModelID);
+                System.out.println("civitaiVersionID: " + civitaiVersionID);
+                System.out.println("================================================");
+
+                Long modelId = parseLongOrNull(civitaiModelID);
+                Long versionId = parseLongOrNull(civitaiVersionID);
+                if (modelId == null || versionId == null) {
+                        System.err.println("Invalid modelId/versionId (null/NaN). Returning empty.");
+                        return Optional.empty();
+                }
+
+                try {
+                        return models_Offline_Table_Repository
+                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, versionId);
+                } catch (Exception ex) {
+                        log.error("Unexpected error fetching offline record (modelId={}, versionId={}): {}",
+                                        modelId, versionId, ex.getMessage(), ex);
+                        throw new CustomException("Unexpected error while retrieving the offline record.", ex);
+                }
+        }
 }
