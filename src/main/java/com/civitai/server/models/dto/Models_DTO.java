@@ -15,6 +15,8 @@ public class Models_DTO {
 
     private String mainModelName;
 
+    private Integer myRating; // nullable
+
     private List<String> tags;
 
     private List<String> localTags;

@@ -1003,6 +1003,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 models_DTO.setId(tables_DTO.getModels_Table_Entitiy().getId());
                 models_DTO.setName(tables_DTO.getModels_Table_Entitiy().getName());
                 models_DTO.setMainModelName(tables_DTO.getModels_Table_Entitiy().getMainModelName());
+                models_DTO.setMyRating(tables_DTO.getModels_Table_Entitiy().getMyRating());
                 models_DTO.setTags(JsonUtils.convertStringToObject(
                                 tables_DTO.getModels_Table_Entitiy().getTags(), List.class));
                 models_DTO.setCategory(tables_DTO.getModels_Table_Entitiy().getCategory());
