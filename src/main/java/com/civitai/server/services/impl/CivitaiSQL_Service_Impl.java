@@ -2493,4 +2493,157 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         throw new IllegalArgumentException("myRating must be between 0 and 20");
                 }
         }
+
+        // Keep these private helpers inside the service class
+        private boolean isBlank(String s) {
+                return s == null || s.trim().isEmpty();
+        }
+
+        private String requireValidJson(String raw, String fieldName) {
+                try {
+                        objectMapper.readTree(raw); // validate JSON
+                        return raw;
+                } catch (Exception e) {
+                        throw new IllegalArgumentException(fieldName + " must be valid JSON.");
+                }
+        }
+
+        /** Remove bidirectional links so Jackson won't recurse. */
+        private void trimCycles(FullModelRecordDTO dto) {
+                if (dto == null)
+                        return;
+                if (dto.getModel() != null) {
+                        dto.getModel().setModelsUrlsTable(null);
+                }
+                if (dto.getUrl() != null) {
+                        dto.getUrl().setModelsTableEntity(null);
+                }
+        }
+
+        @Override
+        @Transactional
+        public FullModelRecordDTO updateFullByModelAndVersion(FullModelRecordDTO incoming) {
+                String modelNumber = incoming.getModel().getModelNumber();
+                String versionNumber = incoming.getModel().getVersionNumber();
+
+                Models_Table_Entity model = models_Table_Repository
+                                .findByModelNumberAndVersionNumber(modelNumber, versionNumber)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "Target model not found by (modelNumber, versionNumber)."));
+
+                final int id = model.getId();
+
+                // -------- models_table (PATCH) --------
+                Models_Table_Entity patch = incoming.getModel();
+                if (patch != null) {
+                        if (patch.getName() != null)
+                                model.setName(patch.getName());
+                        if (patch.getMainModelName() != null)
+                                model.setMainModelName(patch.getMainModelName());
+
+                        // JSON columns: skip on blank, validate on non-blank
+                        if (patch.getTags() != null && !isBlank(patch.getTags()))
+                                model.setTags(requireValidJson(patch.getTags().trim(), "tags"));
+                        if (patch.getLocalTags() != null && !isBlank(patch.getLocalTags()))
+                                model.setLocalTags(requireValidJson(patch.getLocalTags().trim(), "localTags"));
+                        if (patch.getAliases() != null && !isBlank(patch.getAliases()))
+                                model.setAliases(requireValidJson(patch.getAliases().trim(), "aliases"));
+                        if (patch.getTriggerWords() != null && !isBlank(patch.getTriggerWords()))
+                                model.setTriggerWords(requireValidJson(patch.getTriggerWords().trim(), "triggerWords"));
+
+                        if (patch.getLocalPath() != null)
+                                model.setLocalPath(patch.getLocalPath());
+                        if (patch.getCategory() != null)
+                                model.setCategory(patch.getCategory());
+                        if (patch.getNsfw() != null)
+                                model.setNsfw(patch.getNsfw());
+                        if (patch.getUrlAccessable() != null)
+                                model.setUrlAccessable(patch.getUrlAccessable());
+                        if (patch.getFlag() != null)
+                                model.setFlag(patch.getFlag());
+                        if (patch.getMyRating() != null)
+                                model.setMyRating(patch.getMyRating());
+                }
+                models_Table_Repository.save(model);
+
+                // -------- models_descriptions_table (UPSERT if provided) --------
+                if (incoming.getDescription() != null) {
+                        Models_Descriptions_Table_Entity in = incoming.getDescription();
+                        Models_Descriptions_Table_Entity row = models_Descriptions_Table_Repository.findById(id)
+                                        .orElseGet(() -> {
+                                                var x = new Models_Descriptions_Table_Entity();
+                                                x.setId(id);
+                                                return x;
+                                        });
+                        if (in.getDescription() != null)
+                                row.setDescription(in.getDescription());
+                        models_Descriptions_Table_Repository.save(row);
+                }
+
+                // -------- models_urls_table (UPSERT if provided) --------
+                if (incoming.getUrl() != null) {
+                        Models_Urls_Table_Entity in = incoming.getUrl();
+                        Models_Urls_Table_Entity row = models_Urls_Table_Repository.findById(id)
+                                        .orElseGet(() -> {
+                                                var x = new Models_Urls_Table_Entity();
+                                                x.setId(id);
+                                                x.setModelsTableEntity(model);
+                                                return x;
+                                        });
+                        if (in.getUrl() != null)
+                                row.setUrl(in.getUrl());
+                        if (row.getModelsTableEntity() == null || row.getModelsTableEntity().getId() != id) {
+                                row.setModelsTableEntity(model);
+                        }
+                        models_Urls_Table_Repository.save(row);
+                }
+
+                // -------- models_details_table (UPSERT if provided) --------
+                if (incoming.getDetails() != null) {
+                        Models_Details_Table_Entity in = incoming.getDetails();
+                        Models_Details_Table_Entity row = models_Details_Table_Repository.findById(id)
+                                        .orElseGet(() -> {
+                                                var x = new Models_Details_Table_Entity();
+                                                x.setId(id);
+                                                return x;
+                                        });
+                        if (in.getType() != null)
+                                row.setType(in.getType());
+                        if (in.getStats() != null)
+                                row.setStats(in.getStats());
+                        if (in.getUploaded() != null)
+                                row.setUploaded(in.getUploaded());
+                        if (in.getBaseModel() != null)
+                                row.setBaseModel(in.getBaseModel());
+                        if (in.getHash() != null)
+                                row.setHash(in.getHash());
+                        if (in.getUsageTips() != null)
+                                row.setUsageTips(in.getUsageTips());
+                        if (in.getCreatorName() != null)
+                                row.setCreatorName(in.getCreatorName());
+                        models_Details_Table_Repository.save(row);
+                }
+
+                // -------- models_images_table (UPSERT if provided) --------
+                if (incoming.getImages() != null) {
+                        Models_Images_Table_Entity in = incoming.getImages();
+                        Models_Images_Table_Entity row = models_Images_Table_Repository.findById(id)
+                                        .orElseGet(() -> {
+                                                var x = new Models_Images_Table_Entity();
+                                                x.setId(id);
+                                                return x;
+                                        });
+                        if (in.getImageUrls() != null && !isBlank(in.getImageUrls())) {
+                                row.setImageUrls(requireValidJson(in.getImageUrls().trim(), "images.imageUrls"));
+                        }
+                        models_Images_Table_Repository.save(row);
+                }
+
+                // Reload & trim cycles before returning (no entity annotation changes)
+                FullModelRecordDTO out = findFullByModelAndVersion(model.getModelNumber(), model.getVersionNumber())
+                                .orElseThrow(() -> new IllegalStateException("Updated record could not be reloaded."));
+                trimCycles(out);
+                return out;
+        }
+
 }

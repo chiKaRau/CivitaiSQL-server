@@ -151,4 +151,11 @@ public interface CivitaiSQL_Service {
 
         Models_Table_Entity updateMyRatingByModelAndVersion(String modelNumber, String versionNumber, int rating);
 
+        /**
+         * Apply only non-null fields/sections; locate by dto.model.modelNumber +
+         * dto.model.versionNumber.
+         * Returns refreshed record after update.
+         */
+        FullModelRecordDTO updateFullByModelAndVersion(FullModelRecordDTO incoming);
+
 }

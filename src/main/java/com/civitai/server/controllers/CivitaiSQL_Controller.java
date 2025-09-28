@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -1667,6 +1668,34 @@ public class CivitaiSQL_Controller {
             return v != null ? Integer.parseInt(v.toString()) : null;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    /**
+     * PATCH-like update: apply only non-null fields/sections of FullModelRecordDTO.
+     * Target is located by dto.model.modelNumber + dto.model.versionNumber.
+     */
+    @PutMapping("/update-full-record-by-modelID-and-version")
+    public ResponseEntity<CustomResponse<FullModelRecordDTO>> updateFullRecord(
+            @RequestBody FullModelRecordDTO dto) {
+
+        if (dto == null || dto.getModel() == null ||
+                dto.getModel().getModelNumber() == null || dto.getModel().getModelNumber().isBlank() ||
+                dto.getModel().getVersionNumber() == null || dto.getModel().getVersionNumber().isBlank()) {
+
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse
+                            .failure("Invalid input: model.modelNumber and model.versionNumber are required."));
+        }
+
+        try {
+            FullModelRecordDTO updated = civitaiSQL_Service.updateFullByModelAndVersion(dto);
+            return ResponseEntity.ok(CustomResponse.success("Model update successful", updated));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure(ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError()
+                    .body(CustomResponse.failure("Update failed: " + ex.getMessage()));
         }
     }
 
