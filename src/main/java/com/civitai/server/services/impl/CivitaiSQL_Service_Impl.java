@@ -2220,78 +2220,78 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 log.info("[creator-url] INPUT >> url='{}', status='{}', lastChecked={}, rating='{}'",
                                 creatorUrl, status, lastChecked, rating);
 
-                try {
-                        if (Boolean.TRUE.equals(lastChecked)) {
-                                int cleared = creator_Table_Repository.clearLastCheckedForAll();
-                                log.info("[creator-url] cleared lastChecked=true on {} rows", cleared);
-                        }
+                // Per-URL lock: serialize read/modify/save for the same URL
+                synchronized (creatorUrl.intern()) {
+                        try {
+                                if (Boolean.TRUE.equals(lastChecked)) {
+                                        int cleared = creator_Table_Repository.clearLastCheckedForAll();
+                                        log.info("[creator-url] cleared lastChecked=true on {} rows", cleared);
+                                }
 
-                        var existing = creator_Table_Repository.findFirstByCivitaiUrl(creatorUrl);
-                        Creator_Table_Entity e = existing
-                                        .orElseGet(() -> Creator_Table_Entity.builder().civitaiUrl(creatorUrl).build());
+                                var existing = creator_Table_Repository.findFirstByCivitaiUrl(creatorUrl);
+                                Creator_Table_Entity e = existing
+                                                .orElseGet(() -> Creator_Table_Entity.builder().civitaiUrl(creatorUrl)
+                                                                .build());
 
-                        boolean changed = false;
+                                boolean changed = false;
 
-                        // 1) Status: update only if changed
-                        if (status != null) {
-                                String cur = e.getStatus();
-                                if (cur == null || !cur.equalsIgnoreCase(status)) {
-                                        log.info("[creator-url] status changed: '{}' -> '{}' (lastChecked={})",
-                                                        cur, status, lastChecked);
-                                        e.setStatus(status);
-                                        e.setLastChecked(lastChecked);
-                                        changed = true;
+                                // 1) Status: update only if changed
+                                if (status != null) {
+                                        String cur = e.getStatus();
+                                        if (cur == null || !cur.equalsIgnoreCase(status)) {
+                                                log.info("[creator-url] status changed: '{}' -> '{}' (lastChecked={})",
+                                                                cur, status, lastChecked);
+                                                e.setStatus(status);
+                                                e.setLastChecked(lastChecked);
+                                                changed = true;
+                                        } else {
+                                                log.info("[creator-url] status unchanged ('{}')", status);
+                                        }
+                                }
+
+                                // Always handle lastChecked true (and timestamp)
+                                if (Boolean.TRUE.equals(lastChecked)) {
+                                        e.setLastChecked(true);
+                                        e.setLastCheckedDate(LocalDateTime.now());
+                                        changed = true; // ensure we persist the timestamp
+                                }
+
+                                // 2) Rating rules
+                                if (rating != null) {
+                                        String curRating = e.getRating();
+                                        if ("N/A".equalsIgnoreCase(rating)) {
+                                                if (curRating == null || !"N/A".equalsIgnoreCase(curRating)) {
+                                                        log.info("[creator-url] rating changed: '{}' -> 'N/A'",
+                                                                        curRating);
+                                                        e.setRating("N/A");
+                                                        changed = true;
+                                                } else {
+                                                        log.info("[creator-url] rating already 'N/A' -> unchanged");
+                                                }
+                                        } else { // real rating
+                                                if (curRating == null || !curRating.equalsIgnoreCase(rating)) {
+                                                        log.info("[creator-url] rating changed: '{}' -> '{}'",
+                                                                        curRating, rating);
+                                                        e.setRating(rating);
+                                                        changed = true;
+                                                } else {
+                                                        log.info("[creator-url] rating unchanged ('{}')", rating);
+                                                }
+                                        }
+                                }
+
+                                if (changed || existing.isEmpty()) {
+                                        creator_Table_Repository.save(e);
+                                        log.info("[creator-url] SAVED id={} url='{}'", e.getId(), creatorUrl);
                                 } else {
-                                        log.info("[creator-url] status unchanged ('{}')", status);
+                                        log.info("[creator-url] NO CHANGE id={} url='{}' -> skip save", e.getId(),
+                                                        creatorUrl);
                                 }
-                        }
 
-                        // ✅ Always handle the lastChecked flag & timestamp when true,
-                        // regardless of whether status changed
-                        if (Boolean.TRUE.equals(lastChecked)) {
-                                e.setLastChecked(true);
-                                e.setLastCheckedDate(LocalDateTime.now());
-                                changed = true; // ensure we persist the timestamp
+                        } catch (Exception ex) {
+                                log.error("[creator-url] update failed for {}: {}", creatorUrl, ex.getMessage(), ex);
+                                throw new CustomException("Error updating creator URL list", ex);
                         }
-
-                        // 2) Rating:
-                        // - If incoming rating is "N/A", treat it as NO-OP (do not overwrite an
-                        // existing rating).
-                        // - Only set to "N/A" if there was no rating yet (null).
-                        // - If rating is a real value (EX/SSS/.../A/B/.../F), update when changed.
-                        if (rating != null) {
-                                String curRating = e.getRating();
-                                if ("N/A".equalsIgnoreCase(rating)) {
-                                        if (curRating == null) {
-                                                e.setRating("N/A");
-                                                changed = true;
-                                                log.info("[creator-url] rating set from <null> -> 'N/A'");
-                                        } else {
-                                                log.info("[creator-url] incoming 'N/A' -> keep existing rating '{}'",
-                                                                curRating);
-                                        }
-                                } else { // real rating
-                                        if (curRating == null || !curRating.equalsIgnoreCase(rating)) {
-                                                log.info("[creator-url] rating changed: '{}' -> '{}'", curRating,
-                                                                rating);
-                                                e.setRating(rating);
-                                                changed = true;
-                                        } else {
-                                                log.info("[creator-url] rating unchanged ('{}')", rating);
-                                        }
-                                }
-                        }
-
-                        if (changed || existing.isEmpty()) {
-                                creator_Table_Repository.save(e);
-                                log.info("[creator-url] SAVED id={} url='{}'", e.getId(), creatorUrl);
-                        } else {
-                                log.info("[creator-url] NO CHANGE id={} url='{}' -> skip save", e.getId(), creatorUrl);
-                        }
-
-                } catch (Exception ex) {
-                        log.error("[creator-url] update failed for {}: {}", creatorUrl, ex.getMessage(), ex);
-                        throw new CustomException("Error updating creator URL list", ex);
                 }
         }
 
