@@ -2256,26 +2256,23 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         changed = true; // ensure we persist the timestamp
                                 }
 
-                                // 2) Rating rules
                                 if (rating != null) {
                                         String curRating = e.getRating();
                                         if ("N/A".equalsIgnoreCase(rating)) {
-                                                if (curRating == null || !"N/A".equalsIgnoreCase(curRating)) {
-                                                        log.info("[creator-url] rating changed: '{}' -> 'N/A'",
-                                                                        curRating);
+                                                if (curRating == null) {
                                                         e.setRating("N/A");
                                                         changed = true;
+                                                        log.info("[creator-url] rating set from <null> -> 'N/A'");
                                                 } else {
-                                                        log.info("[creator-url] rating already 'N/A' -> unchanged");
+                                                        log.info("[creator-url] incoming 'N/A' -> keep existing rating '{}'",
+                                                                        curRating);
                                                 }
-                                        } else { // real rating
+                                        } else {
                                                 if (curRating == null || !curRating.equalsIgnoreCase(rating)) {
                                                         log.info("[creator-url] rating changed: '{}' -> '{}'",
                                                                         curRating, rating);
                                                         e.setRating(rating);
                                                         changed = true;
-                                                } else {
-                                                        log.info("[creator-url] rating unchanged ('{}')", rating);
                                                 }
                                         }
                                 }
