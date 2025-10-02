@@ -31,11 +31,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
+import com.civitai.server.models.dto.PageResponse;
 import com.civitai.server.models.dto.Tables_DTO;
+import com.civitai.server.models.dto.TagCountDTO;
+import com.civitai.server.models.dto.TopTagsRequest;
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
@@ -1265,6 +1269,27 @@ public class CivitaiSQL_Controller {
         } else {
             return ResponseEntity.ok().body(CustomResponse.failure("No offline downloads found"));
         }
+    }
+
+    @PostMapping("/get-top-tags")
+    public ResponseEntity<CustomResponse<PageResponse<TagCountDTO>>> getTopTags(@RequestBody TopTagsRequest req) {
+        var result = civitaiSQL_Service.get_top_tags_page(req);
+        return ResponseEntity.ok(CustomResponse.success("OK", result));
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping("/get_offline_download_list-in-page")
+    public ResponseEntity<CustomResponse<PageResponse<java.util.Map<String, Object>>>> getOfflineDownloadListInPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(defaultValue = "false") boolean filterEmptyBaseModel,
+            @RequestParam(name = "prefix", required = false) java.util.List<String> prefixes,
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "op", defaultValue = "contains") String op) {
+
+        var result = civitaiSQL_Service.get_offline_download_list_paged(
+                page, size, filterEmptyBaseModel, prefixes, search, op);
+        return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
 
     @SuppressWarnings("unchecked")

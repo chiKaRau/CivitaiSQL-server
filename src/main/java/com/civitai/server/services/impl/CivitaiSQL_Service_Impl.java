@@ -10,6 +10,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -19,6 +20,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
@@ -36,7 +38,10 @@ import com.civitai.server.exception.CustomDatabaseException;
 import com.civitai.server.exception.CustomException;
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
+import com.civitai.server.models.dto.PageResponse;
 import com.civitai.server.models.dto.Tables_DTO;
+import com.civitai.server.models.dto.TagCountDTO;
+import com.civitai.server.models.dto.TopTagsRequest;
 import com.civitai.server.models.entities.civitaiSQL.Creator_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Descriptions_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
@@ -66,6 +71,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Predicate;
+
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -2640,6 +2648,393 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 FullModelRecordDTO out = findFullByModelAndVersion(model.getModelNumber(), model.getVersionNumber())
                                 .orElseThrow(() -> new IllegalStateException("Updated record could not be reloaded."));
                 trimCycles(out);
+                return out;
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public PageResponse<Map<String, Object>> get_offline_download_list_paged(
+                        int page,
+                        int size,
+                        boolean filterEmptyBaseModel,
+                        List<String> prefixes,
+                        String search,
+                        String op) { // <-- onlyPending removed
+
+                final int p = Math.max(0, page);
+                final int s = Math.min(Math.max(1, size), 500);
+
+                var pageable = org.springframework.data.domain.PageRequest.of(
+                                p, s, org.springframework.data.domain.Sort.by("id").descending());
+
+                // short-circuit for “no prefixes selected”
+                if (prefixes != null && prefixes.size() == 1 && "__NONE__".equals(prefixes.get(0))) {
+                        var out = new PageResponse<Map<String, Object>>();
+                        out.content = java.util.List.of();
+                        out.page = p;
+                        out.size = s;
+                        out.totalElements = 0L;
+                        out.totalPages = 0;
+                        out.hasNext = false;
+                        out.hasPrevious = false;
+                        return out;
+                }
+
+                Specification<Models_Offline_Table_Entity> spec = (root, q, cb) -> {
+                        var ands = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+                        // 1) base model present (optional)
+                        if (filterEmptyBaseModel) {
+                                var base = root.get("civitaiBaseModel").as(String.class);
+                                ands.add(cb.and(cb.isNotNull(base), cb.notEqual(base, "")));
+                        }
+
+                        // 2) prefixes (case-insensitive; “Updates” is contains)
+                        if (prefixes != null && !prefixes.isEmpty()) {
+                                var pathExpr = root.get("downloadFilePath").as(String.class);
+                                ands.add(cb.isNotNull(pathExpr));
+                                var pathLower = cb.lower(pathExpr);
+
+                                var ors = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                                for (String pref : prefixes) {
+                                        if ("/@scan@/Update/".equalsIgnoreCase(pref)) {
+                                                ors.add(cb.like(pathLower, "%/@scan@/update/%"));
+                                        } else {
+                                                ors.add(cb.like(pathLower, pref.toLowerCase() + "%"));
+                                        }
+                                }
+                                if (!ors.isEmpty())
+                                        ands.add(cb.or(ors.toArray(jakarta.persistence.criteria.Predicate[]::new)));
+                        }
+
+                        // 3) text search with operator
+                        if (search != null && !search.isBlank()) {
+                                String sTerm = search.trim().toLowerCase();
+                                String opNorm = (op == null ? "contains" : op).toLowerCase();
+
+                                java.util.function.Function<jakarta.persistence.criteria.Expression<String>, jakarta.persistence.criteria.Predicate> pos = expr -> {
+                                        var v = cb.lower(cb.coalesce(expr, ""));
+                                        return switch (opNorm) {
+                                                case "equals" -> cb.equal(v, sTerm);
+                                                case "begins with" -> cb.like(v, sTerm + "%");
+                                                case "ends with" -> cb.like(v, "%" + sTerm);
+                                                default -> cb.like(v, "%" + sTerm + "%"); // contains
+                                        };
+                                };
+                                java.util.function.Function<jakarta.persistence.criteria.Expression<String>, jakarta.persistence.criteria.Predicate> neg = expr -> {
+                                        var v = cb.lower(cb.coalesce(expr, ""));
+                                        return switch (opNorm) {
+                                                case "does not equal" -> cb.notEqual(v, sTerm);
+                                                case "does not contain" -> cb.notLike(v, "%" + sTerm + "%");
+                                                default -> null;
+                                        };
+                                };
+
+                                var fields = java.util.List.of(
+                                                root.get("civitaiFileName").as(String.class),
+                                                root.get("civitaiUrl").as(String.class),
+                                                root.get("downloadFilePath").as(String.class),
+                                                root.get("selectedCategory").as(String.class),
+                                                root.get("civitaiModelID").as(String.class),
+                                                root.get("civitaiVersionID").as(String.class),
+                                                root.get("civitaiTags").as(String.class), // JSON text
+                                                root.get("modelVersionObject").as(String.class) // JSON text
+                                );
+
+                                boolean isNegative = "does not contain".equals(opNorm)
+                                                || "does not equal".equals(opNorm);
+                                var preds = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                                for (var f : fields) {
+                                        var pPred = isNegative ? neg.apply(f) : pos.apply(f);
+                                        if (pPred != null)
+                                                preds.add(pPred);
+                                }
+
+                                if (!preds.isEmpty()) {
+                                        ands.add(isNegative
+                                                        ? cb.and(preds.toArray(
+                                                                        jakarta.persistence.criteria.Predicate[]::new))
+                                                        : cb.or(preds.toArray(
+                                                                        jakarta.persistence.criteria.Predicate[]::new)));
+                                }
+                        }
+
+                        return ands.isEmpty() ? cb.conjunction()
+                                        : cb.and(ands.toArray(jakarta.persistence.criteria.Predicate[]::new));
+                };
+
+                var pageResult = models_Offline_Table_Repository.findAll(spec, pageable);
+
+                var mapped = new java.util.ArrayList<java.util.Map<String, Object>>(pageResult.getNumberOfElements());
+                for (var e : pageResult.getContent()) {
+                        var m = new java.util.HashMap<String, Object>();
+                        m.put("civitaiFileName", e.getCivitaiFileName());
+                        m.put("downloadFilePath", e.getDownloadFilePath());
+                        m.put("civitaiUrl", e.getCivitaiUrl());
+                        m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                        m.put("selectedCategory", e.getSelectedCategory());
+                        m.put("civitaiModelID",
+                                        e.getCivitaiModelID() == null ? null : String.valueOf(e.getCivitaiModelID()));
+                        m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
+                                        : String.valueOf(e.getCivitaiVersionID()));
+
+                        try {
+                                if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
+                                        m.put("civitaiModelFileList", objectMapper.readValue(
+                                                        e.getCivitaiModelFileList(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {
+                                                        }));
+                                } else
+                                        m.put("civitaiModelFileList", null);
+
+                                if (e.getModelVersionObject() != null && !e.getModelVersionObject().isBlank()) {
+                                        m.put("modelVersionObject", objectMapper.readValue(
+                                                        e.getModelVersionObject(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {
+                                                        }));
+                                } else
+                                        m.put("modelVersionObject", null);
+
+                                if (e.getCivitaiTags() != null && !e.getCivitaiTags().isBlank()) {
+                                        m.put("civitaiTags", objectMapper.readValue(
+                                                        e.getCivitaiTags(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                        }));
+                                } else
+                                        m.put("civitaiTags", null);
+
+                                if (e.getImageUrlsArray() != null && !e.getImageUrlsArray().isBlank()) {
+                                        var urls = objectMapper.readValue(
+                                                        e.getImageUrlsArray(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                        });
+                                        m.put("imageUrlsArray", urls.toArray(new String[0]));
+                                } else
+                                        m.put("imageUrlsArray", null);
+                        } catch (Exception ignore) {
+                        }
+
+                        mapped.add(m);
+                }
+
+                var out = new PageResponse<java.util.Map<String, Object>>();
+                out.content = mapped;
+                out.page = p;
+                out.size = s;
+                out.totalElements = pageResult.getTotalElements();
+                out.totalPages = pageResult.getTotalPages();
+                out.hasNext = pageResult.hasNext();
+                out.hasPrevious = pageResult.hasPrevious();
+                return out;
+        }
+
+        @Override
+        @org.springframework.transaction.annotation.Transactional(readOnly = true, rollbackFor = Exception.class)
+        public com.civitai.server.models.dto.PageResponse<com.civitai.server.models.dto.TagCountDTO> get_top_tags_page(
+                        com.civitai.server.models.dto.TopTagsRequest req) {
+
+                final int p = Math.max(0, req.getPage());
+                final int s = Math.min(Math.max(1, req.getSize()), 500);
+
+                // ---- JPA spec: PENDING rows only (+ optional search/op) ----
+                org.springframework.data.jpa.domain.Specification<com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity> spec = (
+                                root, q, cb) -> {
+                        java.util.List<jakarta.persistence.criteria.Predicate> ands = new java.util.ArrayList<>();
+
+                        // pending paths (case-insensitive)
+                        jakarta.persistence.criteria.Expression<String> pathExpr = cb
+                                        .lower(cb.coalesce(root.get("downloadFilePath"), ""));
+                        jakarta.persistence.criteria.Predicate p1 = cb.equal(pathExpr, "/@scan@/acg/pending");
+                        jakarta.persistence.criteria.Predicate p2 = cb.equal(pathExpr, "/@scan@/acg/pending/");
+                        ands.add(cb.or(p1, p2));
+
+                        // optional text search across multiple fields
+                        String search = req.getSearch();
+                        String op = (req.getOp() == null ? "contains" : req.getOp()).toLowerCase(java.util.Locale.ROOT);
+                        if (search != null && !search.isBlank()) {
+                                String sTerm = search.trim().toLowerCase(java.util.Locale.ROOT);
+
+                                java.util.List<jakarta.persistence.criteria.Expression<String>> fields = java.util.List
+                                                .of(
+                                                                root.get("civitaiFileName").as(String.class),
+                                                                root.get("civitaiUrl").as(String.class),
+                                                                root.get("downloadFilePath").as(String.class),
+                                                                root.get("selectedCategory").as(String.class),
+                                                                root.get("civitaiModelID").as(String.class),
+                                                                root.get("civitaiVersionID").as(String.class),
+                                                                root.get("civitaiTags").as(String.class), // JSON text
+                                                                root.get("modelVersionObject").as(String.class) // JSON
+                                                                                                                // text
+                                );
+
+                                java.util.function.Function<jakarta.persistence.criteria.Expression<String>, jakarta.persistence.criteria.Predicate> pos = expr -> {
+                                        var v = cb.lower(cb.coalesce(expr, ""));
+                                        return switch (op) {
+                                                case "equals" -> cb.equal(v, sTerm);
+                                                case "begins with" -> cb.like(v, sTerm + "%");
+                                                case "ends with" -> cb.like(v, "%" + sTerm);
+                                                default -> cb.like(v, "%" + sTerm + "%"); // contains
+                                        };
+                                };
+
+                                java.util.function.Function<jakarta.persistence.criteria.Expression<String>, jakarta.persistence.criteria.Predicate> neg = expr -> {
+                                        var v = cb.lower(cb.coalesce(expr, ""));
+                                        return switch (op) {
+                                                case "does not equal" -> cb.notEqual(v, sTerm);
+                                                case "does not contain" -> cb.notLike(v, "%" + sTerm + "%");
+                                                default -> null; // not applicable
+                                        };
+                                };
+
+                                boolean isNegative = "does not contain".equals(op) || "does not equal".equals(op);
+                                java.util.List<jakarta.persistence.criteria.Predicate> preds = new java.util.ArrayList<>();
+                                for (var f : fields) {
+                                        var pr = isNegative ? neg.apply(f) : pos.apply(f);
+                                        if (pr != null)
+                                                preds.add(pr);
+                                }
+                                if (!preds.isEmpty()) {
+                                        ands.add(isNegative
+                                                        ? cb.and(preds.toArray(
+                                                                        jakarta.persistence.criteria.Predicate[]::new))
+                                                        : cb.or(preds.toArray(
+                                                                        jakarta.persistence.criteria.Predicate[]::new)));
+                                }
+                        }
+
+                        return ands.isEmpty()
+                                        ? cb.conjunction()
+                                        : cb.and(ands.toArray(jakarta.persistence.criteria.Predicate[]::new));
+                };
+
+                java.util.List<com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity> rows = models_Offline_Table_Repository
+                                .findAll(spec);
+
+                // ---- counting tokens in-memory ----
+                final String source = java.util.Optional.ofNullable(req.getSource()).orElse("all")
+                                .toLowerCase(java.util.Locale.ROOT);
+                final java.util.Set<String> excluded = java.util.Optional.ofNullable(req.getExclude())
+                                .orElseGet(java.util.List::of)
+                                .stream().filter(java.util.Objects::nonNull)
+                                .map(s2 -> s2.toLowerCase(java.util.Locale.ROOT))
+                                .collect(java.util.stream.Collectors.toSet());
+                final int minLen = Math.max(0, req.getMinLen());
+                final boolean allowNumbers = req.isAllowNumbers();
+                final java.util.regex.Pattern splitter = java.util.regex.Pattern.compile("[^\\p{L}\\p{N}]+");
+
+                java.util.Map<String, Long> freq = new java.util.HashMap<>(4096);
+
+                for (var e : rows) {
+                        java.util.List<String> tokens = new java.util.ArrayList<>(16);
+
+                        // 1) tags (JSON array of strings)
+                        if ("all".equals(source) || "tags".equals(source) || "other".equals(source)) {
+                                String raw = e.getCivitaiTags();
+                                if (raw != null && !raw.isBlank()) {
+                                        try {
+                                                java.util.List<String> tags = objectMapper.readValue(
+                                                                raw,
+                                                                new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                                });
+                                                if (tags != null)
+                                                        tokens.addAll(tags);
+                                        } catch (Exception ignore) {
+                                        }
+                                }
+                        }
+
+                        // 2) fileName
+                        if ("all".equals(source) || "filename".equals(source) || "fileName".equals(source)
+                                        || "other".equals(source)) {
+                                String fn = e.getCivitaiFileName();
+                                if (fn != null && !fn.isBlank()) {
+                                        for (String t : splitter.split(fn)) {
+                                                if (!t.isBlank())
+                                                        tokens.add(t);
+                                        }
+                                }
+                        }
+
+                        // 3) titles: model.model.name (+ version name for "all"/"other")
+                        if ("all".equals(source) || "titles".equals(source) || "other".equals(source)) {
+                                String mvoRaw = e.getModelVersionObject();
+                                if (mvoRaw != null && !mvoRaw.isBlank()) {
+                                        try {
+                                                java.util.Map<String, Object> mvo = objectMapper.readValue(
+                                                                mvoRaw,
+                                                                new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {
+                                                                });
+
+                                                if ("all".equals(source) || "other".equals(source)) {
+                                                        Object verNameObj = mvo.get("name");
+                                                        String verName = verNameObj == null ? null
+                                                                        : String.valueOf(verNameObj);
+                                                        if (verName != null && !verName.isBlank()) {
+                                                                for (String t : splitter.split(verName)) {
+                                                                        if (!t.isBlank())
+                                                                                tokens.add(t);
+                                                                }
+                                                        }
+                                                }
+
+                                                Object modelObj = mvo.get("model");
+                                                if (modelObj instanceof java.util.Map<?, ?> mm) {
+                                                        Object modelNameObj = ((java.util.Map<?, ?>) mm).get("name");
+                                                        String modelName = modelNameObj == null ? null
+                                                                        : String.valueOf(modelNameObj);
+                                                        if (modelName != null && !modelName.isBlank()) {
+                                                                for (String t : splitter.split(modelName)) {
+                                                                        if (!t.isBlank())
+                                                                                tokens.add(t);
+                                                                }
+                                                        }
+                                                }
+                                        } catch (Exception ignore) {
+                                        }
+                                }
+                        }
+
+                        // normalize & count
+                        for (String raw : tokens) {
+                                String tag = raw.toLowerCase(java.util.Locale.ROOT).trim();
+                                if (tag.isEmpty())
+                                        continue;
+                                if (tag.length() < minLen)
+                                        continue;
+                                if (!allowNumbers && tag.chars().allMatch(Character::isDigit))
+                                        continue;
+                                if (excluded.contains(tag))
+                                        continue;
+                                freq.merge(tag, 1L, Long::sum);
+                        }
+                }
+
+                // ---- sort by count desc, then tag asc ----
+                java.util.List<java.util.Map.Entry<String, Long>> sorted = freq.entrySet()
+                                .stream()
+                                .sorted((a, b) -> {
+                                        int c = java.lang.Long.compare(b.getValue(), a.getValue());
+                                        return (c != 0) ? c : a.getKey().compareTo(b.getKey());
+                                })
+                                .toList();
+
+                // ---- paginate ----
+                int from = Math.min(p * s, sorted.size());
+                int to = Math.min(from + s, sorted.size());
+
+                java.util.List<com.civitai.server.models.dto.TagCountDTO> pageContent = sorted.subList(from, to)
+                                .stream()
+                                .map(e -> new com.civitai.server.models.dto.TagCountDTO(e.getKey(), e.getValue()))
+                                .toList();
+
+                com.civitai.server.models.dto.PageResponse<com.civitai.server.models.dto.TagCountDTO> out = new com.civitai.server.models.dto.PageResponse<>();
+                out.content = pageContent;
+                out.page = p;
+                out.size = s;
+                out.totalElements = (long) sorted.size();
+                out.totalPages = (int) Math.ceil(sorted.size() / (double) s);
+                out.hasNext = to < sorted.size();
+                out.hasPrevious = from > 0;
                 return out;
         }
 

@@ -12,8 +12,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface Models_Offline_Table_Repository
-                extends JpaRepository<Models_Offline_Table_Entity, Long> {
+public interface Models_Offline_Table_Repository extends
+                JpaRepository<Models_Offline_Table_Entity, Long>,
+                org.springframework.data.jpa.repository.JpaSpecificationExecutor<Models_Offline_Table_Entity> {
 
         Optional<Models_Offline_Table_Entity> findFirstByCivitaiModelIDAndCivitaiVersionID(
                         Long civitaiModelID, Long civitaiVersionID);

@@ -6,9 +6,14 @@ import java.util.Optional;
 
 import javax.swing.text.html.Option;
 
+import org.springframework.lang.Nullable;
+
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
+import com.civitai.server.models.dto.PageResponse;
 import com.civitai.server.models.dto.Tables_DTO;
+import com.civitai.server.models.dto.TagCountDTO;
+import com.civitai.server.models.dto.TopTagsRequest;
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
@@ -157,5 +162,11 @@ public interface CivitaiSQL_Service {
          * Returns refreshed record after update.
          */
         FullModelRecordDTO updateFullByModelAndVersion(FullModelRecordDTO incoming);
+
+        public PageResponse<Map<String, Object>> get_offline_download_list_paged(
+                        int page, int size, boolean filterEmptyBaseModel, List<String> prefixes,
+                        String search, String op);
+
+        PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
 
 }
