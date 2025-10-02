@@ -1285,10 +1285,35 @@ public class CivitaiSQL_Controller {
             @RequestParam(defaultValue = "false") boolean filterEmptyBaseModel,
             @RequestParam(name = "prefix", required = false) java.util.List<String> prefixes,
             @RequestParam(name = "search", required = false) String search,
-            @RequestParam(name = "op", defaultValue = "contains") String op) {
+            @RequestParam(name = "op", defaultValue = "contains") String op,
+            @RequestParam(name = "status", defaultValue = "both") String status // <- NEW
+    ) {
+
+        final int p = Math.max(0, page);
+        final int s = Math.min(Math.max(1, size), 500);
+
+        System.out.println("---- GET /get-offline-download-list-paged ----");
+        System.out.println("page = " + page + " (normalized=" + p + ")");
+        System.out.println("size = " + size + " (normalized=" + s + ")");
+        System.out.println("filterEmptyBaseModel = " + filterEmptyBaseModel);
+        System.out.println("op = " + op);
+        System.out.println("status = " + status);
+        System.out.println("search = " + (search == null ? "<null>" : ('"' + search + '"')));
+
+        if (prefixes == null) {
+            System.out.println("prefixes = <null>");
+        } else {
+            System.out.println("prefixes.size = " + prefixes.size());
+            int cap = Math.min(prefixes.size(), 20); // avoid dumping huge lists
+            System.out.println("prefixes(first " + cap + ") = " + prefixes.subList(0, cap));
+            if (prefixes.size() > cap) {
+                System.out.println("prefixes(remaining) = " + (prefixes.size() - cap) + " more …");
+            }
+        }
 
         var result = civitaiSQL_Service.get_offline_download_list_paged(
-                page, size, filterEmptyBaseModel, prefixes, search, op);
+                page, size, filterEmptyBaseModel, prefixes, search, op, status // <- pass through
+        );
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
 

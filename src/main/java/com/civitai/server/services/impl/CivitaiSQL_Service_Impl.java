@@ -2659,15 +2659,15 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         boolean filterEmptyBaseModel,
                         List<String> prefixes,
                         String search,
-                        String op) { // <-- onlyPending removed
-
+                        String op,
+                        String status) {
                 final int p = Math.max(0, page);
                 final int s = Math.min(Math.max(1, size), 500);
 
                 var pageable = org.springframework.data.domain.PageRequest.of(
                                 p, s, org.springframework.data.domain.Sort.by("id").descending());
 
-                // short-circuit for “no prefixes selected”
+                // Special “no results”
                 if (prefixes != null && prefixes.size() == 1 && "__NONE__".equals(prefixes.get(0))) {
                         var out = new PageResponse<Map<String, Object>>();
                         out.content = java.util.List.of();
@@ -2683,6 +2683,30 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 Specification<Models_Offline_Table_Entity> spec = (root, q, cb) -> {
                         var ands = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
 
+                        // Build path expr once; use coalesce("") so LIKE works even if null
+                        var pathExpr = root.get("downloadFilePath").as(String.class);
+                        var pathLower = cb.lower(cb.coalesce(pathExpr, ""));
+
+                        // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
+                        // (case-insensitive)
+                        // Also include backslash form in case you persist Windows-style paths.
+                        var pendingSlash = cb.like(pathLower, "/@scan@/acg/pending%");
+                        var pendingBack = cb.like(pathLower, "\\@scan\\@\\acg\\pending%");
+                        var isPending = cb.or(pendingSlash, pendingBack);
+
+                        // 0) status filter (pending / non-pending / both) – derived from path
+                        String statusNorm = (status == null ? "both" : status)
+                                        .toLowerCase(java.util.Locale.ROOT)
+                                        .replaceAll("[_\\s-]+", ""); // "non-pending" -> "nonpending"
+
+                        if ("pending".equals(statusNorm)) {
+                                ands.add(isPending);
+                        } else if ("nonpending".equals(statusNorm)) {
+                                // Exclude null paths from "non-pending" to avoid counting unknowns as
+                                // non-pending.
+                                ands.add(cb.and(cb.isNotNull(pathExpr), cb.not(isPending)));
+                        }
+
                         // 1) base model present (optional)
                         if (filterEmptyBaseModel) {
                                 var base = root.get("civitaiBaseModel").as(String.class);
@@ -2691,10 +2715,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         // 2) prefixes (case-insensitive; “Updates” is contains)
                         if (prefixes != null && !prefixes.isEmpty()) {
-                                var pathExpr = root.get("downloadFilePath").as(String.class);
-                                ands.add(cb.isNotNull(pathExpr));
-                                var pathLower = cb.lower(pathExpr);
-
                                 var ors = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
                                 for (String pref : prefixes) {
                                         if ("/@scan@/Update/".equalsIgnoreCase(pref)) {
@@ -2703,11 +2723,12 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 ors.add(cb.like(pathLower, pref.toLowerCase() + "%"));
                                         }
                                 }
-                                if (!ors.isEmpty())
+                                if (!ors.isEmpty()) {
                                         ands.add(cb.or(ors.toArray(jakarta.persistence.criteria.Predicate[]::new)));
+                                }
                         }
 
-                        // 3) text search with operator
+                        // 3) text search with operator (your code unchanged)
                         if (search != null && !search.isBlank()) {
                                 String sTerm = search.trim().toLowerCase();
                                 String opNorm = (op == null ? "contains" : op).toLowerCase();
@@ -2759,7 +2780,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 }
                         }
 
-                        return ands.isEmpty() ? cb.conjunction()
+                        return ands.isEmpty()
+                                        ? cb.conjunction()
                                         : cb.and(ands.toArray(jakarta.persistence.criteria.Predicate[]::new));
                 };
 
@@ -2777,7 +2799,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         e.getCivitaiModelID() == null ? null : String.valueOf(e.getCivitaiModelID()));
                         m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
                                         : String.valueOf(e.getCivitaiVersionID()));
-
                         try {
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
                                         m.put("civitaiModelFileList", objectMapper.readValue(
@@ -2813,7 +2834,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         m.put("imageUrlsArray", null);
                         } catch (Exception ignore) {
                         }
-
                         mapped.add(m);
                 }
 

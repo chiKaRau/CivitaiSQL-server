@@ -165,7 +165,7 @@ public interface CivitaiSQL_Service {
 
         public PageResponse<Map<String, Object>> get_offline_download_list_paged(
                         int page, int size, boolean filterEmptyBaseModel, List<String> prefixes,
-                        String search, String op);
+                        String search, String op, String status);
 
         PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
 
