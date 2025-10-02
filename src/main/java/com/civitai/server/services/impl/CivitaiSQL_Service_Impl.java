@@ -1785,7 +1785,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 try {
                         return (s == null || s.isBlank()) ? null : Long.parseLong(s.trim());
                 } catch (NumberFormatException ex) {
-                        log.warn("Failed to parse Long from '{}'", s);
+                        // log.warn("Failed to parse Long from '{}'", s);
                         return null;
                 }
         }
@@ -1854,10 +1854,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 // System.out.println("=== checkQuantityOfOfflineDownloadList() ===");
                 // System.out.println("civitaiModelID : " + civitaiModelID);
                 // System.out.println("============================================");
-
+                
                 Long modelId = parseLongOrNull(civitaiModelID);
                 if (modelId == null) {
-                        System.err.println("Invalid civitaiModelID (null/NaN). Returning 0.");
+                        // System.err.println("Invalid civitaiModelID (null/NaN). Returning 0.");
                         return 0L;
                 }
 
