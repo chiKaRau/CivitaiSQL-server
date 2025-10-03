@@ -1667,6 +1667,44 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true)
+        public PageResponse<Map<String, Object>> findVirtualFilesPaged(
+                        String path, int page, int size, String sortKey, String sortDir) {
+
+                String normalizedPath = (path.endsWith("\\") ? path.substring(0, path.length() - 1) : path);
+
+                int p = Math.max(0, page);
+                int s = Math.min(Math.max(1, size), 500);
+                int offset = p * s;
+
+                List<Models_Table_Entity> rows = models_Table_Repository
+                                .findVirtualFilesByPathPaged(normalizedPath, offset, s, sortKey,
+                                                "asc".equalsIgnoreCase(sortDir));
+
+                long total = models_Table_Repository.countVirtualFilesByPath(normalizedPath);
+
+                List<Map<String, Object>> content = new java.util.ArrayList<>(rows.size());
+                for (Models_Table_Entity entity : rows) {
+                        Map<String, Object> map = new java.util.HashMap<>();
+                        String lp = entity.getLocalPath();
+                        String drive = (lp != null && !lp.isEmpty()) ? lp.substring(0, 1) : "";
+                        map.put("drive", drive);
+                        map.put("model", convertToDTO(entity));
+                        content.add(map);
+                }
+
+                PageResponse<Map<String, Object>> out = new PageResponse<>();
+                out.content = content;
+                out.page = p;
+                out.size = s;
+                out.totalElements = total;
+                out.totalPages = (int) Math.ceil((double) total / (double) s);
+                out.hasPrevious = p > 0;
+                out.hasNext = (p + 1) < out.totalPages;
+                return out;
+        }
+
+        @Override
+        @Transactional(readOnly = true)
         public Optional<List<Map<String, String>>> findVirtualDirectoriesWithDrive(String path) {
                 List<Object[]> results = models_Table_Repository.findVirtualDirectoriesWithDrive(path);
                 if (results == null || results.isEmpty()) {
@@ -1854,7 +1892,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 // System.out.println("=== checkQuantityOfOfflineDownloadList() ===");
                 // System.out.println("civitaiModelID : " + civitaiModelID);
                 // System.out.println("============================================");
-                
+
                 Long modelId = parseLongOrNull(civitaiModelID);
                 if (modelId == null) {
                         // System.err.println("Invalid civitaiModelID (null/NaN). Returning 0.");

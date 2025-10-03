@@ -7,6 +7,8 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
 
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,6 +72,61 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         }
         query.where(cb.or(predicates.toArray(new Predicate[0])));
         return entityManager.createQuery(query).getResultList();
+    }
+
+    @Override
+    public List<Models_Table_Entity> findVirtualFilesByPathPaged(
+            String normalizedPath, int offset, int limit, String sortKey, boolean asc) {
+
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Models_Table_Entity> cq = cb.createQuery(Models_Table_Entity.class);
+        Root<Models_Table_Entity> root = cq.from(Models_Table_Entity.class);
+
+        Predicate pred = cb.like(root.get("localPath"), "%" + normalizedPath);
+        cq.where(pred);
+
+        List<Order> orders = new java.util.ArrayList<>();
+        String key = (sortKey == null ? "name" : sortKey).toLowerCase();
+        boolean dirAsc = asc;
+
+        switch (key) {
+            case "created":
+                orders.add(dirAsc ? cb.asc(root.get("createdAt")) : cb.desc(root.get("createdAt")));
+                break;
+            case "modified":
+                orders.add(dirAsc ? cb.asc(root.get("updatedAt")) : cb.desc(root.get("updatedAt")));
+                break;
+            case "myrating": {
+                // NULLS LAST
+                Expression<Integer> nullsLast = cb.<Integer>selectCase()
+                        .when(cb.isNull(root.get("myRating")), 1)
+                        .otherwise(0);
+                orders.add(cb.asc(nullsLast));
+                orders.add(dirAsc ? cb.asc(root.get("myRating")) : cb.desc(root.get("myRating")));
+                break;
+            }
+            case "name":
+            default:
+                orders.add(dirAsc ? cb.asc(root.get("name")) : cb.desc(root.get("name")));
+                break;
+        }
+        orders.add(dirAsc ? cb.asc(root.get("id")) : cb.desc(root.get("id"))); // tiebreaker
+        cq.orderBy(orders);
+
+        return entityManager.createQuery(cq)
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    @Override
+    public long countVirtualFilesByPath(String normalizedPath) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+        Root<Models_Table_Entity> root = cq.from(Models_Table_Entity.class);
+        cq.select(cb.count(root))
+                .where(cb.like(root.get("localPath"), "%" + normalizedPath));
+        return entityManager.createQuery(cq).getSingleResult();
     }
 
 }
