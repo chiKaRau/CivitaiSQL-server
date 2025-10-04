@@ -93,12 +93,15 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         List<Predicate> preds = new ArrayList<>();
         preds.add(pathPred);
 
-        // Text predicate (case-insensitive) on name / mainModelName
+        // Text predicate across FOUR columns: name, mainModelName, versionNumber,
+        // modelNumber
         if (q != null && !q.isBlank()) {
             String like = "%" + q.toLowerCase() + "%";
             Predicate byName = cb.like(cb.lower(root.get("name")), like);
             Predicate byMain = cb.like(cb.lower(root.get("mainModelName")), like);
-            preds.add(cb.or(byName, byMain));
+            Predicate byVersion = cb.like(cb.lower(root.get("versionNumber")), like);
+            Predicate byModelNumber = cb.like(cb.lower(root.get("modelNumber")), like);
+            preds.add(cb.or(byName, byMain, byVersion, byModelNumber));
         }
 
         cq.where(preds.toArray(new Predicate[0]));
