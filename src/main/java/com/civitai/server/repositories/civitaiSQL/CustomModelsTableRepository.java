@@ -9,9 +9,9 @@ public interface CustomModelsTableRepository {
 
     List<Models_Table_Entity> findByModelNumberAndVersionNumberIn(List<Object[]> pairs);
 
-    public List<Models_Table_Entity> findVirtualFilesByPathPaged(
-            String normalizedPath, int offset, int limit, String sortKey, boolean asc);
+    List<Models_Table_Entity> findVirtualFilesByPathPaged(
+            String normalizedPath, int offset, int limit, String sortKey, boolean asc, String q);
 
-    public long countVirtualFilesByPath(String normalizedPath);
+    long countVirtualFilesByPath(String normalizedPath, String q);
 
 }

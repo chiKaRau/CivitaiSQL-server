@@ -1665,22 +1665,25 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return Optional.of(result);
         }
 
+        // impl
         @Override
         @Transactional(readOnly = true)
         public PageResponse<Map<String, Object>> findVirtualFilesPaged(
-                        String path, int page, int size, String sortKey, String sortDir) {
+                        String path, int page, int size, String sortKey, String sortDir, String q) {
 
                 String normalizedPath = (path.endsWith("\\") ? path.substring(0, path.length() - 1) : path);
 
                 int p = Math.max(0, page);
                 int s = Math.min(Math.max(1, size), 500);
                 int offset = p * s;
+                boolean asc = "asc".equalsIgnoreCase(sortDir);
 
+                // fetch page (exact dir OR subtree when searching)
                 List<Models_Table_Entity> rows = models_Table_Repository
-                                .findVirtualFilesByPathPaged(normalizedPath, offset, s, sortKey,
-                                                "asc".equalsIgnoreCase(sortDir));
+                                .findVirtualFilesByPathPaged(normalizedPath, offset, s, sortKey, asc, q);
 
-                long total = models_Table_Repository.countVirtualFilesByPath(normalizedPath);
+                // total count must match the same predicates
+                long total = models_Table_Repository.countVirtualFilesByPath(normalizedPath, q);
 
                 List<Map<String, Object>> content = new java.util.ArrayList<>(rows.size());
                 for (Models_Table_Entity entity : rows) {

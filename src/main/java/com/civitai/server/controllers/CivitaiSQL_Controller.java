@@ -915,17 +915,29 @@ public class CivitaiSQL_Controller {
     @PostMapping("/find-virtual-files")
     public ResponseEntity<CustomResponse<PageResponse<Map<String, Object>>>> findVirtualFilesPaged(
             @RequestBody Map<String, Object> body) {
+
         String path = (String) body.get("path");
         if (path == null || path.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Provided path is empty or null"));
         }
+
         int page = body.get("page") != null ? ((Number) body.get("page")).intValue() : 0;
         int size = body.get("size") != null ? ((Number) body.get("size")).intValue() : 100;
         String sortKey = (String) body.getOrDefault("sortKey", "name");
         String sortDir = (String) body.getOrDefault("sortDir", "asc");
+        String q = (String) body.get("q"); // 👈 optional
+
+        // 🔍 Debug input
+        System.out.println("[POST /find-virtual-files] INPUT");
+        System.out.println("  path   = " + path);
+        System.out.println("  page   = " + page);
+        System.out.println("  size   = " + size);
+        System.out.println("  sortKey= " + sortKey);
+        System.out.println("  sortDir= " + sortDir);
+        System.out.println("  q      = " + (q == null ? "<null>" : ('"' + q + '"')));
 
         PageResponse<Map<String, Object>> resp = civitaiSQL_Service
-                .findVirtualFilesPaged(path, page, size, sortKey, sortDir);
+                .findVirtualFilesPaged(path, page, size, sortKey, sortDir, q); // 👈 pass q
 
         if (resp.content == null || resp.content.isEmpty()) {
             return ResponseEntity.ok(CustomResponse.failure("No virtual files found"));
