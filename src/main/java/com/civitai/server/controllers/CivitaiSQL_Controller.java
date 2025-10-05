@@ -939,6 +939,10 @@ public class CivitaiSQL_Controller {
         PageResponse<Map<String, Object>> resp = civitaiSQL_Service
                 .findVirtualFilesPaged(path, page, size, sortKey, sortDir, q); // 👈 pass q
 
+        System.out.println("[/find-virtual-files] OUT total=" + resp.totalElements
+                + " page=" + resp.page + " size=" + resp.size
+                + " returned=" + (resp.content == null ? 0 : resp.content.size()));
+
         if (resp.content == null || resp.content.isEmpty()) {
             return ResponseEntity.ok(CustomResponse.failure("No virtual files found"));
         }
