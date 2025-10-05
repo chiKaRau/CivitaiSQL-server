@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -15,6 +16,7 @@ import jakarta.persistence.criteria.Order;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.CustomModelsTableRepository;
 
@@ -68,41 +70,43 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
      * Parse q into (fielded tokens in order, remaining free text). Throws on
      * unknown field.
      */
+    // --- in parseQ(String q): sanitize first, and clean leftover at the end ---
     private static ParsedQ parseQ(String q) {
+        q = stripOuterQuotes(q); // <--- NEW
         if (q == null || q.isBlank()) {
             return new ParsedQ("", List.of());
         }
+
         Matcher m = FIELD_CLAUSE.matcher(q);
         List<FieldToken> tokens = new ArrayList<>();
         StringBuilder leftover = new StringBuilder(q);
-        int shift = 0; // track deletions so we can remove by original span
+        int shift = 0;
 
         while (m.find()) {
-            String field = m.group(1);
-            String v1 = m.group(2);
-            String v2 = m.group(3);
-            String v3 = m.group(4);
-            String raw = v1 != null ? v1 : v2 != null ? v2 : v3;
+            String fieldRaw = m.group(1);
+            String field = normalizeField(fieldRaw);
+            String v1 = m.group(2), v2 = m.group(3), v3 = m.group(4);
+            String raw = v1 != null ? v1 : (v2 != null ? v2 : v3);
 
-            if ("creator".equals(field)) {
-                // allowed, but not in ALLOWED_FIELDS because it uses a JOIN (see method)
-            } else if (!ALLOWED_FIELDS.containsKey(field)) {
-                throw new IllegalArgumentException("Unknown search field: " + field);
+            if (!ALLOWED_FIELDS.containsKey(field) && !DETAILS_FIELDS.contains(field)) {
+                throw new IllegalArgumentException("Unknown search field: " + fieldRaw);
             }
 
-            // unescape \" or \' inside quotes
             String val = raw.replace("\\\"", "\"").replace("\\'", "'");
-
             tokens.add(new FieldToken(field, val, m.start()));
 
-            // remove this span from the leftover
-            int start = m.start() - shift;
-            int end = m.end() - shift;
+            int start = m.start() - shift, end = m.end() - shift;
             leftover.replace(start, end, " ");
             shift += (m.end() - m.start());
         }
 
-        return new ParsedQ(leftover.toString().trim(), tokens);
+        // collapse quotes-only leftovers to empty
+        String rest = leftover.toString()
+                .replace("\"", " ").replace("'", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        return new ParsedQ(rest, tokens);
     }
 
     private static final class ParsedQ {
@@ -120,6 +124,136 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
     /** Case-insensitive LIKE: LOWER(expr) LIKE %val% */
     private static Predicate likeCi(CriteriaBuilder cb, Expression<String> expr, String valLower) {
         return cb.like(cb.lower(expr), "%" + valLower + "%");
+    }
+
+    /**
+     * LOWER(REPLACE(expr, '\', '/')) so we can do slash-agnostic LIKEs safely
+     * (MySQL-safe)
+     */
+    private static Expression<String> normPathExpr(CriteriaBuilder cb, Expression<String> pathExpr) {
+        // CHAR(92) = backslash in MySQL; avoids escaping hell
+        Expression<String> backslash = cb.function("CHAR", String.class, cb.literal(92));
+        Expression<String> fwd = cb.function("REPLACE", String.class, pathExpr, backslash, cb.literal("/"));
+        return cb.lower(fwd);
+    }
+
+    private static String normalizeNeedle(String raw) {
+        if (raw == null)
+            return "";
+        String s = raw.replace('\\', '/').toLowerCase();
+        // trim trailing slashes so "%/acg/appearance%" matches both ".../appearance"
+        // and ".../appearance/..."
+        while (s.endsWith("/"))
+            s = s.substring(0, s.length() - 1);
+        return s;
+    }
+
+    /** Fields that live in models_details_table */
+    private static final java.util.Set<String> DETAILS_FIELDS = java.util.Set.of(
+            "type", "baseModel", "creatorName");
+
+    /** Accept friendly aliases in q: base_model, creator_name, creator */
+    private static String normalizeField(String raw) {
+        if (raw == null)
+            return null;
+        switch (raw) {
+            case "base_model":
+                return "baseModel";
+            case "creator_name":
+            case "creator":
+                return "creatorName";
+            default:
+                return raw;
+        }
+    }
+
+    /**
+     * EXISTS (select 1 from models_details_table d where d._id = m._id and
+     * lower(d.field) like %val%)
+     */
+    /**
+     * m.id IN (select d.id from models_details_table d
+     * where d.id = m.id and lower(d.<field>) like %val%)
+     */
+    private static Predicate detailsLikeIn(CriteriaBuilder cb,
+            CriteriaQuery<?> parent,
+            Root<Models_Table_Entity> root,
+            String detailsField,
+            String valLower) {
+
+        Subquery<Integer> sq = parent.subquery(Integer.class);
+        Root<Models_Details_Table_Entity> d = sq.from(Models_Details_Table_Entity.class);
+
+        Expression<?> col = d.get(detailsField);
+        Expression<String> asString = (col.getJavaType() == String.class)
+                ? d.get(detailsField)
+                : cb.function("CAST", String.class, col);
+
+        sq.select(d.get("id"))
+                .where(
+                        cb.and(
+                                cb.equal(d.get("id"), root.get("id")), // link d._id = m._id
+                                cb.like(cb.lower(asString), "%" + valLower + "%") // filter on details field
+                        ));
+
+        return root.get("id").in(sq);
+    }
+
+    /**
+     * EXISTS (select 1
+     * from models_details_table d
+     * where d.id = m.id
+     * and lower(d.<field>) like %val%)
+     */
+    private static Predicate detailsLikeExists(
+            CriteriaBuilder cb,
+            CriteriaQuery<?> parent,
+            Root<Models_Table_Entity> root,
+            String detailsField,
+            String valLower) {
+
+        Subquery<Integer> sq = parent.subquery(Integer.class);
+        Root<Models_Details_Table_Entity> d = sq.from(Models_Details_Table_Entity.class);
+
+        Expression<?> col = d.get(detailsField);
+        Expression<String> asString = (col.getJavaType() == String.class)
+                ? d.get(detailsField)
+                : cb.function("CAST", String.class, col);
+
+        sq.select(cb.literal(1))
+                .where(
+                        cb.and(
+                                cb.equal(d.get("id"), root.get("id")), // link d._id = m._id
+                                cb.like(cb.lower(asString), "%" + valLower + "%") // filter on details field
+                        ));
+
+        return cb.exists(sq);
+    }
+
+    // --- add helpers near the top of the class ---
+
+    /** If q is wrapped in a single pair of quotes, remove them. */
+    private static String stripOuterQuotes(String s) {
+        if (s == null)
+            return null;
+        s = s.trim();
+        if ((s.length() >= 2) &&
+                ((s.startsWith("\"") && s.endsWith("\"")) || (s.startsWith("'") && s.endsWith("'")))) {
+            return s.substring(1, s.length() - 1).trim();
+        }
+        return s;
+    }
+
+    /** Is there any meaningful free text (at least one letter or digit)? */
+    private static boolean hasMeaningfulFreeText(String s) {
+        if (s == null)
+            return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isLetterOrDigit(c))
+                return true;
+        }
+        return false;
     }
 
     @Override
@@ -179,37 +313,23 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         CriteriaQuery<Models_Table_Entity> cq = cb.createQuery(Models_Table_Entity.class);
         Root<Models_Table_Entity> root = cq.from(Models_Table_Entity.class);
 
-        // --- Path predicate (same behavior as before) ---
-        Predicate pathPred = (q != null && !q.isBlank())
-                ? cb.like(root.get("localPath"), "%" + normalizedPath + "%") // subtree
-                : cb.like(root.get("localPath"), "%" + normalizedPath); // ends-with
-
+        // predicates list FIRST
         List<Predicate> preds = new ArrayList<>();
+
+        // normalize the DB column + needle
+        Expression<String> normLocal = normPathExpr(cb, root.get("localPath"));
+        String needle = normalizeNeedle(normalizedPath);
+
+        // path predicate
+        Predicate pathPred = (q != null && !q.isBlank())
+                ? cb.like(normLocal, "%" + needle + "%") // subtree when searching
+                : cb.like(normLocal, "%" + needle); // ends-with-ish
         preds.add(pathPred);
 
         // --- Parse fielded clauses out of q ---
         ParsedQ parsed = parseQ(q);
         String freeText = parsed.freeText;
         List<FieldToken> tokens = parsed.tokens;
-
-        // --- Optional JOIN for creator ---
-        // If you have a relation like:
-        // @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name="creator_id")
-        // private Creator_Table_Entity creator;
-        // then:
-        Join<Object, Object> creatorJoin = null;
-        boolean needsCreator = tokens.stream().anyMatch(t -> "creator".equals(t.field));
-        if (needsCreator) {
-            // 1) If you HAVE a JPA relation named "creator", use this:
-            // creatorJoin = root.join("creator", JoinType.LEFT);
-            //
-            // 2) If you DO NOT have a relation, but you added a simple column "creator",
-            // comment this out and handle via ALLOWED_FIELDS map in the loop below.
-            //
-            // If neither exists yet, this will throw at runtime; add one of the two options
-            // first.
-            creatorJoin = root.join("creator", JoinType.LEFT);
-        }
 
         // --- Build predicates for fielded tokens, in the order they appeared (order
         // doesn’t change filtering, but helps relevance scoring) ---
@@ -219,41 +339,33 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
 
         for (FieldToken t : tokens) {
             String valLower = t.value.toLowerCase();
-
             Predicate p;
-            if ("creator".equals(t.field)) {
-                // JOIN path (option 1). Change "name" to whatever the creator field is.
-                Expression<String> creatorName = creatorJoin.get("name");
-                p = likeCi(cb, creatorName, valLower);
 
-                // relevance: earlier tokens get bigger weight
-                Expression<Integer> bit = cb.<Integer>selectCase().when(p, weight).otherwise(0);
-                relevanceBits.add(bit);
+            if (DETAILS_FIELDS.contains(t.field)) {
+                // models_details_table via EXISTS
+                p = detailsLikeExists(cb, cq, root, t.field, valLower);
             } else {
+                // main-table column (existing behavior)
                 String path = ALLOWED_FIELDS.get(t.field);
                 Expression<?> column = root.get(path);
-
-                Expression<String> asString;
-                if (column.getJavaType() == String.class) {
-                    asString = root.get(path);
-                } else {
-                    // cast non-strings to string for LIKE (dialect-specific; this works on many
-                    // DBs)
-                    asString = cb.function("CAST", String.class, column);
-                }
+                Expression<String> asString = (column.getJavaType() == String.class)
+                        ? root.get(path)
+                        : cb.function("CAST", String.class, column);
                 p = likeCi(cb, asString, valLower);
-
-                Expression<Integer> bit = cb.<Integer>selectCase().when(p, weight).otherwise(0);
-                relevanceBits.add(bit);
             }
 
             preds.add(p);
-            weight--; // next token gets slightly less weight
+
+            // (optional) relevance scoring you already had
+            Expression<Integer> bit = cb.<Integer>selectCase().when(p, weight).otherwise(0);
+            relevanceBits.add(bit);
+            weight--;
         }
 
         // --- Free-text across your 4 columns (as before), if any text remains ---
+        // --- in findVirtualFilesByPathPaged(...) where you add free text ---
         Predicate freeTextOr = null;
-        if (freeText != null && !freeText.isBlank()) {
+        if (hasMeaningfulFreeText(freeText)) { // <--- changed condition
             String like = "%" + freeText.toLowerCase() + "%";
             Predicate byName = cb.like(cb.lower(root.get("name")), like);
             Predicate byMain = cb.like(cb.lower(root.get("mainModelName")), like);
@@ -263,7 +375,6 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
             freeTextOr = cb.or(byName, byMain, byVersion, byModelNumber);
             preds.add(freeTextOr);
 
-            // relevance bit for free text (weight 1)
             relevanceBits.add(cb.<Integer>selectCase().when(freeTextOr, 1).otherwise(0));
         }
 
@@ -322,13 +433,17 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         CriteriaQuery<Long> cq = cb.createQuery(Long.class);
         Root<Models_Table_Entity> root = cq.from(Models_Table_Entity.class);
 
-        // Path predicate (same rule as list): subtree when q present, ends-with when no
-        // q
-        Predicate pathPred = (q != null && !q.isBlank())
-                ? cb.like(root.get("localPath"), "%" + normalizedPath + "%")
-                : cb.like(root.get("localPath"), "%" + normalizedPath);
-
+        // predicates list FIRST
         List<Predicate> preds = new ArrayList<>();
+
+        // normalize the DB column + needle
+        Expression<String> normLocal = normPathExpr(cb, root.get("localPath"));
+        String needle = normalizeNeedle(normalizedPath);
+
+        // path predicate
+        Predicate pathPred = (q != null && !q.isBlank())
+                ? cb.like(normLocal, "%" + needle + "%") // subtree when searching
+                : cb.like(normLocal, "%" + needle); // ends-with-ish
         preds.add(pathPred);
 
         // Parse q into fielded tokens + free text (reuse the same parseQ used in list)
@@ -338,22 +453,23 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         for (FieldToken t : parsed.tokens) {
             String valLower = t.value.toLowerCase();
 
-            // NOTE: we only handle direct columns here (no creator join).
-            String path = ALLOWED_FIELDS.get(t.field);
-            if (path == null) {
-                throw new IllegalArgumentException("Unknown search field: " + t.field);
+            if (DETAILS_FIELDS.contains(t.field)) {
+                preds.add(detailsLikeExists(cb, cq, root, t.field, valLower));
+            } else {
+                String path = ALLOWED_FIELDS.get(t.field);
+                if (path == null) {
+                    throw new IllegalArgumentException("Unknown search field: " + t.field);
+                }
+                Expression<?> col = root.get(path);
+                Expression<String> asString = (col.getJavaType() == String.class)
+                        ? root.get(path)
+                        : cb.function("CAST", String.class, col);
+                preds.add(cb.like(cb.lower(asString), "%" + valLower + "%"));
             }
-
-            Expression<?> col = root.get(path);
-            Expression<String> asString = (col.getJavaType() == String.class)
-                    ? root.get(path)
-                    : cb.function("CAST", String.class, col);
-
-            preds.add(cb.like(cb.lower(asString), "%" + valLower + "%"));
         }
 
-        // Free-text across the 4 columns (same as list)
-        if (parsed.freeText != null && !parsed.freeText.isBlank()) {
+        // --- in countVirtualFilesByPath(...) the same free-text condition ---
+        if (hasMeaningfulFreeText(parsed.freeText)) { // <--- changed condition
             String like = "%" + parsed.freeText.toLowerCase() + "%";
             Predicate byName = cb.like(cb.lower(root.get("name")), like);
             Predicate byMain = cb.like(cb.lower(root.get("mainModelName")), like);
