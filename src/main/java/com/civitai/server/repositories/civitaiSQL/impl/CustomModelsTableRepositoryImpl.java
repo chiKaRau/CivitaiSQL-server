@@ -321,9 +321,11 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         String needle = normalizeNeedle(normalizedPath);
 
         // path predicate
-        Predicate pathPred = (q != null && !q.isBlank())
-                ? cb.like(normLocal, "%" + needle + "%") // subtree when searching
-                : cb.like(normLocal, "%" + needle); // ends-with-ish
+        // replace the whole pathPred block with this:
+        Predicate pathPred = cb.or(
+                cb.like(normLocal, "%" + needle), // exact dir: .../appearance
+                cb.like(normLocal, "%" + needle + "/")// exact dir w/ trailing slash: .../appearance/
+        );
         preds.add(pathPred);
 
         // --- Parse fielded clauses out of q ---
@@ -483,9 +485,11 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
         String needle = normalizeNeedle(normalizedPath);
 
         // path predicate
-        Predicate pathPred = (q != null && !q.isBlank())
-                ? cb.like(normLocal, "%" + needle + "%") // subtree when searching
-                : cb.like(normLocal, "%" + needle); // ends-with-ish
+        // replace the whole pathPred block with this:
+        Predicate pathPred = cb.or(
+                cb.like(normLocal, "%" + needle), // exact dir: .../appearance
+                cb.like(normLocal, "%" + needle + "/")// exact dir w/ trailing slash: .../appearance/
+        );
         preds.add(pathPred);
 
         // Parse q into fielded tokens + free text (reuse the same parseQ used in list)
