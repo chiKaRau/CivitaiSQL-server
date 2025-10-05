@@ -408,6 +408,48 @@ public class CustomModelsTableRepositoryImpl implements CustomModelsTableReposit
                 orders.add(asc ? cb.asc(root.get("myRating")) : cb.desc(root.get("myRating")));
                 break;
             }
+
+            case "modelnumber": {
+                // Put null/empty last
+                Predicate isNullOrEmpty = cb.or(
+                        cb.isNull(root.get("modelNumber")),
+                        cb.equal(cb.trim(root.get("modelNumber")), ""));
+                Expression<Integer> nullsLast = cb.<Integer>selectCase()
+                        .when(isNullOrEmpty, 1).otherwise(0);
+                orders.add(cb.asc(nullsLast));
+
+                // Prefer a numeric cast for correct numeric ordering
+                // Most Hibernate+MySQL setups will emit CAST(model_number AS integer)
+                Expression<Integer> modelNumAsInt = root.get("modelNumber").as(Integer.class);
+                orders.add(asc ? cb.asc(modelNumAsInt) : cb.desc(modelNumAsInt));
+
+                // (Optional) stable fallback if your dialect can’t cast:
+                // orders.add(asc ? cb.asc(cb.length(root.get("modelNumber"))) :
+                // cb.desc(cb.length(root.get("modelNumber"))));
+                // orders.add(asc ? cb.asc(root.get("modelNumber")) :
+                // cb.desc(root.get("modelNumber")));
+                break;
+            }
+
+            case "versionnumber": {
+                Predicate isNullOrEmpty = cb.or(
+                        cb.isNull(root.get("versionNumber")),
+                        cb.equal(cb.trim(root.get("versionNumber")), ""));
+                Expression<Integer> nullsLast = cb.<Integer>selectCase()
+                        .when(isNullOrEmpty, 1).otherwise(0);
+                orders.add(cb.asc(nullsLast));
+
+                Expression<Integer> versionNumAsInt = root.get("versionNumber").as(Integer.class);
+                orders.add(asc ? cb.asc(versionNumAsInt) : cb.desc(versionNumAsInt));
+
+                // (Optional) fallback as above if needed
+                // orders.add(asc ? cb.asc(cb.length(root.get("versionNumber"))) :
+                // cb.desc(cb.length(root.get("versionNumber"))));
+                // orders.add(asc ? cb.asc(root.get("versionNumber")) :
+                // cb.desc(root.get("versionNumber")));
+                break;
+            }
+
             case "relevance":
                 // already added above; also add id tiebreaker below
                 break;
