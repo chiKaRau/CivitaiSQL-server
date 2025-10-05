@@ -1,6 +1,7 @@
 package com.civitai.server.services.impl;
 
 import java.net.URI;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -1708,22 +1709,52 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true)
-        public Optional<List<Map<String, String>>> findVirtualDirectoriesWithDrive(String path) {
-                List<Object[]> results = models_Table_Repository.findVirtualDirectoriesWithDrive(path);
-                if (results == null || results.isEmpty()) {
-                        return Optional.empty();
+        public List<Map<String, Object>> findVirtualDirectoriesWithDrive(String path, String sortKey, String sortDir) {
+                // ensure trailing backslash to avoid partial matches like "\ACG\A" matching
+                // "\ACG\AAA"
+                String p = path.endsWith("\\") ? path : path + "\\";
+
+                List<Object[]> rows = models_Table_Repository.findVirtualDirectoriesAgg(p);
+                // rows: drive, directory, file_count, dir_created_at, dir_modified_at,
+                // dir_rating_avg, dir_rating_max
+
+                List<Map<String, Object>> out = new ArrayList<>(rows.size());
+                for (Object[] r : rows) {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("drive", r[0]);
+                        m.put("directory", r[1]);
+                        m.put("fileCount", r[2]);
+                        m.put("dirCreatedAt", r[3]); // Timestamp (MIN created_at)
+                        m.put("dirModifiedAt", r[4]); // Timestamp (MAX updated_at)
+                        m.put("dirRatingAvg", r[5]); // Double
+                        m.put("dirRatingMax", r[6]); // Integer
+                        out.add(m);
                 }
 
-                List<Map<String, String>> directories = new ArrayList<>();
-                for (Object[] row : results) {
-                        Map<String, String> map = new HashMap<>();
-                        // Expecting row[0] is drive, row[1] is directory
-                        map.put("drive", row[0] != null ? row[0].toString() : "");
-                        map.put("directory", row[1] != null ? row[1].toString() : "");
-                        directories.add(map);
+                // sort in Java (simpler & safe)
+                Comparator<Map<String, Object>> cmp;
+                switch (sortKey) {
+                        case "created":
+                                cmp = Comparator.comparing(m -> (Timestamp) m.get("dirCreatedAt"),
+                                                Comparator.nullsFirst(Comparator.naturalOrder()));
+                                break;
+                        case "modified":
+                                cmp = Comparator.comparing(m -> (Timestamp) m.get("dirModifiedAt"),
+                                                Comparator.nullsFirst(Comparator.naturalOrder()));
+                                break;
+                        case "myRating":
+                                // choose avg or max; here avg
+                                cmp = Comparator.comparing(m -> (Number) m.get("dirRatingAvg"),
+                                                Comparator.nullsFirst(Comparator.comparingDouble(Number::doubleValue)));
+                                break;
+                        default: // name
+                                cmp = Comparator.comparing(m -> String.valueOf(m.get("directory")),
+                                                (a, b) -> a.compareToIgnoreCase(b)); // simple alpha; swap for “natural”
+                                                                                     // if you prefer
                 }
+                out.sort("desc".equalsIgnoreCase(sortDir) ? cmp.reversed() : cmp);
 
-                return Optional.of(directories);
+                return out;
         }
 
         @Override

@@ -950,22 +950,24 @@ public class CivitaiSQL_Controller {
     }
 
     @PostMapping("/find-virtual-directories")
-    public ResponseEntity<CustomResponse<List<Map<String, String>>>> findVirtualDirectories(
-            @RequestBody Map<String, String> requestBody) {
+    public ResponseEntity<CustomResponse<List<Map<String, Object>>>> findVirtualDirectories(
+            @RequestBody Map<String, Object> body) {
 
-        String path = requestBody.get("path");
+        String path = (String) body.get("path");
         if (path == null || path.trim().isEmpty()) {
             return ResponseEntity.badRequest()
                     .body(CustomResponse.failure("Provided path is empty or null"));
         }
 
-        Optional<List<Map<String, String>>> directoriesOptional = civitaiSQL_Service
-                .findVirtualDirectoriesWithDrive(path);
+        // optional; default to "name"/"asc"
+        String sortKey = String.valueOf(body.getOrDefault("sortKey", "name"));
+        String sortDir = String.valueOf(body.getOrDefault("sortDir", "asc"));
 
-        return directoriesOptional
-                .map(dirs -> ResponseEntity
-                        .ok(CustomResponse.success("Virtual directories retrieved successfully", dirs)))
-                .orElseGet(() -> ResponseEntity.ok(CustomResponse.failure("No virtual directories found")));
+        var dirs = civitaiSQL_Service.findVirtualDirectoriesWithDrive(path, sortKey, sortDir);
+        if (dirs.isEmpty()) {
+            return ResponseEntity.ok(CustomResponse.failure("No virtual directories found"));
+        }
+        return ResponseEntity.ok(CustomResponse.success("Virtual directories retrieved successfully", dirs));
     }
 
     @SuppressWarnings("unchecked")

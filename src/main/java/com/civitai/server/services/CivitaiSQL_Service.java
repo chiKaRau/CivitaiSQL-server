@@ -107,7 +107,7 @@ public interface CivitaiSQL_Service {
         PageResponse<Map<String, Object>> findVirtualFilesPaged(
                         String path, int page, int size, String sortKey, String sortDir, String q);
 
-        public Optional<List<Map<String, String>>> findVirtualDirectoriesWithDrive(String path);
+        public List<Map<String, Object>> findVirtualDirectoriesWithDrive(String path, String sortKey, String sortDir);
 
         public void update_offline_download_list(
                         String civitaiFileName,
