@@ -1047,6 +1047,45 @@ public class CivitaiSQL_Controller {
                     }
                 }
 
+                // --- EARLY ACCESS PATCH: add earlyAccessEndsAt next to availability ---
+                Object availabilityVal = modelVersionObject.get("availability");
+                String availability = availabilityVal != null ? String.valueOf(availabilityVal) : null;
+
+                if ("EarlyAccess".equalsIgnoreCase(availability)) {
+                    try {
+                        // Build the endpoint for the version details
+                        String versionUrl = "https://civitai.com/api/v1/model-versions/" + civitaiVersionID;
+
+                        // A tiny RestTemplate with short timeouts so it won't hang your whole request
+                        org.springframework.http.client.SimpleClientHttpRequestFactory rf = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+                        rf.setConnectTimeout(4000);
+                        rf.setReadTimeout(4000);
+
+                        org.springframework.web.client.RestTemplate rt = new org.springframework.web.client.RestTemplate(
+                                rf);
+
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> versionPayload = rt.getForObject(versionUrl, Map.class);
+
+                        if (versionPayload != null && versionPayload.get("earlyAccessEndsAt") != null) {
+                            // Add as a sibling of "availability"
+                            modelVersionObject.put("earlyAccessEndsAt", versionPayload.get("earlyAccessEndsAt"));
+                        } else {
+                            // If you prefer always having the key present for EA, keep null; else skip this
+                            // put.
+                            modelVersionObject.put("earlyAccessEndsAt", null);
+                        }
+                    } catch (Exception eaEx) {
+                        // Don't fail the whole flow just because this call failed; log and continue
+                        System.err.println("Failed to fetch earlyAccessEndsAt for version " + civitaiVersionID
+                                + ": " + eaEx.getMessage());
+                        // Optional: still add the key so downstream knows it's EarlyAccess but unknown
+                        // end date
+                        modelVersionObject.put("earlyAccessEndsAt", null);
+                    }
+                }
+                // --- END EARLY ACCESS PATCH ---
+
                 // Build compact model summary from the top-level model
                 Map<String, Object> modelSummary = new java.util.LinkedHashMap<>();
                 modelSummary.put("id", fetchedModel.get("id")); // optional, handy later
