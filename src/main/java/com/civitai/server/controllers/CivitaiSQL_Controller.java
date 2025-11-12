@@ -970,6 +970,12 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok(CustomResponse.success("Virtual directories retrieved successfully", dirs));
     }
 
+    //TODO
+    //add update hold (offline window mode)
+
+    //add update pioirty (offline window mode)
+
+    //TODO add hold and priorty when window mode
     @SuppressWarnings("unchecked")
     @PostMapping("/add-offline-download-file-into-offline-download-list")
     public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadList(

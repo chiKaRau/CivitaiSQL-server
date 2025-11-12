@@ -40,4 +40,8 @@ public interface Models_Offline_Table_Repository extends
         // assumes your entity field is named "id" and mapped to column `_id`
         List<Models_Offline_Table_Entity> findAllByIsErrorTrueOrderByIdAsc();
 
+        // in Models_Offline_Table_Repository
+        org.springframework.data.domain.Page<Models_Offline_Table_Entity> findByEarlyAccessEndsAtIsNull(
+                        org.springframework.data.domain.Pageable pageable);
+
 }

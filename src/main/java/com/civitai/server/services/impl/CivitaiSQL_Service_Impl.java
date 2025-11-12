@@ -1795,6 +1795,36 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 Long modelId = parseLongOrNull(civitaiModelID);
                 Long versionId = parseLongOrNull(civitaiVersionID);
 
+                // inside update_offline_download_list(...) — right after you parse
+                // modelId/versionId
+                java.time.LocalDateTime earlyAccessEndsAt = null;
+                try {
+                        Object ea = (modelVersionObject != null) ? modelVersionObject.get("earlyAccessEndsAt") : null;
+                        if (ea != null) {
+                                String iso = String.valueOf(ea).trim();
+                                if (!iso.isEmpty() && !"null".equalsIgnoreCase(iso)) {
+                                        try {
+                                                earlyAccessEndsAt = java.time.OffsetDateTime.parse(iso)
+                                                                .toLocalDateTime();
+                                        } catch (Exception p1) {
+                                                try {
+                                                        earlyAccessEndsAt = java.time.LocalDateTime.parse(iso);
+                                                } catch (Exception p2) {
+                                                        if (iso.length() >= 19) {
+                                                                try {
+                                                                        earlyAccessEndsAt = java.time.LocalDateTime
+                                                                                        .parse(iso.substring(0, 19));
+                                                                } catch (Exception ignore) {
+                                                                }
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
+                } catch (Exception ignore) {
+                        /* leave as null if unparsable */
+                }
+
                 // (optional) quick param dump
                 System.out.println("=== update_offline_download_list() ===");
                 System.out.println("modelId=" + modelId + ", versionId=" + versionId +
@@ -1822,6 +1852,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         e.setModelVersionObject(toJsonOrNull(modelVersionObject));
                                         e.setImageUrlsArray(toJsonOrNull(imageUrlsArray));
                                         e.setCivitaiTags(toJsonOrNull(civitaiTags));
+                                        e.setEarlyAccessEndsAt(earlyAccessEndsAt);
                                         models_Offline_Table_Repository.save(e);
                                 }
                                 // not modify mode -> no-op if exists
@@ -1842,6 +1873,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         .modelVersionObject(toJsonOrNull(modelVersionObject))
                                         .imageUrlsArray(toJsonOrNull(imageUrlsArray))
                                         .civitaiTags(toJsonOrNull(civitaiTags))
+                                        .earlyAccessEndsAt(earlyAccessEndsAt)
                                         .build();
                         models_Offline_Table_Repository.save(e);
 

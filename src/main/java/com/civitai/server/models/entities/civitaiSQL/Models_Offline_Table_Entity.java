@@ -55,4 +55,22 @@ public class Models_Offline_Table_Entity {
 
     @Column(name = "is_error", columnDefinition = "TINYINT(1)")
     private Boolean isError;
+
+    @Column(name = "hold", nullable = false, columnDefinition = "TINYINT(1)")
+    @Builder.Default
+    private boolean hold = false;
+
+    @Column(name = "download_priority", nullable = false, columnDefinition = "TINYINT UNSIGNED")
+    @Builder.Default
+    private int downloadPriority = 10;
+
+    @Column(name = "early_access_ends_at")
+    private LocalDateTime earlyAccessEndsAt;
+
+    @PrePersist
+    void clampDefaults() {
+        if (downloadPriority < 1 || downloadPriority > 10)
+            downloadPriority = 10;
+    }
+
 }
