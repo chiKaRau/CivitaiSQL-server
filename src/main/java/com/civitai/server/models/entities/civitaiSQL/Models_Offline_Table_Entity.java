@@ -58,7 +58,7 @@ public class Models_Offline_Table_Entity {
 
     @Column(name = "hold", nullable = false, columnDefinition = "TINYINT(1)")
     @Builder.Default
-    private boolean hold = false;
+    private Boolean hold = false;
 
     @Column(name = "download_priority", nullable = false, columnDefinition = "TINYINT UNSIGNED")
     @Builder.Default

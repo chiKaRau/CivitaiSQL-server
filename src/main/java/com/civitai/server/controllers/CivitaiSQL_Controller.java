@@ -970,12 +970,12 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok(CustomResponse.success("Virtual directories retrieved successfully", dirs));
     }
 
-    //TODO
-    //add update hold (offline window mode)
+    // TODO
+    // add update hold (offline window mode)
 
-    //add update pioirty (offline window mode)
+    // add update pioirty (offline window mode)
 
-    //TODO add hold and priorty when window mode
+    // TODO add hold and priorty when window mode
     @SuppressWarnings("unchecked")
     @PostMapping("/add-offline-download-file-into-offline-download-list")
     public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadList(
@@ -1814,6 +1814,69 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.internalServerError()
                     .body(CustomResponse.failure("Update failed: " + ex.getMessage()));
         }
+    }
+
+    @PostMapping(path = "/update-hold-from-offline-download_list")
+    public ResponseEntity<CustomResponse<String>> UpdateHoldFromOfflineDownloadList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelNumber = requestBody.get("modelNumber") != null ? requestBody.get("modelNumber").toString() : null;
+        String versionNumber = requestBody.get("versionNumber") != null ? requestBody.get("versionNumber").toString()
+                : null;
+        Object holdObj = requestBody.get("hold");
+
+        if (modelNumber == null || modelNumber.isBlank() || versionNumber == null || versionNumber.isBlank()
+                || holdObj == null) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: modelNumber, versionNumber and hold are required"));
+        }
+
+        boolean hold = (holdObj instanceof Boolean)
+                ? (Boolean) holdObj
+                : Boolean.parseBoolean(holdObj.toString());
+
+        boolean updated = civitaiSQL_Service.update_hold_from_offline_download_list(modelNumber, versionNumber, hold);
+        if (!updated) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                    .body(CustomResponse.failure("Record not found or IDs invalid"));
+        }
+        return ResponseEntity.ok(CustomResponse.success("Hold updated"));
+    }
+
+    @PostMapping(path = "/update-download-priority-from-offline-download_list")
+    public ResponseEntity<CustomResponse<String>> UpdateDownloadPriorityFromOfflineDownloadList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelNumber = requestBody.get("modelNumber") != null ? requestBody.get("modelNumber").toString() : null;
+        String versionNumber = requestBody.get("versionNumber") != null ? requestBody.get("versionNumber").toString()
+                : null;
+        Object priorityObj = requestBody.get("downloadPriority");
+
+        if (modelNumber == null || modelNumber.isBlank() || versionNumber == null || versionNumber.isBlank()
+                || priorityObj == null) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse
+                            .failure("Invalid input: modelNumber, versionNumber and downloadPriority are required"));
+        }
+
+        int requestedPriority;
+        try {
+            requestedPriority = (priorityObj instanceof Number)
+                    ? ((Number) priorityObj).intValue()
+                    : Integer.parseInt(priorityObj.toString());
+        } catch (NumberFormatException nfe) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("downloadPriority must be an integer"));
+        }
+
+        boolean updated = civitaiSQL_Service.update_download_priority_from_offline_download_list(
+                modelNumber, versionNumber, requestedPriority);
+
+        if (!updated) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                    .body(CustomResponse.failure("Record not found or IDs invalid"));
+        }
+        return ResponseEntity.ok(CustomResponse.success("Download priority updated"));
     }
 
 }

@@ -2005,6 +2005,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
                                                 : String.valueOf(e.getCivitaiVersionID()));
 
+                                m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
+                                m.put("downloadPriority", e.getDownloadPriority());
+                                m.put("hold", e.getHold());
+
                                 // parse JSON columns (DB stores valid JSON; null-safe here)
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
                                         m.put("civitaiModelFileList", objectMapper.readValue(
@@ -2097,6 +2101,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 : String.valueOf(e.getCivitaiModelID()));
                                 m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
                                                 : String.valueOf(e.getCivitaiVersionID()));
+                                m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
+                                m.put("downloadPriority", e.getDownloadPriority());
+                                m.put("hold", e.getHold());
 
                                 // parse JSON columns inline
                                 List<Map<String, Object>> fileList = null;
@@ -3160,6 +3167,56 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 out.hasNext = to < sorted.size();
                 out.hasPrevious = from > 0;
                 return out;
+        }
+
+        @Override
+        public boolean update_hold_from_offline_download_list(String civitaiModelID, String civitaiVersionID,
+                        boolean hold) {
+                if (civitaiModelID == null || civitaiVersionID == null)
+                        return false;
+                Long modelId, versionId;
+                try {
+                        modelId = Long.valueOf(civitaiModelID.trim());
+                        versionId = Long.valueOf(civitaiVersionID.trim());
+                } catch (NumberFormatException e) {
+                        return false;
+                }
+
+                var opt = models_Offline_Table_Repository
+                                .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, versionId);
+                if (opt.isEmpty())
+                        return false;
+
+                var e = opt.get();
+                e.setHold(hold);
+                models_Offline_Table_Repository.save(e);
+                return true;
+        }
+
+        @Override
+        public boolean update_download_priority_from_offline_download_list(String civitaiModelID,
+                        String civitaiVersionID, int downloadPriority) {
+                if (civitaiModelID == null || civitaiVersionID == null)
+                        return false;
+                Long modelId, versionId;
+                try {
+                        modelId = Long.valueOf(civitaiModelID.trim());
+                        versionId = Long.valueOf(civitaiVersionID.trim());
+                } catch (NumberFormatException e) {
+                        return false;
+                }
+
+                int clamped = Math.max(1, Math.min(10, downloadPriority));
+
+                var opt = models_Offline_Table_Repository
+                                .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, versionId);
+                if (opt.isEmpty())
+                        return false;
+
+                var e = opt.get();
+                e.setDownloadPriority(clamped);
+                models_Offline_Table_Repository.save(e);
+                return true;
         }
 
 }

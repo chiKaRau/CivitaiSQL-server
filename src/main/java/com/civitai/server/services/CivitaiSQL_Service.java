@@ -173,4 +173,10 @@ public interface CivitaiSQL_Service {
 
         PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
 
+        public boolean update_hold_from_offline_download_list(String civitaiModelID, String civitaiVersionID,
+                        boolean hold);
+
+        public boolean update_download_priority_from_offline_download_list(String civitaiModelID,
+                        String civitaiVersionID, int downloadPriority);
+
 }
