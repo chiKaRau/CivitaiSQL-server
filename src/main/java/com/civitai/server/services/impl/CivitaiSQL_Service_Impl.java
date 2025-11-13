@@ -2910,6 +2910,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         e.getCivitaiModelID() == null ? null : String.valueOf(e.getCivitaiModelID()));
                         m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
                                         : String.valueOf(e.getCivitaiVersionID()));
+                        m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
+                        m.put("downloadPriority", e.getDownloadPriority());
+                        m.put("hold", e.getHold());
                         try {
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
                                         m.put("civitaiModelFileList", objectMapper.readValue(
