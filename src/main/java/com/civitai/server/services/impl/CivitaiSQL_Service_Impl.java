@@ -3000,6 +3000,92 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public java.util.List<java.util.Map<String, Object>> get_offline_download_list_hold() {
+                var entities = models_Offline_Table_Repository
+                                .findAllByHoldTrueOrderByDownloadPriorityDescIdDesc();
+
+                var out = new java.util.ArrayList<java.util.Map<String, Object>>(entities.size());
+                for (var e : entities) {
+                        out.add(mapOfflineEntity(e));
+                }
+                return out;
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public java.util.List<java.util.Map<String, Object>> get_offline_download_list_early_access_active() {
+                var now = java.time.LocalDateTime.now();
+
+                var entities = models_Offline_Table_Repository
+                                .findAllByEarlyAccessEndsAtAfterOrderByEarlyAccessEndsAtAscIdDesc(now);
+
+                var out = new java.util.ArrayList<java.util.Map<String, Object>>(entities.size());
+                for (var e : entities) {
+                        out.add(mapOfflineEntity(e));
+                }
+                return out;
+        }
+
+        private Map<String, Object> mapOfflineEntity(Models_Offline_Table_Entity e) {
+                var m = new java.util.HashMap<String, Object>();
+                m.put("civitaiFileName", e.getCivitaiFileName());
+                m.put("downloadFilePath", e.getDownloadFilePath());
+                m.put("civitaiUrl", e.getCivitaiUrl());
+                m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                m.put("selectedCategory", e.getSelectedCategory());
+                m.put("civitaiModelID",
+                                e.getCivitaiModelID() == null ? null : String.valueOf(e.getCivitaiModelID()));
+                m.put("civitaiVersionID",
+                                e.getCivitaiVersionID() == null ? null : String.valueOf(e.getCivitaiVersionID()));
+                m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
+                m.put("downloadPriority", e.getDownloadPriority());
+                m.put("hold", e.getHold());
+
+                try {
+                        if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
+                                m.put("civitaiModelFileList", objectMapper.readValue(
+                                                e.getCivitaiModelFileList(),
+                                                new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {
+                                                }));
+                        } else {
+                                m.put("civitaiModelFileList", null);
+                        }
+
+                        if (e.getModelVersionObject() != null && !e.getModelVersionObject().isBlank()) {
+                                m.put("modelVersionObject", objectMapper.readValue(
+                                                e.getModelVersionObject(),
+                                                new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {
+                                                }));
+                        } else {
+                                m.put("modelVersionObject", null);
+                        }
+
+                        if (e.getCivitaiTags() != null && !e.getCivitaiTags().isBlank()) {
+                                m.put("civitaiTags", objectMapper.readValue(
+                                                e.getCivitaiTags(),
+                                                new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                }));
+                        } else {
+                                m.put("civitaiTags", null);
+                        }
+
+                        if (e.getImageUrlsArray() != null && !e.getImageUrlsArray().isBlank()) {
+                                var urls = objectMapper.readValue(
+                                                e.getImageUrlsArray(),
+                                                new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                });
+                                m.put("imageUrlsArray", urls.toArray(new String[0]));
+                        } else {
+                                m.put("imageUrlsArray", null);
+                        }
+                } catch (Exception ignore) {
+                }
+
+                return m;
+        }
+
+        @Override
         @org.springframework.transaction.annotation.Transactional(readOnly = true, rollbackFor = Exception.class)
         public com.civitai.server.models.dto.PageResponse<com.civitai.server.models.dto.TagCountDTO> get_top_tags_page(
                         com.civitai.server.models.dto.TopTagsRequest req) {

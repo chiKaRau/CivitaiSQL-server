@@ -2,6 +2,7 @@ package com.civitai.server.repositories.civitaiSQL;
 
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,5 +44,12 @@ public interface Models_Offline_Table_Repository extends
         // in Models_Offline_Table_Repository
         org.springframework.data.domain.Page<Models_Offline_Table_Entity> findByEarlyAccessEndsAtIsNull(
                         org.springframework.data.domain.Pageable pageable);
+
+        // All records where hold = true, highest priority first, newest id first
+        java.util.List<Models_Offline_Table_Entity> findAllByHoldTrueOrderByDownloadPriorityDescIdDesc();
+
+        // All records where earlyAccessEndsAt is in the future (active early access)
+        java.util.List<Models_Offline_Table_Entity> findAllByEarlyAccessEndsAtAfterOrderByEarlyAccessEndsAtAscIdDesc(
+                        LocalDateTime now);
 
 }

@@ -187,4 +187,8 @@ public interface CivitaiSQL_Service {
         public boolean update_download_priority_from_offline_download_list(String civitaiModelID,
                         String civitaiVersionID, int downloadPriority);
 
+        java.util.List<java.util.Map<String, Object>> get_offline_download_list_hold();
+
+        java.util.List<java.util.Map<String, Object>> get_offline_download_list_early_access_active();
+
 }

@@ -1397,6 +1397,22 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
 
+    @CrossOrigin(origins = "*")
+    @GetMapping("/get_offline_download_list_hold")
+    public ResponseEntity<CustomResponse<java.util.List<java.util.Map<String, Object>>>> getOfflineDownloadListHold() {
+
+        var result = civitaiSQL_Service.get_offline_download_list_hold();
+        return ResponseEntity.ok().body(CustomResponse.success("OK", result));
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping("/get_offline_download_list_early_access_active")
+    public ResponseEntity<CustomResponse<java.util.List<java.util.Map<String, Object>>>> getOfflineDownloadListEarlyAccessActive() {
+
+        var result = civitaiSQL_Service.get_offline_download_list_early_access_active();
+        return ResponseEntity.ok().body(CustomResponse.success("OK", result));
+    }
+
     @SuppressWarnings("unchecked")
     @PostMapping("/remove-from-error-model-list")
     public ResponseEntity<CustomResponse<String>> removeFromErrorModelList(
