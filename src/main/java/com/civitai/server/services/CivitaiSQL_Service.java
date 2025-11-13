@@ -167,9 +167,17 @@ public interface CivitaiSQL_Service {
          */
         FullModelRecordDTO updateFullByModelAndVersion(FullModelRecordDTO incoming);
 
-        public PageResponse<Map<String, Object>> get_offline_download_list_paged(
-                        int page, int size, boolean filterEmptyBaseModel, List<String> prefixes,
-                        String search, String op, String status);
+        PageResponse<Map<String, Object>> get_offline_download_list_paged(
+                        int page,
+                        int size,
+                        boolean filterEmptyBaseModel,
+                        List<String> prefixes,
+                        String search,
+                        String op,
+                        String status,
+                        boolean includeHold,
+                        boolean includeEarlyAccess,
+                        String sortDir);
 
         PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
 

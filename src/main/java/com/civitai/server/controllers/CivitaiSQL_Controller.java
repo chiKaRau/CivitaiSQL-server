@@ -1353,8 +1353,10 @@ public class CivitaiSQL_Controller {
             @RequestParam(name = "prefix", required = false) java.util.List<String> prefixes,
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "op", defaultValue = "contains") String op,
-            @RequestParam(name = "status", defaultValue = "both") String status // <- NEW
-    ) {
+            @RequestParam(name = "status", defaultValue = "both") String status,
+            @RequestParam(name = "includeHold", defaultValue = "true") boolean includeHold,
+            @RequestParam(name = "includeEarlyAccess", defaultValue = "true") boolean includeEarlyAccess,
+            @RequestParam(name = "sortDir", defaultValue = "desc") String sortDir) {
 
         final int p = Math.max(0, page);
         final int s = Math.min(Math.max(1, size), 500);
@@ -1365,6 +1367,9 @@ public class CivitaiSQL_Controller {
         System.out.println("filterEmptyBaseModel = " + filterEmptyBaseModel);
         System.out.println("op = " + op);
         System.out.println("status = " + status);
+        System.out.println("includeHold = " + includeHold);
+        System.out.println("includeEarlyAccess = " + includeEarlyAccess);
+        System.out.println("sortDir = " + sortDir);
         System.out.println("search = " + (search == null ? "<null>" : ('"' + search + '"')));
 
         if (prefixes == null) {
@@ -1379,8 +1384,16 @@ public class CivitaiSQL_Controller {
         }
 
         var result = civitaiSQL_Service.get_offline_download_list_paged(
-                page, size, filterEmptyBaseModel, prefixes, search, op, status // <- pass through
-        );
+                page,
+                size,
+                filterEmptyBaseModel,
+                prefixes,
+                search,
+                op,
+                status,
+                includeHold,
+                includeEarlyAccess,
+                sortDir);
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
 

@@ -2771,12 +2771,28 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         List<String> prefixes,
                         String search,
                         String op,
-                        String status) {
+                        String status,
+                        boolean includeHold,
+                        boolean includeEarlyAccess,
+                        String sortDir) {
+
                 final int p = Math.max(0, page);
                 final int s = Math.min(Math.max(1, size), 500);
 
-                var pageable = org.springframework.data.domain.PageRequest.of(
-                                p, s, org.springframework.data.domain.Sort.by("id").descending());
+                org.springframework.data.domain.Sort sort;
+                if ("asc".equalsIgnoreCase(sortDir)) {
+                        // lowest priority first (probably not what you want, but supported)
+                        sort = org.springframework.data.domain.Sort.by(
+                                        org.springframework.data.domain.Sort.Order.asc("downloadPriority"),
+                                        org.springframework.data.domain.Sort.Order.asc("id"));
+                } else {
+                        // default: highest priority first, newest id first
+                        sort = org.springframework.data.domain.Sort.by(
+                                        org.springframework.data.domain.Sort.Order.desc("downloadPriority"),
+                                        org.springframework.data.domain.Sort.Order.desc("id"));
+                }
+
+                var pageable = org.springframework.data.domain.PageRequest.of(p, s, sort);
 
                 // Special “no results”
                 if (prefixes != null && prefixes.size() == 1 && "__NONE__".equals(prefixes.get(0))) {
@@ -2791,12 +2807,33 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         return out;
                 }
 
+                final java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
                 Specification<Models_Offline_Table_Entity> spec = (root, q, cb) -> {
                         var ands = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
 
                         // Build path expr once; use coalesce("") so LIKE works even if null
                         var pathExpr = root.get("downloadFilePath").as(String.class);
                         var pathLower = cb.lower(cb.coalesce(pathExpr, ""));
+
+                        // 0a) HOLD filter: when includeHold == false, only show non-hold entries
+                        if (!includeHold) {
+                                // hold is non-null (TINYINT(1) NOT NULL)
+                                ands.add(cb.isFalse(root.get("hold")));
+                        }
+
+                        // 0b) EARLY ACCESS filter: when includeEarlyAccess == false,
+                        // exclude entries whose earlyAccessEndsAt is in the future.
+                        if (!includeEarlyAccess) {
+                                jakarta.persistence.criteria.Path<java.time.LocalDateTime> earlyPath = root
+                                                .get("earlyAccessEndsAt");
+                                ands.add(
+                                                cb.or(
+                                                                cb.isNull(earlyPath),
+                                                                cb.lessThanOrEqualTo(earlyPath, now) // only past or
+                                                                                                     // null
+                                ));
+                        }
 
                         // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
                         // (case-insensitive)

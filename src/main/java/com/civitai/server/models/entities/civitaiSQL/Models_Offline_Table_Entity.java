@@ -62,7 +62,7 @@ public class Models_Offline_Table_Entity {
 
     @Column(name = "download_priority", nullable = false, columnDefinition = "TINYINT UNSIGNED")
     @Builder.Default
-    private int downloadPriority = 10;
+    private int downloadPriority = 1;
 
     @Column(name = "early_access_ends_at")
     private LocalDateTime earlyAccessEndsAt;
