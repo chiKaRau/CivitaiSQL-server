@@ -970,12 +970,6 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok(CustomResponse.success("Virtual directories retrieved successfully", dirs));
     }
 
-    // TODO
-    // add update hold (offline window mode)
-
-    // add update pioirty (offline window mode)
-
-    // TODO add hold and priorty when window mode
     @SuppressWarnings("unchecked")
     @PostMapping("/add-offline-download-file-into-offline-download-list")
     public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadList(
@@ -999,6 +993,29 @@ public class CivitaiSQL_Controller {
         List<String> civitaiTags = modelObject.get("civitaiTags") != null
                 ? (List<String>) modelObject.get("civitaiTags")
                 : new ArrayList<>();
+
+        // NEW: Hold flag
+        Boolean hold = null;
+        Object holdObj = modelObject.get("hold");
+        if (holdObj instanceof Boolean) {
+            hold = (Boolean) holdObj;
+        } else if (holdObj != null) {
+            // in case it comes as "true"/"false" string
+            hold = Boolean.valueOf(String.valueOf(holdObj));
+        }
+
+        // NEW: Download priority (1..10)
+        Integer downloadPriority = null;
+        Object dpObj = modelObject.get("downloadPriority");
+        if (dpObj instanceof Number) {
+            downloadPriority = ((Number) dpObj).intValue();
+        } else if (dpObj != null) {
+            try {
+                downloadPriority = Integer.parseInt(String.valueOf(dpObj).trim());
+            } catch (NumberFormatException ignore) {
+                // leave null -> will fall back to default in service
+            }
+        }
 
         // Validate required parameters (using isEmpty() for String checks)
         if (civitaiUrl == null || civitaiUrl.isEmpty() ||
@@ -1154,7 +1171,9 @@ public class CivitaiSQL_Controller {
                         imageUrlsArray,
                         selectedCategory,
                         civitaiTags,
-                        isModifyMode);
+                        isModifyMode,
+                        hold,
+                        downloadPriority);
 
                 fileService.update_folder_list(downloadFilePath);
 

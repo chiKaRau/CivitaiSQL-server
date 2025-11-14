@@ -1789,7 +1789,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         String[] imageUrlsArray,
                         String selectedCategory,
                         List<String> civitaiTags,
-                        Boolean isModifyMode) {
+                        Boolean isModifyMode,
+                        Boolean hold,
+                        Integer downloadPriority) {
 
                 // parse first so we can log them in catch blocks
                 Long modelId = parseLongOrNull(civitaiModelID);
@@ -1853,6 +1855,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         e.setImageUrlsArray(toJsonOrNull(imageUrlsArray));
                                         e.setCivitaiTags(toJsonOrNull(civitaiTags));
                                         e.setEarlyAccessEndsAt(earlyAccessEndsAt);
+
+                                        if (hold != null) {
+                                                e.setHold(hold);
+                                        }
+                                        if (downloadPriority != null) {
+                                                e.setDownloadPriority(clampPriority(downloadPriority));
+                                        }
+
                                         models_Offline_Table_Repository.save(e);
                                 }
                                 // not modify mode -> no-op if exists
@@ -1874,6 +1884,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         .imageUrlsArray(toJsonOrNull(imageUrlsArray))
                                         .civitaiTags(toJsonOrNull(civitaiTags))
                                         .earlyAccessEndsAt(earlyAccessEndsAt)
+                                        .hold(hold != null ? hold : Boolean.FALSE)
+                                        .downloadPriority(clampPriority(downloadPriority))
                                         .build();
                         models_Offline_Table_Repository.save(e);
 
@@ -1915,6 +1927,18 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 } catch (Exception e) {
                         return String.valueOf(obj);
                 }
+        }
+
+        // NEW: helper to clamp priority 1..10 with default 5
+        private int clampPriority(Integer priority) {
+                if (priority == null)
+                        return 5;
+                int p = priority.intValue();
+                if (p < 1)
+                        p = 1;
+                if (p > 10)
+                        p = 10;
+                return p;
         }
 
         @Override

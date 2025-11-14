@@ -121,7 +121,9 @@ public interface CivitaiSQL_Service {
                         String[] imageUrlsArray,
                         String selectedCategory,
                         List<String> civitaiTags,
-                        Boolean isModifyMode);
+                        Boolean isModifyMode,
+                        Boolean hold,
+                        Integer downloadPriority);
 
         public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
 
