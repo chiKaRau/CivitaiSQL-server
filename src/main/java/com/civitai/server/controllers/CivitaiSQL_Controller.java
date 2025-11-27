@@ -1459,18 +1459,29 @@ public class CivitaiSQL_Controller {
         }
     }
 
+    // @GetMapping("/get_error_model_list")
+    // public ResponseEntity<CustomResponse<Map<String, List<String>>>>
+    // getErrorModelList() {
+    // List<String> errorModelList = civitaiSQL_Service.get_error_model_list();
+
+    // if (!errorModelList.isEmpty()) {
+    // Map<String, List<String>> payload = new HashMap<>();
+    // payload.put("errorModelList", errorModelList);
+
+    // return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList
+    // retrieval successful", payload));
+    // } else {
+    // return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the
+    // database"));
+    // }
+    // }
+
+    @CrossOrigin(origins = "*")
     @GetMapping("/get_error_model_list")
-    public ResponseEntity<CustomResponse<Map<String, List<String>>>> getErrorModelList() {
-        List<String> errorModelList = civitaiSQL_Service.get_error_model_list();
+    public ResponseEntity<CustomResponse<java.util.List<java.util.Map<String, Object>>>> getErrorModelList() {
 
-        if (!errorModelList.isEmpty()) {
-            Map<String, List<String>> payload = new HashMap<>();
-            payload.put("errorModelList", errorModelList);
-
-            return ResponseEntity.ok().body(CustomResponse.success("ErrorModelList retrieval successful", payload));
-        } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("No Model found in the database"));
-        }
+        var result = civitaiSQL_Service.get_error_model_list();
+        return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
 
     @GetMapping("/get_creator_url_list")

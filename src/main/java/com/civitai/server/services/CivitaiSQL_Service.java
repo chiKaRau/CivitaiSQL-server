@@ -135,8 +135,6 @@ public interface CivitaiSQL_Service {
 
         public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID);
 
-        public List<String> get_error_model_list();
-
         public void update_error_model_offline_list(String civitaiModelID, String civitaiVersionID, Boolean isError);
 
         public List<Map<String, Object>> get_creator_url_list();
@@ -192,6 +190,8 @@ public interface CivitaiSQL_Service {
         java.util.List<java.util.Map<String, Object>> get_offline_download_list_hold();
 
         java.util.List<java.util.Map<String, Object>> get_offline_download_list_early_access_active();
+
+        java.util.List<java.util.Map<String, Object>> get_error_model_list();
 
         public boolean update_downloadFilePath_from_offline_download_list(
                         String civitaiModelID,

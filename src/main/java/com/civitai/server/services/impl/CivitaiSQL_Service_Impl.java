@@ -2277,18 +2277,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         }
 
         @Override
-        @Transactional(readOnly = true)
-        public List<String> get_error_model_list() {
-                List<Models_Offline_Table_Entity> rows = models_Offline_Table_Repository
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public java.util.List<java.util.Map<String, Object>> get_error_model_list() {
+                var entities = models_Offline_Table_Repository
                                 .findAllByIsErrorTrueOrderByIdAsc();
 
-                List<String> out = new ArrayList<>(rows.size());
-                for (Models_Offline_Table_Entity e : rows) {
-                        String modelId = e.getCivitaiModelID() == null ? "" : String.valueOf(e.getCivitaiModelID());
-                        String versionId = e.getCivitaiVersionID() == null ? ""
-                                        : String.valueOf(e.getCivitaiVersionID());
-                        String fileName = e.getCivitaiFileName() == null ? "" : e.getCivitaiFileName();
-                        out.add(modelId + "_" + versionId + "_" + fileName);
+                var out = new java.util.ArrayList<java.util.Map<String, Object>>(entities.size());
+                for (var e : entities) {
+                        out.add(mapOfflineEntity(e));
                 }
                 return out;
         }
