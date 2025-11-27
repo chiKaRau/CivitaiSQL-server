@@ -1884,6 +1884,8 @@ public class CivitaiSQL_Controller {
                 : null;
         Object holdObj = requestBody.get("hold");
 
+        System.out.println("Updating " + modelNumber + "_" + versionNumber + " for hold");
+
         if (modelNumber == null || modelNumber.isBlank() || versionNumber == null || versionNumber.isBlank()
                 || holdObj == null) {
             return ResponseEntity.badRequest()
@@ -1910,6 +1912,8 @@ public class CivitaiSQL_Controller {
         String versionNumber = requestBody.get("versionNumber") != null ? requestBody.get("versionNumber").toString()
                 : null;
         Object priorityObj = requestBody.get("downloadPriority");
+
+        System.out.println("Updating " + modelNumber + "_" + versionNumber + " for Download Priority");
 
         if (modelNumber == null || modelNumber.isBlank() || versionNumber == null || versionNumber.isBlank()
                 || priorityObj == null) {
