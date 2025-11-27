@@ -193,4 +193,9 @@ public interface CivitaiSQL_Service {
 
         java.util.List<java.util.Map<String, Object>> get_offline_download_list_early_access_active();
 
+        public boolean update_downloadFilePath_from_offline_download_list(
+                        String civitaiModelID,
+                        String civitaiVersionID,
+                        String downloadFilePath);
+
 }

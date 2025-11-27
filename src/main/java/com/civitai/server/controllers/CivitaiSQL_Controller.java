@@ -1927,4 +1927,40 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok(CustomResponse.success("Download priority updated"));
     }
 
+    @PostMapping(path = "/update-download-file-path-from-offline-download_list")
+    public ResponseEntity<CustomResponse<String>> updateDownloadFilePathFromOfflineDownloadList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelNumber = requestBody.get("modelNumber") != null
+                ? requestBody.get("modelNumber").toString()
+                : null;
+
+        String versionNumber = requestBody.get("versionNumber") != null
+                ? requestBody.get("versionNumber").toString()
+                : null;
+
+        String downloadFilePath = requestBody.get("downloadFilePath") != null
+                ? requestBody.get("downloadFilePath").toString()
+                : null;
+
+        if (modelNumber == null || modelNumber.isBlank()
+                || versionNumber == null || versionNumber.isBlank()
+                || downloadFilePath == null || downloadFilePath.isBlank()) {
+
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure(
+                            "Invalid input: modelNumber, versionNumber and downloadFilePath are required"));
+        }
+
+        boolean updated = civitaiSQL_Service.update_downloadFilePath_from_offline_download_list(
+                modelNumber, versionNumber, downloadFilePath);
+
+        if (!updated) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                    .body(CustomResponse.failure("Record not found or IDs invalid"));
+        }
+
+        return ResponseEntity.ok(CustomResponse.success("downloadFilePath updated"));
+    }
+
 }

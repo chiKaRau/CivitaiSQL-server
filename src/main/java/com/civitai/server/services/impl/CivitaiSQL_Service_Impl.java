@@ -3369,4 +3369,36 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return true;
         }
 
+        @Override
+        public boolean update_downloadFilePath_from_offline_download_list(String civitaiModelID,
+                        String civitaiVersionID,
+                        String downloadFilePath) {
+
+                if (civitaiModelID == null || civitaiVersionID == null || downloadFilePath == null) {
+                        return false;
+                }
+
+                Long modelId;
+                Long versionId;
+                try {
+                        modelId = Long.valueOf(civitaiModelID.trim());
+                        versionId = Long.valueOf(civitaiVersionID.trim());
+                } catch (NumberFormatException e) {
+                        return false;
+                }
+
+                var opt = models_Offline_Table_Repository
+                                .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, versionId);
+
+                if (opt.isEmpty()) {
+                        return false;
+                }
+
+                var entity = opt.get();
+                entity.setDownloadFilePath(downloadFilePath.trim());
+                models_Offline_Table_Repository.save(entity);
+
+                return true;
+        }
+
 }
