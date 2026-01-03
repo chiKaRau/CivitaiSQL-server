@@ -36,6 +36,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
+import com.civitai.server.models.dto.OfflineBulkPatchRequest;
+import com.civitai.server.models.dto.OfflineBulkPatchResult;
 import com.civitai.server.models.dto.PageResponse;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.dto.TagCountDTO;
@@ -1976,6 +1978,16 @@ public class CivitaiSQL_Controller {
         }
 
         return ResponseEntity.ok(CustomResponse.success("downloadFilePath updated"));
+    }
+
+    @PostMapping("/bulk-patch-offline-download_list")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> bulkPatchOfflineDownloadList(
+            @RequestBody Map<String, Object> body) {
+
+        Map<String, Object> result = civitaiSQL_Service.bulkPatchOfflineDownloadList(body);
+
+        // result contains: requested, updated
+        return ResponseEntity.ok(CustomResponse.success("bulk patch done", result));
     }
 
 }

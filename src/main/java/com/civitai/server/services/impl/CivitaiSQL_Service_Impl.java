@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -39,6 +40,8 @@ import com.civitai.server.exception.CustomDatabaseException;
 import com.civitai.server.exception.CustomException;
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
+import com.civitai.server.models.dto.OfflineBulkPatchRequest;
+import com.civitai.server.models.dto.OfflineBulkPatchResult;
 import com.civitai.server.models.dto.PageResponse;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.dto.TagCountDTO;
@@ -72,6 +75,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 
@@ -84,6 +90,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         // such as what kind of method to query our database
         // we can setup a findAll to find all data
         // we can setup a findByID to find a single data
+
+        @PersistenceContext
+        private EntityManager em;
 
         private final Models_Table_Repository models_Table_Repository;
         private final Models_Descriptions_Table_Repository models_Descriptions_Table_Repository;
@@ -3395,6 +3404,155 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 models_Offline_Table_Repository.save(entity);
 
                 return true;
+        }
+
+        @Transactional
+        public Map<String, Object> bulkPatchOfflineDownloadList(Map<String, Object> body) {
+
+                // ---- validate root shape ----
+                Object targetsObj = body.get("targets");
+                Object patchObj = body.get("patch");
+
+                if (!(targetsObj instanceof List) || !(patchObj instanceof Map)) {
+                        throw new IllegalArgumentException("Body must be { targets: [...], patch: {...} }");
+                }
+
+                @SuppressWarnings("unchecked")
+                List<Object> targets = (List<Object>) targetsObj;
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> patch = (Map<String, Object>) patchObj;
+
+                if (targets.isEmpty()) {
+                        throw new IllegalArgumentException("targets must not be empty");
+                }
+
+                // ---- patch fields (null means 'no change') ----
+                Boolean holdPatch = null;
+                if (patch.containsKey("hold") && patch.get("hold") != null) {
+                        Object hv = patch.get("hold");
+                        if (hv instanceof Boolean)
+                                holdPatch = (Boolean) hv;
+                        else
+                                holdPatch = Boolean.valueOf(String.valueOf(hv));
+                }
+
+                Integer prioPatch = null;
+                if (patch.containsKey("downloadPriority") && patch.get("downloadPriority") != null) {
+                        Object pv = patch.get("downloadPriority");
+                        if (pv instanceof Number)
+                                prioPatch = ((Number) pv).intValue();
+                        else
+                                prioPatch = Integer.valueOf(String.valueOf(pv));
+                        prioPatch = Math.max(1, Math.min(10, prioPatch));
+                }
+
+                // IMPORTANT: null = no change, "" = clear allowed
+                String pathPatch = null;
+                if (patch.containsKey("downloadFilePath")) {
+                        Object fv = patch.get("downloadFilePath");
+                        if (fv != null)
+                                pathPatch = String.valueOf(fv);
+                        else
+                                pathPatch = null; // explicit null -> no change in this API
+                }
+
+                if (holdPatch == null && prioPatch == null && pathPatch == null) {
+                        throw new IllegalArgumentException("patch must include at least one non-null field");
+                }
+                if (pathPatch != null && pathPatch.length() > 1000) {
+                        throw new IllegalArgumentException("downloadFilePath too long (max 1000)");
+                }
+
+                // ---- parse + dedupe targets ----
+                Set<String> keys = new LinkedHashSet<>();
+                Set<Long> modelIds = new LinkedHashSet<>();
+
+                for (Object tObj : targets) {
+                        if (!(tObj instanceof Map))
+                                continue;
+
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> t = (Map<String, Object>) tObj;
+
+                        Object mObj = t.containsKey("modelNumber") ? t.get("modelNumber") : t.get("civitaiModelID");
+                        Object vObj = t.containsKey("versionNumber") ? t.get("versionNumber")
+                                        : t.get("civitaiVersionID");
+
+                        if (mObj == null || vObj == null)
+                                continue;
+
+                        Long m;
+                        Long v;
+                        try {
+                                m = Long.valueOf(String.valueOf(mObj).trim());
+                                v = Long.valueOf(String.valueOf(vObj).trim());
+                        } catch (Exception ex) {
+                                continue;
+                        }
+
+                        modelIds.add(m);
+                        keys.add(m + ":" + v);
+                }
+
+                int requested = keys.size();
+                if (requested == 0) {
+                        throw new IllegalArgumentException("No valid targets");
+                }
+
+                // ---- fetch candidates by modelId IN (...) then match by (modelId, versionId)
+                // ----
+                List<Models_Offline_Table_Entity> candidates = models_Offline_Table_Repository
+                                .findAllByCivitaiModelIDIn(new ArrayList<>(modelIds));
+
+                Map<String, Models_Offline_Table_Entity> byKey = new HashMap<>();
+                for (Models_Offline_Table_Entity e : candidates) {
+                        if (e.getCivitaiModelID() == null || e.getCivitaiVersionID() == null)
+                                continue;
+                        byKey.put(e.getCivitaiModelID() + ":" + e.getCivitaiVersionID(), e);
+                }
+
+                // ---- apply patch ----
+                int updated = 0;
+                List<Models_Offline_Table_Entity> dirty = new ArrayList<>();
+
+                for (String key : keys) {
+                        Models_Offline_Table_Entity e = byKey.get(key);
+                        if (e == null)
+                                continue;
+
+                        boolean changed = false;
+
+                        if (holdPatch != null && !holdPatch.equals(e.getHold())) {
+                                e.setHold(holdPatch);
+                                changed = true;
+                        }
+
+                        if (prioPatch != null && e.getDownloadPriority() != prioPatch.intValue()) {
+                                e.setDownloadPriority(prioPatch.intValue());
+                                changed = true;
+                        }
+
+                        if (pathPatch != null && !java.util.Objects.equals(e.getDownloadFilePath(), pathPatch)) {
+                                e.setDownloadFilePath(pathPatch);
+                                changed = true;
+                        }
+
+                        if (changed) {
+                                updated++;
+                                dirty.add(e);
+                        }
+                }
+
+                if (!dirty.isEmpty()) {
+                        models_Offline_Table_Repository.saveAll(dirty);
+                        models_Offline_Table_Repository.flush();
+                }
+
+                Map<String, Object> out = new HashMap<>();
+                out.put("requested", requested);
+                out.put("updated", updated);
+                return out;
         }
 
 }
