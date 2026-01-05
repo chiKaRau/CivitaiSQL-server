@@ -35,4 +35,5 @@ docker/
 files/
 src/main/resources/application.properties
 src/main/resources/civitaiConfig.json
+src/main/resources/geminiConfig.json
 
