@@ -10,8 +10,6 @@ import org.springframework.lang.Nullable;
 
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
-import com.civitai.server.models.dto.OfflineBulkPatchRequest;
-import com.civitai.server.models.dto.OfflineBulkPatchResult;
 import com.civitai.server.models.dto.PageResponse;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.dto.TagCountDTO;
