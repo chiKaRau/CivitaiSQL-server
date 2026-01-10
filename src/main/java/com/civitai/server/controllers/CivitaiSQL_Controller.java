@@ -9,6 +9,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -42,12 +43,13 @@ import com.civitai.server.models.dto.TagCountDTO;
 import com.civitai.server.models.dto.TopTagsRequest;
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
-import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.services.CivitaiSQL_Service;
 import com.civitai.server.services.Civitai_Service;
 import com.civitai.server.services.File_Service;
+import com.civitai.server.services.Gemini_Service;
+import com.civitai.server.services.Jikan_Service;
 import com.civitai.server.utils.CustomResponse;
 import com.civitai.server.utils.JsonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,13 +63,18 @@ public class CivitaiSQL_Controller {
     private CivitaiSQL_Service civitaiSQL_Service;
     private Civitai_Service civitai_Service;
     private File_Service fileService;
+    private Gemini_Service gemini_Service;
+    private Jikan_Service jikan_Service;
 
     @Autowired
     public CivitaiSQL_Controller(CivitaiSQL_Service civitaiSQL_Service, Civitai_Service civitai_Service,
+            Gemini_Service gemini_Service, Jikan_Service jikan_Service,
             File_Service fileService) {
         this.civitaiSQL_Service = civitaiSQL_Service;
         this.civitai_Service = civitai_Service;
         this.fileService = fileService;
+        this.gemini_Service = gemini_Service;
+        this.jikan_Service = jikan_Service;
     }
 
     // Testing Api Route
@@ -1414,6 +1421,545 @@ public class CivitaiSQL_Controller {
                 includeEarlyAccess,
                 sortDir);
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping("/get_pending_from_offline_download_list-in-page")
+    public ResponseEntity<CustomResponse<PageResponse<java.util.Map<String, Object>>>> getPendingFromOfflineDownloadListInPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        final int p = Math.max(0, page);
+        final int s = Math.min(Math.max(1, size), 500);
+
+        // --- Preset values for "Pending" view ---
+        final boolean filterEmptyBaseModel = false;
+        final List<String> prefixes = Arrays.asList(
+                "/@scan@/ACG/Pending",
+                "/@scan@/ACG/Pending/");
+        final String search = null;
+        final String op = "contains";
+        final String status = "pending";
+        final boolean includeHold = false;
+        final boolean includeEarlyAccess = false;
+        final String sortDir = "desc";
+
+        System.out.println("---- GET /get_pending_from_offline_download_list-in-page ----");
+        System.out.println("page = " + page + " (normalized=" + p + ")");
+        System.out.println("size = " + size + " (normalized=" + s + ")");
+        System.out.println("filterEmptyBaseModel = " + filterEmptyBaseModel);
+        System.out.println("op = " + op);
+        System.out.println("status = " + status);
+        System.out.println("includeHold = " + includeHold);
+        System.out.println("includeEarlyAccess = " + includeEarlyAccess);
+        System.out.println("sortDir = " + sortDir);
+        System.out.println("search = <null>");
+        System.out.println("prefixes.size = " + prefixes.size());
+        System.out.println("prefixes = " + prefixes);
+
+        var result = civitaiSQL_Service.get_offline_download_list_paged(
+                p,
+                s,
+                filterEmptyBaseModel,
+                prefixes,
+                search,
+                op,
+                status,
+                includeHold,
+                includeEarlyAccess,
+                sortDir);
+
+        return ResponseEntity.ok().body(CustomResponse.success("OK", result));
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping("/get_pending_from_offline_download_list-ai_suggestion")
+    public ResponseEntity<CustomResponse<List<com.civitai.server.models.dto.PendingAiSuggestionDTO>>> getPendingFromOfflineDownloadListAiSuggestion(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+            final int p = Math.max(0, page);
+            final int s = Math.min(Math.max(1, size), 500);
+
+            // preset (your "pending" filters)
+            final boolean filterEmptyBaseModel = false;
+            final java.util.List<String> prefixes = java.util.Arrays.asList(
+                    "/@scan@/ACG/Pending",
+                    "/@scan@/ACG/Pending/");
+            final String search = null;
+            final String op = "contains";
+            final String status = "pending";
+            final boolean includeHold = false;
+            final boolean includeEarlyAccess = false;
+            final String sortDir = "desc";
+
+            // 1) Fetch
+            PageResponse<java.util.Map<String, Object>> pageResult = civitaiSQL_Service
+                    .get_offline_download_list_paged_aiSuggestedArtworkTitleEmpty(
+                            p, s,
+                            filterEmptyBaseModel,
+                            prefixes,
+                            search,
+                            op,
+                            status,
+                            includeHold,
+                            includeEarlyAccess,
+                            sortDir);
+
+            // 2) Convert to JsonNode so we can read "content" without relying on getters
+            com.fasterxml.jackson.databind.JsonNode pageNode = mapper.valueToTree(pageResult);
+
+            // try root.content first, then payload.content fallback
+            com.fasterxml.jackson.databind.JsonNode contentNode = pageNode.path("content");
+            if (!contentNode.isArray()) {
+                contentNode = pageNode.path("payload").path("content");
+            }
+
+            if (!contentNode.isArray() || contentNode.size() == 0) {
+                return ResponseEntity.ok(CustomResponse.success("OK", java.util.List.of()));
+            }
+
+            // 3) Build Gemini inputs (+ keep a map id -> characterName so we can merge
+            // later)
+            java.util.List<com.civitai.server.services.impl.Gemini_Service_impl.CharacterMatchInput> inputs = new java.util.ArrayList<>();
+            java.util.Map<String, String> idToCharacterName = new java.util.LinkedHashMap<>();
+
+            for (int i = 0; i < contentNode.size(); i++) {
+                com.fasterxml.jackson.databind.JsonNode row = contentNode.get(i);
+
+                String civitaiVersionID = row.path("civitaiVersionID").asText(null);
+                String civitaiUrl = row.path("civitaiUrl").asText(null);
+                String civitaiFileName = row.path("civitaiFileName").asText(null);
+
+                String modelName = row.path("modelVersionObject").path("model").path("name").asText(null);
+                String versionName = row.path("modelVersionObject").path("name").asText(null); // v1.0
+
+                // characterName = modelName + " - " + versionName
+                String a = modelName == null ? "" : modelName.trim();
+                String b = versionName == null ? "" : versionName.trim();
+                String characterName;
+                if (a.isBlank() && b.isBlank())
+                    characterName = null;
+                else if (a.isBlank())
+                    characterName = b;
+                else if (b.isBlank())
+                    characterName = a;
+                else
+                    characterName = a + " - " + b;
+
+                if (characterName == null || characterName.isBlank())
+                    continue;
+
+                // tags: civitaiTags (len >= 2, distinct, limit 25)
+                java.util.LinkedHashSet<String> dedupe = new java.util.LinkedHashSet<>();
+                com.fasterxml.jackson.databind.JsonNode tagsNode = row.path("civitaiTags");
+                if (tagsNode.isArray()) {
+                    for (int t = 0; t < tagsNode.size(); t++) {
+                        com.fasterxml.jackson.databind.JsonNode tagNode = tagsNode.get(t);
+                        if (tagNode != null && tagNode.isTextual()) {
+                            String tag = tagNode.asText("").trim();
+                            if (tag.length() >= 2)
+                                dedupe.add(tag);
+                            if (dedupe.size() >= 25)
+                                break;
+                        }
+                    }
+                }
+                java.util.List<String> tags = new java.util.ArrayList<>(dedupe);
+
+                // id: prefer civitaiVersionID, else fallback to index
+                String id = (civitaiVersionID != null && !civitaiVersionID.trim().isBlank())
+                        ? civitaiVersionID.trim()
+                        : String.valueOf(i);
+
+                // trimToNull for filename/url
+                civitaiFileName = (civitaiFileName == null || civitaiFileName.trim().isBlank()) ? null
+                        : civitaiFileName.trim();
+                civitaiUrl = (civitaiUrl == null || civitaiUrl.trim().isBlank()) ? null : civitaiUrl.trim();
+
+                com.civitai.server.services.impl.Gemini_Service_impl.CharacterMatchInput in = new com.civitai.server.services.impl.Gemini_Service_impl.CharacterMatchInput();
+                in.setId(id);
+                in.setCharacterName(characterName);
+                in.setTags(tags);
+                in.setCivitaiFileName(civitaiFileName);
+                in.setCivitaiUrl(civitaiUrl);
+
+                inputs.add(in);
+                idToCharacterName.putIfAbsent(id, characterName);
+            }
+
+            if (inputs.isEmpty()) {
+                return ResponseEntity.ok(CustomResponse.success("OK", java.util.List.of()));
+            }
+
+            // 4) Call Gemini once (batch)
+            java.util.List<com.civitai.server.services.impl.Gemini_Service_impl.CharacterTitleMatch> aiSuggestion = gemini_Service
+                    .matchCharactersToTitles(inputs);
+
+            // 5) Jikan normalization
+            java.util.List<com.civitai.server.services.impl.Gemini_Service_impl.CharacterTitleMatch> normalized = jikan_Service
+                    .normalizeTitles(aiSuggestion);
+
+            // 6) folders list
+            java.util.List<String> foldersList = fileService.get_folders_list();
+
+            // Build folder index ONCE (so we don't rebuild for every match)
+            java.util.List<String> f_paths = new java.util.ArrayList<>();
+            java.util.List<String> f_normNames = new java.util.ArrayList<>();
+            java.util.List<String> f_normPaths = new java.util.ArrayList<>();
+            java.util.List<java.util.Set<String>> f_nameBigrams = new java.util.ArrayList<>();
+            java.util.List<java.util.Set<String>> f_nameTokens = new java.util.ArrayList<>();
+
+            for (String path : foldersList) {
+                if (path == null || path.isBlank())
+                    continue;
+
+                String pth = path.trim();
+                String tmp = pth;
+                if (tmp.endsWith("/"))
+                    tmp = tmp.substring(0, tmp.length() - 1);
+
+                int idx = tmp.lastIndexOf('/');
+                String base = (idx >= 0) ? tmp.substring(idx + 1) : tmp;
+
+                String nn = norm(base);
+                String np = norm(pth);
+
+                f_paths.add(pth);
+                f_normNames.add(nn);
+                f_normPaths.add(np);
+                f_nameBigrams.add(bigrams(nn));
+                f_nameTokens.add(tokens(nn));
+            }
+
+            // 7) Merge by id
+            java.util.Map<String, String> aiTitleById = new java.util.HashMap<>();
+            if (aiSuggestion != null) {
+                for (var x : aiSuggestion) {
+                    if (x == null)
+                        continue;
+                    String id = x.getId();
+                    String title = x.getTitle();
+                    if (id == null || id.isBlank())
+                        continue;
+                    if (title == null || title.isBlank())
+                        continue;
+                    aiTitleById.put(id.trim(), title.trim());
+                }
+            }
+
+            java.util.Map<String, String> normTitleById = new java.util.HashMap<>();
+            if (normalized != null) {
+                for (var x : normalized) {
+                    if (x == null)
+                        continue;
+                    String id = x.getId();
+                    String title = x.getTitle();
+                    if (id == null || id.isBlank())
+                        continue;
+                    if (title == null || title.isBlank())
+                        continue;
+                    normTitleById.put(id.trim(), title.trim());
+                }
+            }
+
+            // 8) Build final DTO list (+ fuzzy folder suggestions)
+            final int suggestLimit = 5;
+            final double suggestThreshold = 0.35;
+
+            java.util.List<com.civitai.server.models.dto.PendingAiSuggestionDTO> out = new java.util.ArrayList<>();
+
+            for (var e : idToCharacterName.entrySet()) {
+                String id = e.getKey();
+                String characterName = e.getValue();
+
+                String aiTitle = aiTitleById.get(id);
+                String jikanTitle = normTitleById.get(id);
+
+                com.civitai.server.models.dto.PendingAiSuggestionDTO dto = new com.civitai.server.models.dto.PendingAiSuggestionDTO();
+
+                dto.setCivitaiVersionID(id);
+                dto.setCharacterName(characterName);
+
+                dto.setAiSuggestedArtworkTitle(aiTitle);
+                dto.setJikanNormalizedArtworkTitle(jikanTitle);
+
+                dto.setAiSuggestedDownloadFilePath(
+                        pickValidPaths(topFolderMatches(aiTitle, foldersList, suggestLimit, suggestThreshold),
+                                suggestLimit));
+
+                dto.setJikanSuggestedDownloadFilePath(
+                        pickValidPaths(topFolderMatches(jikanTitle, foldersList, suggestLimit, suggestThreshold),
+                                suggestLimit));
+
+                dto.setLocalSuggestedDownloadFilePath(
+                        pickValidPaths(topFolderMatchesWithIndex(characterName, suggestLimit, 0.45,
+                                f_paths, f_normNames, f_normPaths, f_nameBigrams, f_nameTokens), suggestLimit));
+
+                out.add(dto);
+            }
+
+            int updated = civitaiSQL_Service.updatePendingAiSuggestions(out);
+            System.out.println("Updated rows: " + updated);
+
+            return ResponseEntity.ok(CustomResponse.success("OK", out));
+
+        } catch (Exception ex) {
+            System.err.println("Unexpected error occurred: " + ex.getMessage());
+            ex.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(CustomResponse.failure("Unexpected error: " + ex.getMessage()));
+        }
+    }
+
+    /*
+     * =========================
+     * Helper methods (same file)
+     * =========================
+     */
+
+    private static java.util.List<String> pickValidPaths(java.util.List<String> paths, int limit) {
+        if (paths == null || paths.isEmpty())
+            return java.util.List.of();
+
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        java.util.LinkedHashSet<String> dedupe = new java.util.LinkedHashSet<>();
+
+        for (String p : paths) {
+            if (p == null)
+                continue;
+            String x = p.trim();
+            if (x.isBlank())
+                continue;
+
+            // must start with '/'
+            if (!x.startsWith("/"))
+                continue;
+
+            // must NOT contain update segment
+            if (x.contains("/Update/") || x.contains("@scan@/Update/"))
+                continue;
+
+            // de-dupe while preserving order
+            if (dedupe.add(x)) {
+                out.add(x);
+                if (out.size() >= Math.max(1, limit))
+                    break;
+            }
+        }
+        return out;
+    }
+
+    private static java.util.List<String> topFolderMatches(String term, java.util.List<String> foldersList,
+            int limit, double threshold) {
+        if (term == null || term.trim().isBlank())
+            return java.util.List.of();
+        if (foldersList == null || foldersList.isEmpty())
+            return java.util.List.of();
+
+        String normTerm = norm(term);
+        if (normTerm.isBlank())
+            return java.util.List.of();
+
+        java.util.Set<String> termBigrams = bigrams(normTerm);
+        java.util.Set<String> termTokens = tokens(normTerm);
+
+        // Pre-index folders (local, per-request)
+        java.util.List<String> paths = new java.util.ArrayList<>();
+        java.util.List<String> normNames = new java.util.ArrayList<>();
+        java.util.List<String> normPaths = new java.util.ArrayList<>();
+        java.util.List<java.util.Set<String>> nameBigrams = new java.util.ArrayList<>();
+        java.util.List<java.util.Set<String>> nameTokens = new java.util.ArrayList<>();
+
+        for (String path : foldersList) {
+            if (path == null || path.isBlank())
+                continue;
+
+            String p = path.trim();
+            String base = p;
+            String tmp = p;
+            if (tmp.endsWith("/"))
+                tmp = tmp.substring(0, tmp.length() - 1);
+            int idx = tmp.lastIndexOf('/');
+            if (idx >= 0)
+                base = tmp.substring(idx + 1);
+            else
+                base = tmp;
+
+            String nn = norm(base);
+            String np = norm(p);
+
+            paths.add(p);
+            normNames.add(nn);
+            normPaths.add(np);
+            nameBigrams.add(bigrams(nn));
+            nameTokens.add(tokens(nn));
+        }
+
+        int n = paths.size();
+        double[] scores = new double[n];
+        java.util.List<Integer> idxs = new java.util.ArrayList<>(n);
+
+        for (int i = 0; i < n; i++) {
+            String nn = normNames.get(i);
+            String np = normPaths.get(i);
+
+            boolean containsName = !nn.isBlank() && nn.contains(normTerm);
+            boolean containsPath = !np.isBlank() && np.contains(normTerm);
+
+            double dice = diceCoefficient(termBigrams, nameBigrams.get(i));
+            double jac = jaccard(termTokens, nameTokens.get(i));
+
+            // weighted blend (tweak to taste)
+            double score = 0.75 * dice + 0.25 * jac;
+
+            if (containsName)
+                score = Math.min(1.0, score + 0.15);
+            else if (containsPath)
+                score = Math.min(1.0, score + 0.08);
+
+            scores[i] = score;
+            if (score >= threshold)
+                idxs.add(i);
+        }
+
+        idxs.sort((a, b) -> Double.compare(scores[b], scores[a]));
+
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (int k = 0; k < idxs.size() && out.size() < Math.max(1, limit); k++) {
+            out.add(paths.get(idxs.get(k)));
+        }
+        return out;
+    }
+
+    private static String norm(String s) {
+        if (s == null)
+            return "";
+        String x = s.trim().toLowerCase(java.util.Locale.ROOT);
+
+        // strip accents
+        x = java.text.Normalizer.normalize(x, java.text.Normalizer.Form.NFKD)
+                .replaceAll("\\p{M}+", "");
+
+        // non-alnum -> space (":" "-" "/" etc)
+        x = x.replaceAll("[^a-z0-9]+", " ");
+
+        // collapse spaces
+        x = x.replaceAll("\\s+", " ").trim();
+        return x;
+    }
+
+    private static java.util.Set<String> tokens(String s) {
+        if (s == null || s.isBlank())
+            return java.util.Set.of();
+        String[] parts = s.split(" ");
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String p : parts) {
+            if (p.length() < 2)
+                continue; // your rule
+            out.add(p);
+        }
+        return out;
+    }
+
+    private static java.util.Set<String> bigrams(String s) {
+        if (s == null)
+            return java.util.Set.of();
+        String x = s.replace(" ", "");
+        if (x.length() < 2)
+            return java.util.Set.of();
+
+        java.util.HashSet<String> out = new java.util.HashSet<>();
+        for (int i = 0; i < x.length() - 1; i++) {
+            out.add(x.substring(i, i + 2));
+        }
+        return out;
+    }
+
+    private static double diceCoefficient(java.util.Set<String> a, java.util.Set<String> b) {
+        if (a.isEmpty() || b.isEmpty())
+            return 0.0;
+        int inter = 0;
+        if (a.size() > b.size()) {
+            java.util.Set<String> tmp = a;
+            a = b;
+            b = tmp;
+        }
+        for (String x : a)
+            if (b.contains(x))
+                inter++;
+        return (2.0 * inter) / (a.size() + b.size());
+    }
+
+    private static double jaccard(java.util.Set<String> a, java.util.Set<String> b) {
+        if (a.isEmpty() || b.isEmpty())
+            return 0.0;
+        int inter = 0;
+        if (a.size() > b.size()) {
+            java.util.Set<String> tmp = a;
+            a = b;
+            b = tmp;
+        }
+        for (String x : a)
+            if (b.contains(x))
+                inter++;
+        int union = (a.size() + b.size() - inter);
+        return union == 0 ? 0.0 : (inter * 1.0 / union);
+    }
+
+    private static java.util.List<String> topFolderMatchesWithIndex(
+            String term, int limit, double threshold,
+            java.util.List<String> paths,
+            java.util.List<String> normNames,
+            java.util.List<String> normPaths,
+            java.util.List<java.util.Set<String>> nameBigrams,
+            java.util.List<java.util.Set<String>> nameTokens) {
+        if (term == null || term.trim().isBlank())
+            return java.util.List.of();
+        if (paths == null || paths.isEmpty())
+            return java.util.List.of();
+
+        String normTerm = norm(term);
+        if (normTerm.isBlank())
+            return java.util.List.of();
+
+        java.util.Set<String> termBigrams = bigrams(normTerm);
+        java.util.Set<String> termTokens = tokens(normTerm);
+
+        int n = paths.size();
+        double[] scores = new double[n];
+        java.util.List<Integer> idxs = new java.util.ArrayList<>(n);
+
+        for (int i = 0; i < n; i++) {
+            String nn = normNames.get(i);
+            String np = normPaths.get(i);
+
+            boolean containsName = !nn.isBlank() && nn.contains(normTerm);
+            boolean containsPath = !np.isBlank() && np.contains(normTerm);
+
+            double dice = diceCoefficient(termBigrams, nameBigrams.get(i));
+            double jac = jaccard(termTokens, nameTokens.get(i));
+
+            double score = 0.75 * dice + 0.25 * jac;
+
+            if (containsName)
+                score = Math.min(1.0, score + 0.15);
+            else if (containsPath)
+                score = Math.min(1.0, score + 0.08);
+
+            scores[i] = score;
+            if (score >= threshold)
+                idxs.add(i);
+        }
+
+        idxs.sort((a, b) -> Double.compare(scores[b], scores[a]));
+
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (int k = 0; k < idxs.size() && out.size() < Math.max(1, limit); k++) {
+            out.add(paths.get(idxs.get(k)));
+        }
+        return out;
     }
 
     @CrossOrigin(origins = "*")

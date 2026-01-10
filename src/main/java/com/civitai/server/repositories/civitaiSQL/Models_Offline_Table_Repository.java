@@ -55,4 +55,5 @@ public interface Models_Offline_Table_Repository extends
         java.util.List<Models_Offline_Table_Entity> findAllByEarlyAccessEndsAtAfterOrderByEarlyAccessEndsAtAscIdDesc(
                         LocalDateTime now);
 
+        List<Models_Offline_Table_Entity> findAllByCivitaiVersionIDIn(List<Long> versionIds);
 }

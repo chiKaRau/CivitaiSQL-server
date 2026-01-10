@@ -41,6 +41,7 @@ import com.civitai.server.exception.CustomException;
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.PageResponse;
+import com.civitai.server.models.dto.PendingAiSuggestionDTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.dto.TagCountDTO;
 import com.civitai.server.models.dto.TopTagsRequest;
@@ -3028,6 +3029,250 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public PageResponse<Map<String, Object>> get_offline_download_list_paged_aiSuggestedArtworkTitleEmpty(
+                        int page,
+                        int size,
+                        boolean filterEmptyBaseModel,
+                        List<String> prefixes,
+                        String search,
+                        String op,
+                        String status,
+                        boolean includeHold,
+                        boolean includeEarlyAccess,
+                        String sortDir) {
+
+                final int p = Math.max(0, page);
+                final int s = Math.min(Math.max(1, size), 500);
+
+                org.springframework.data.domain.Sort sort;
+                if ("asc".equalsIgnoreCase(sortDir)) {
+                        sort = org.springframework.data.domain.Sort.by(
+                                        org.springframework.data.domain.Sort.Order.asc("downloadPriority"),
+                                        org.springframework.data.domain.Sort.Order.asc("id"));
+                } else {
+                        sort = org.springframework.data.domain.Sort.by(
+                                        org.springframework.data.domain.Sort.Order.desc("downloadPriority"),
+                                        org.springframework.data.domain.Sort.Order.desc("id"));
+                }
+
+                var pageable = org.springframework.data.domain.PageRequest.of(p, s, sort);
+
+                // Special “no results”
+                if (prefixes != null && prefixes.size() == 1 && "__NONE__".equals(prefixes.get(0))) {
+                        var out = new PageResponse<Map<String, Object>>();
+                        out.content = java.util.List.of();
+                        out.page = p;
+                        out.size = s;
+                        out.totalElements = 0L;
+                        out.totalPages = 0;
+                        out.hasNext = false;
+                        out.hasPrevious = false;
+                        return out;
+                }
+
+                final java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+                Specification<Models_Offline_Table_Entity> spec = (root, q, cb) -> {
+                        var ands = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+                        // -------------------------------
+                        // NEW FILTER (keep only rows where aiSuggestedArtworkTitle is NOT set)
+                        // Treat NULL / "" / " " as "empty"
+                        // -------------------------------
+                        var aiTitleExpr = root.get("aiSuggestedArtworkTitle").as(String.class);
+                        var aiTitleTrimmed = cb.trim(cb.coalesce(aiTitleExpr, ""));
+                        ands.add(cb.equal(aiTitleTrimmed, "")); // => NULL or blank only
+
+                        // Build path expr once; use coalesce("") so LIKE works even if null
+                        var pathExpr = root.get("downloadFilePath").as(String.class);
+                        var pathLower = cb.lower(cb.coalesce(pathExpr, ""));
+
+                        // 0a) HOLD filter: when includeHold == false, only show non-hold entries
+                        if (!includeHold) {
+                                ands.add(cb.isFalse(root.get("hold")));
+                        }
+
+                        // 0b) EARLY ACCESS filter: when includeEarlyAccess == false,
+                        // exclude entries whose earlyAccessEndsAt is in the future.
+                        if (!includeEarlyAccess) {
+                                jakarta.persistence.criteria.Path<java.time.LocalDateTime> earlyPath = root
+                                                .get("earlyAccessEndsAt");
+                                ands.add(cb.or(
+                                                cb.isNull(earlyPath),
+                                                cb.lessThanOrEqualTo(earlyPath, now)));
+                        }
+
+                        // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
+                        // (case-insensitive)
+                        // Also include backslash form in case you persist Windows-style paths.
+                        var pendingSlash = cb.like(pathLower, "/@scan@/acg/pending%");
+                        var pendingBack = cb.like(pathLower, "\\@scan\\@\\acg\\pending%");
+                        var isPending = cb.or(pendingSlash, pendingBack);
+
+                        // 0) status filter (pending / non-pending / both) – derived from path
+                        String statusNorm = (status == null ? "both" : status)
+                                        .toLowerCase(java.util.Locale.ROOT)
+                                        .replaceAll("[_\\s-]+", ""); // "non-pending" -> "nonpending"
+
+                        if ("pending".equals(statusNorm)) {
+                                ands.add(isPending);
+                        } else if ("nonpending".equals(statusNorm)) {
+                                ands.add(cb.and(cb.isNotNull(pathExpr), cb.not(isPending)));
+                        }
+
+                        // 1) base model present (optional)
+                        if (filterEmptyBaseModel) {
+                                var base = root.get("civitaiBaseModel").as(String.class);
+                                ands.add(cb.and(cb.isNotNull(base), cb.notEqual(base, "")));
+                        }
+
+                        // 2) prefixes (case-insensitive; “Updates” is contains)
+                        if (prefixes != null && !prefixes.isEmpty()) {
+                                var ors = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                                for (String pref : prefixes) {
+                                        if ("/@scan@/Update/".equalsIgnoreCase(pref)) {
+                                                ors.add(cb.like(pathLower, "%/@scan@/update/%"));
+                                        } else {
+                                                ors.add(cb.like(pathLower, pref.toLowerCase() + "%"));
+                                        }
+                                }
+                                if (!ors.isEmpty()) {
+                                        ands.add(cb.or(ors.toArray(jakarta.persistence.criteria.Predicate[]::new)));
+                                }
+                        }
+
+                        // 3) text search with operator (same logic as your existing function)
+                        if (search != null && !search.isBlank()) {
+                                String sTerm = search.trim().toLowerCase();
+                                String opNorm = (op == null ? "contains" : op).toLowerCase();
+
+                                java.util.function.Function<jakarta.persistence.criteria.Expression<String>, jakarta.persistence.criteria.Predicate> pos = expr -> {
+                                        var v = cb.lower(cb.coalesce(expr, ""));
+                                        return switch (opNorm) {
+                                                case "equals" -> cb.equal(v, sTerm);
+                                                case "begins with" -> cb.like(v, sTerm + "%");
+                                                case "ends with" -> cb.like(v, "%" + sTerm);
+                                                default -> cb.like(v, "%" + sTerm + "%"); // contains
+                                        };
+                                };
+
+                                java.util.function.Function<jakarta.persistence.criteria.Expression<String>, jakarta.persistence.criteria.Predicate> neg = expr -> {
+                                        var v = cb.lower(cb.coalesce(expr, ""));
+                                        return switch (opNorm) {
+                                                case "does not equal" -> cb.notEqual(v, sTerm);
+                                                case "does not contain" -> cb.notLike(v, "%" + sTerm + "%");
+                                                default -> null;
+                                        };
+                                };
+
+                                var fields = java.util.List.of(
+                                                root.get("civitaiFileName").as(String.class),
+                                                root.get("civitaiUrl").as(String.class),
+                                                root.get("downloadFilePath").as(String.class),
+                                                root.get("selectedCategory").as(String.class),
+                                                root.get("civitaiModelID").as(String.class),
+                                                root.get("civitaiVersionID").as(String.class),
+                                                root.get("civitaiTags").as(String.class), // JSON text
+                                                root.get("modelVersionObject").as(String.class) // JSON text
+                                );
+
+                                boolean isNegative = "does not contain".equals(opNorm)
+                                                || "does not equal".equals(opNorm);
+
+                                var preds = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                                for (var f : fields) {
+                                        var pPred = isNegative ? neg.apply(f) : pos.apply(f);
+                                        if (pPred != null)
+                                                preds.add(pPred);
+                                }
+
+                                if (!preds.isEmpty()) {
+                                        ands.add(isNegative
+                                                        ? cb.and(preds.toArray(
+                                                                        jakarta.persistence.criteria.Predicate[]::new))
+                                                        : cb.or(preds.toArray(
+                                                                        jakarta.persistence.criteria.Predicate[]::new)));
+                                }
+                        }
+
+                        return ands.isEmpty()
+                                        ? cb.conjunction()
+                                        : cb.and(ands.toArray(jakarta.persistence.criteria.Predicate[]::new));
+                };
+
+                var pageResult = models_Offline_Table_Repository.findAll(spec, pageable);
+
+                var mapped = new java.util.ArrayList<java.util.Map<String, Object>>(pageResult.getNumberOfElements());
+                for (var e : pageResult.getContent()) {
+                        var m = new java.util.HashMap<String, Object>();
+                        m.put("civitaiFileName", e.getCivitaiFileName());
+                        m.put("downloadFilePath", e.getDownloadFilePath());
+                        m.put("civitaiUrl", e.getCivitaiUrl());
+                        m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                        m.put("selectedCategory", e.getSelectedCategory());
+                        m.put("civitaiModelID",
+                                        e.getCivitaiModelID() == null ? null : String.valueOf(e.getCivitaiModelID()));
+                        m.put("civitaiVersionID", e.getCivitaiVersionID() == null ? null
+                                        : String.valueOf(e.getCivitaiVersionID()));
+                        m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
+                        m.put("downloadPriority", e.getDownloadPriority());
+                        m.put("hold", e.getHold());
+
+                        // (optional) include this field too since it’s relevant for this endpoint
+                        m.put("aiSuggestedArtworkTitle", e.getAiSuggestedArtworkTitle());
+
+                        try {
+                                if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
+                                        m.put("civitaiModelFileList", objectMapper.readValue(
+                                                        e.getCivitaiModelFileList(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {
+                                                        }));
+                                } else
+                                        m.put("civitaiModelFileList", null);
+
+                                if (e.getModelVersionObject() != null && !e.getModelVersionObject().isBlank()) {
+                                        m.put("modelVersionObject", objectMapper.readValue(
+                                                        e.getModelVersionObject(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {
+                                                        }));
+                                } else
+                                        m.put("modelVersionObject", null);
+
+                                if (e.getCivitaiTags() != null && !e.getCivitaiTags().isBlank()) {
+                                        m.put("civitaiTags", objectMapper.readValue(
+                                                        e.getCivitaiTags(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                        }));
+                                } else
+                                        m.put("civitaiTags", null);
+
+                                if (e.getImageUrlsArray() != null && !e.getImageUrlsArray().isBlank()) {
+                                        var urls = objectMapper.readValue(
+                                                        e.getImageUrlsArray(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                        });
+                                        m.put("imageUrlsArray", urls.toArray(new String[0]));
+                                } else
+                                        m.put("imageUrlsArray", null);
+                        } catch (Exception ignore) {
+                        }
+
+                        mapped.add(m);
+                }
+
+                var out = new PageResponse<java.util.Map<String, Object>>();
+                out.content = mapped;
+                out.page = p;
+                out.size = s;
+                out.totalElements = pageResult.getTotalElements();
+                out.totalPages = pageResult.getTotalPages();
+                out.hasNext = pageResult.hasNext();
+                out.hasPrevious = pageResult.hasPrevious();
+                return out;
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
         public java.util.List<java.util.Map<String, Object>> get_offline_download_list_hold() {
                 var entities = models_Offline_Table_Repository
                                 .findAllByHoldTrueOrderByDownloadPriorityDescIdDesc();
@@ -3550,6 +3795,134 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 Map<String, Object> out = new HashMap<>();
                 out.put("requested", requested);
                 out.put("updated", updated);
+                return out;
+        }
+
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public int updatePendingAiSuggestions(List<com.civitai.server.models.dto.PendingAiSuggestionDTO> items) {
+                try {
+                        if (items == null || items.isEmpty())
+                                return 0;
+
+                        // 1) de-dupe by civitaiVersionID (keep first)
+                        Map<Long, com.civitai.server.models.dto.PendingAiSuggestionDTO> byVid = new LinkedHashMap<>();
+
+                        for (var dto : items) {
+                                if (dto == null)
+                                        continue;
+
+                                Long vid = parseLongOrNullforAI(dto.getCivitaiVersionID());
+                                if (vid == null)
+                                        continue;
+
+                                byVid.putIfAbsent(vid, dto);
+                        }
+
+                        if (byVid.isEmpty())
+                                return 0;
+
+                        // 2) fetch all entities in ONE query
+                        List<Long> versionIds = new ArrayList<>(byVid.keySet());
+                        List<com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity> entities = models_Offline_Table_Repository
+                                        .findAllByCivitaiVersionIDIn(versionIds);
+
+                        if (entities == null || entities.isEmpty())
+                                return 0;
+
+                        Map<Long, com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity> entityByVid = new HashMap<>();
+                        for (var e : entities) {
+                                if (e == null)
+                                        continue;
+                                if (e.getCivitaiVersionID() == null)
+                                        continue;
+                                entityByVid.put(e.getCivitaiVersionID(), e);
+                        }
+
+                        // 3) update fields
+                        int updated = 0;
+
+                        for (var entry : byVid.entrySet()) {
+                                Long vid = entry.getKey();
+                                var dto = entry.getValue();
+
+                                var entity = entityByVid.get(vid);
+                                if (entity == null)
+                                        continue;
+
+                                // Titles: clamp to 500 (matches your column length)
+                                entity.setAiSuggestedArtworkTitle(truncate(dto.getAiSuggestedArtworkTitle(), 500));
+                                entity.setJikanNormalizedArtworkTitle(
+                                                truncate(dto.getJikanNormalizedArtworkTitle(), 500));
+
+                                // JSON lists: store as list (Hibernate JSON)
+                                entity.setAiSuggestedDownloadFilePath(
+                                                limitList(dto.getAiSuggestedDownloadFilePath(), 20));
+                                entity.setJikanSuggestedDownloadFilePath(
+                                                limitList(dto.getJikanSuggestedDownloadFilePath(), 20));
+                                entity.setLocalSuggestedDownloadFilePath(
+                                                limitList(dto.getLocalSuggestedDownloadFilePath(), 20));
+
+                                updated++;
+                        }
+
+                        // 4) flush changes (since entities are managed)
+                        models_Offline_Table_Repository.flush();
+
+                        return updated;
+
+                } catch (Exception ex) {
+                        System.err.println("Unexpected error occurred: " + ex.getMessage());
+                        ex.printStackTrace();
+                        throw ex; // so transaction rolls back
+                }
+        }
+
+        /*
+         * =========================
+         * helpers (same service file)
+         * =========================
+         */
+
+        private static Long parseLongOrNullforAI(Object v) {
+                if (v == null)
+                        return null;
+                if (v instanceof Long)
+                        return (Long) v;
+                String s = String.valueOf(v).trim();
+                if (s.isBlank())
+                        return null;
+                try {
+                        return Long.parseLong(s);
+                } catch (Exception ignore) {
+                        return null;
+                }
+        }
+
+        private static String truncate(String s, int max) {
+                if (s == null)
+                        return null;
+                String x = s.trim();
+                if (x.isBlank())
+                        return null;
+                return x.length() <= max ? x : x.substring(0, max);
+        }
+
+        private static List<String> limitList(List<String> src, int max) {
+                if (src == null || src.isEmpty())
+                        return List.of();
+
+                ArrayList<String> out = new ArrayList<>();
+                for (String s : src) {
+                        if (s == null)
+                                continue;
+                        String x = s.trim();
+                        if (x.isBlank())
+                                continue;
+                        out.add(x);
+                        if (out.size() >= max)
+                                break;
+                }
                 return out;
         }
 

@@ -179,6 +179,18 @@ public interface CivitaiSQL_Service {
                         boolean includeEarlyAccess,
                         String sortDir);
 
+        public PageResponse<Map<String, Object>> get_offline_download_list_paged_aiSuggestedArtworkTitleEmpty(
+                        int page,
+                        int size,
+                        boolean filterEmptyBaseModel,
+                        List<String> prefixes,
+                        String search,
+                        String op,
+                        String status,
+                        boolean includeHold,
+                        boolean includeEarlyAccess,
+                        String sortDir);
+
         PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
 
         public boolean update_hold_from_offline_download_list(String civitaiModelID, String civitaiVersionID,
@@ -199,5 +211,7 @@ public interface CivitaiSQL_Service {
                         String downloadFilePath);
 
         public Map<String, Object> bulkPatchOfflineDownloadList(Map<String, Object> body);
+
+        int updatePendingAiSuggestions(List<com.civitai.server.models.dto.PendingAiSuggestionDTO> items);
 
 }

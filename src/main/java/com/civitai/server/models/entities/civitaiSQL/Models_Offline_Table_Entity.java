@@ -3,6 +3,10 @@ package com.civitai.server.models.entities.civitaiSQL;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Data
 @Entity
@@ -24,6 +28,24 @@ public class Models_Offline_Table_Entity {
 
     @Column(length = 1000)
     private String downloadFilePath;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_suggested_download_file_path", columnDefinition = "json")
+    private List<String> aiSuggestedDownloadFilePath;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "jikan_suggested_download_file_path", columnDefinition = "json")
+    private List<String> jikanSuggestedDownloadFilePath;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "local_suggested_download_file_path", columnDefinition = "json")
+    private List<String> localSuggestedDownloadFilePath;
+
+    @Column(name = "ai_suggested_artwork_title", length = 500)
+    private String aiSuggestedArtworkTitle;
+
+    @Column(name = "jikan_normalized_artwork_title", length = 500)
+    private String jikanNormalizedArtworkTitle;
 
     @Column(columnDefinition = "TEXT")
     private String civitaiUrl;
