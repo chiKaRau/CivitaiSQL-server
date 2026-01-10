@@ -2970,6 +2970,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         m.put("downloadFilePath", e.getDownloadFilePath());
                         m.put("civitaiUrl", e.getCivitaiUrl());
                         m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                        m.put("aiSuggestedDownloadFilePath", e.getAiSuggestedDownloadFilePath());
+                        m.put("jikanSuggestedDownloadFilePath", e.getJikanSuggestedDownloadFilePath());
+                        m.put("localSuggestedDownloadFilePath", e.getLocalSuggestedDownloadFilePath());
+                        m.put("aiSuggestedArtworkTitle", e.getAiSuggestedArtworkTitle());
+                        m.put("jikanNormalizedArtworkTitle", e.getJikanNormalizedArtworkTitle());
                         m.put("selectedCategory", e.getSelectedCategory());
                         m.put("civitaiModelID",
                                         e.getCivitaiModelID() == null ? null : String.valueOf(e.getCivitaiModelID()));
