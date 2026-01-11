@@ -1472,8 +1472,8 @@ public class CivitaiSQL_Controller {
     }
 
     @CrossOrigin(origins = "*")
-    @GetMapping("/get_pending_from_offline_download_list-ai_suggestion")
-    public ResponseEntity<CustomResponse<List<com.civitai.server.models.dto.PendingAiSuggestionDTO>>> getPendingFromOfflineDownloadListAiSuggestion(
+    @PostMapping("/run_pending_from_offline_download_list-ai_suggestion")
+    public ResponseEntity<CustomResponse<List<String>>> getPendingFromOfflineDownloadListAiSuggestion(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
         try {
@@ -1703,7 +1703,16 @@ public class CivitaiSQL_Controller {
             int updated = civitaiSQL_Service.updatePendingAiSuggestions(out);
             System.out.println("Updated rows: " + updated);
 
-            return ResponseEntity.ok(CustomResponse.success("OK", out));
+            // Return only IDs (distinct, stable order)
+            java.util.List<String> processedIds = out.stream()
+                    .map(com.civitai.server.models.dto.PendingAiSuggestionDTO::getCivitaiVersionID)
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::trim)
+                    .filter(x -> !x.isBlank())
+                    .distinct()
+                    .toList();
+
+            return ResponseEntity.ok(CustomResponse.success("OK", processedIds));
 
         } catch (Exception ex) {
             System.err.println("Unexpected error occurred: " + ex.getMessage());
