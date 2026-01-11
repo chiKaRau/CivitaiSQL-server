@@ -1712,6 +1712,8 @@ public class CivitaiSQL_Controller {
                     .distinct()
                     .toList();
 
+            System.out.println(processedIds);
+
             return ResponseEntity.ok(CustomResponse.success("OK", processedIds));
 
         } catch (Exception ex) {
