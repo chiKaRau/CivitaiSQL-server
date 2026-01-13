@@ -2040,6 +2040,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
                                 m.put("downloadPriority", e.getDownloadPriority());
                                 m.put("hold", e.getHold());
+                                m.put("isError", e.getIsError());
 
                                 // parse JSON columns (DB stores valid JSON; null-safe here)
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
@@ -2136,6 +2137,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
                                 m.put("downloadPriority", e.getDownloadPriority());
                                 m.put("hold", e.getHold());
+                                m.put("isError", e.getIsError());
 
                                 // parse JSON columns inline
                                 List<Map<String, Object>> fileList = null;
@@ -2802,6 +2804,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         String status,
                         boolean includeHold,
                         boolean includeEarlyAccess,
+                        boolean includeErrors,
                         String sortDir) {
 
                 final int p = Math.max(0, page);
@@ -2861,6 +2864,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                                 cb.lessThanOrEqualTo(earlyPath, now) // only past or
                                                                                                      // null
                                 ));
+                        }
+
+                        // 0c) ERROR filter: when includeErrors == false, exclude rows where isError ==
+                        // true
+                        if (!includeErrors) {
+                                jakarta.persistence.criteria.Path<Boolean> errPath = root.get("isError");
+                                ands.add(cb.or(cb.isNull(errPath), cb.isFalse(errPath)));
                         }
 
                         // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
@@ -2983,6 +2993,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
                         m.put("downloadPriority", e.getDownloadPriority());
                         m.put("hold", e.getHold());
+                        m.put("isError", e.getIsError());
+
                         try {
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
                                         m.put("civitaiModelFileList", objectMapper.readValue(
@@ -3044,6 +3056,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         String status,
                         boolean includeHold,
                         boolean includeEarlyAccess,
+                        boolean includeErrors,
                         String sortDir) {
 
                 final int p = Math.max(0, page);
@@ -3105,6 +3118,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 ands.add(cb.or(
                                                 cb.isNull(earlyPath),
                                                 cb.lessThanOrEqualTo(earlyPath, now)));
+                        }
+
+                        // 0c) ERROR filter: when includeErrors == false, exclude rows where isError ==
+                        // true
+                        if (!includeErrors) {
+                                jakarta.persistence.criteria.Path<Boolean> errPath = root.get("isError");
+                                ands.add(cb.or(cb.isNull(errPath), cb.isFalse(errPath)));
                         }
 
                         // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
@@ -3222,6 +3242,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
                         m.put("downloadPriority", e.getDownloadPriority());
                         m.put("hold", e.getHold());
+                        m.put("isError", e.getIsError());
 
                         // (optional) include this field too since it’s relevant for this endpoint
                         m.put("aiSuggestedArtworkTitle", e.getAiSuggestedArtworkTitle());
@@ -3318,6 +3339,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
                 m.put("downloadPriority", e.getDownloadPriority());
                 m.put("hold", e.getHold());
+                m.put("isError", e.getIsError());
 
                 try {
                         if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
