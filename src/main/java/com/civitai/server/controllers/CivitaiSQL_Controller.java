@@ -1383,6 +1383,7 @@ public class CivitaiSQL_Controller {
             @RequestParam(name = "includeHold", defaultValue = "true") boolean includeHold,
             @RequestParam(name = "includeEarlyAccess", defaultValue = "true") boolean includeEarlyAccess,
             @RequestParam(name = "includeErrors", defaultValue = "true") boolean includeErrors,
+            @RequestParam(name = "aiSuggestedOnly", defaultValue = "false") boolean aiSuggestedOnly,
             @RequestParam(name = "sortDir", defaultValue = "desc") String sortDir) {
 
         final int p = Math.max(0, page);
@@ -1421,6 +1422,7 @@ public class CivitaiSQL_Controller {
                 includeHold,
                 includeEarlyAccess,
                 includeErrors,
+                aiSuggestedOnly,
                 sortDir);
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
@@ -1444,6 +1446,7 @@ public class CivitaiSQL_Controller {
         final boolean includeHold = true;
         final boolean includeEarlyAccess = true;
         final boolean includeErrors = true;
+        final boolean aiSuggestedOnly = false;
         final String sortDir = "desc";
 
         System.out.println("---- GET /get_pending_from_offline_download_list-in-page ----");
@@ -1470,6 +1473,7 @@ public class CivitaiSQL_Controller {
                 includeHold,
                 includeEarlyAccess,
                 includeErrors,
+                aiSuggestedOnly,
                 sortDir);
 
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
@@ -1497,6 +1501,7 @@ public class CivitaiSQL_Controller {
             final boolean includeHold = true;
             final boolean includeEarlyAccess = true;
             final boolean includeErrors = true;
+            final boolean aiSuggestedOnly = false;
             final String sortDir = "desc";
 
             // 1) Fetch
@@ -1511,6 +1516,7 @@ public class CivitaiSQL_Controller {
                             includeHold,
                             includeEarlyAccess,
                             includeErrors,
+                            aiSuggestedOnly,
                             sortDir);
 
             // 2) Convert to JsonNode so we can read "content" without relying on getters

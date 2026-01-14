@@ -2805,6 +2805,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         boolean includeHold,
                         boolean includeEarlyAccess,
                         boolean includeErrors,
+                        boolean aiSuggestedOnly,
                         String sortDir) {
 
                 final int p = Math.max(0, page);
@@ -2871,6 +2872,24 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         if (!includeErrors) {
                                 jakarta.persistence.criteria.Path<Boolean> errPath = root.get("isError");
                                 ands.add(cb.or(cb.isNull(errPath), cb.isFalse(errPath)));
+                        }
+
+                        if (aiSuggestedOnly) {
+                                var aiPath = root.get("aiSuggestedDownloadFilePath");
+
+                                // must exist
+                                ands.add(cb.isNotNull(aiPath));
+
+                                // optional but usually good: must be non-empty JSON array
+                                ands.add(cb.greaterThan(
+                                                cb.function("JSON_LENGTH", Integer.class, aiPath),
+                                                0));
+
+                                // exclude arrays that contain "UNKNOWN"
+                                ands.add(cb.equal(
+                                                cb.function("JSON_CONTAINS", Integer.class, aiPath,
+                                                                cb.literal("\"UNKNOWN\"")),
+                                                0));
                         }
 
                         // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
@@ -3057,6 +3076,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         boolean includeHold,
                         boolean includeEarlyAccess,
                         boolean includeErrors,
+                        boolean aiSuggestedOnly,
                         String sortDir) {
 
                 final int p = Math.max(0, page);
@@ -3125,6 +3145,24 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         if (!includeErrors) {
                                 jakarta.persistence.criteria.Path<Boolean> errPath = root.get("isError");
                                 ands.add(cb.or(cb.isNull(errPath), cb.isFalse(errPath)));
+                        }
+
+                        if (aiSuggestedOnly) {
+                                var aiPath = root.get("aiSuggestedDownloadFilePath");
+
+                                // must exist
+                                ands.add(cb.isNotNull(aiPath));
+
+                                // optional but usually good: must be non-empty JSON array
+                                ands.add(cb.greaterThan(
+                                                cb.function("JSON_LENGTH", Integer.class, aiPath),
+                                                0));
+
+                                // exclude arrays that contain "UNKNOWN"
+                                ands.add(cb.equal(
+                                                cb.function("JSON_CONTAINS", Integer.class, aiPath,
+                                                                cb.literal("\"UNKNOWN\"")),
+                                                0));
                         }
 
                         // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
