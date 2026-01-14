@@ -1477,7 +1477,7 @@ public class CivitaiSQL_Controller {
 
     @CrossOrigin(origins = "*")
     @PostMapping("/run_pending_from_offline_download_list-ai_suggestion")
-    public ResponseEntity<CustomResponse<List<String>>> getPendingFromOfflineDownloadListAiSuggestion(
+    public ResponseEntity<CustomResponse<List<String>>> runPendingFromOfflineDownloadListAiSuggestion(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
         try {
