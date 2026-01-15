@@ -53,6 +53,7 @@ import com.civitai.server.services.Jikan_Service;
 import com.civitai.server.utils.CustomResponse;
 import com.civitai.server.utils.JsonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 @RestController
@@ -2557,4 +2558,45 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok(CustomResponse.success("bulk patch done", result));
     }
 
+    /**
+     * Bulk update downloadFilePath by (civitaiModelID, civitaiVersionID).
+     *
+     * Accepts array of objects like:
+     * [
+     * { "modelId": 123, "versionId": 456, "downloadFilePath":
+     * "/@scan@/ACG/Characters/..." },
+     * { "civitaiModelID": "123", "civitaiVersionID": "789", "selectedPath":
+     * "/@scan@/Update/..." }
+     * ]
+     */
+    @PutMapping("/bulk-update-download-file-path")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> bulkUpdateDownloadFilePath(
+            @RequestBody List<DownloadFilePathPatchItem> items) {
+        if (items == null || items.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Input list is empty."));
+        }
+
+        try {
+            Map<String, Object> result = civitaiSQL_Service.bulkUpdateDownloadFilePath(items);
+            return ResponseEntity.ok(CustomResponse.success("Bulk update completed", result));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure(ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError()
+                    .body(CustomResponse.failure("Bulk update failed: " + ex.getMessage()));
+        }
+    }
+
+    // ✅ Keep it inside the controller so you don't need a new file/class.
+    public static class DownloadFilePathPatchItem {
+        @JsonAlias("civitaiModelID")
+        public String civitaiModelID;
+
+        @JsonAlias("civitaiVersionID")
+        public String civitaiVersionID;
+
+        @JsonAlias("selectedPath")
+        public String selectedPath;
+    }
 }

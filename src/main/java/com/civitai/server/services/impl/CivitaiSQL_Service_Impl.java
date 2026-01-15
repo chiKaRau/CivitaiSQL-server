@@ -36,6 +36,8 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
+import com.civitai.server.controllers.CivitaiSQL_Controller;
+import com.civitai.server.controllers.CivitaiSQL_Controller.DownloadFilePathPatchItem;
 import com.civitai.server.exception.CustomDatabaseException;
 import com.civitai.server.exception.CustomException;
 import com.civitai.server.models.dto.FullModelRecordDTO;
@@ -3989,6 +3991,135 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 break;
                 }
                 return out;
+        }
+
+        @Override
+        @Transactional
+        public Map<String, Object> bulkUpdateDownloadFilePath(
+                        List<CivitaiSQL_Controller.DownloadFilePathPatchItem> items) {
+
+                if (items == null || items.isEmpty()) {
+                        throw new IllegalArgumentException("Input list is empty.");
+                }
+
+                // Dedup by (civitaiModelID, civitaiVersionID). "last one wins".
+                Map<String, CivitaiSQL_Controller.DownloadFilePathPatchItem> dedup = new LinkedHashMap<>();
+                List<String> rejected = new ArrayList<>();
+
+                for (var it : items) {
+                        if (it == null) {
+                                rejected.add("null item");
+                                continue;
+                        }
+
+                        String midRaw = it.civitaiModelID == null ? "" : it.civitaiModelID.trim();
+                        String vidRaw = it.civitaiVersionID == null ? "" : it.civitaiVersionID.trim();
+                        String pathRaw = it.selectedPath == null ? "" : it.selectedPath.trim();
+
+                        if (midRaw.isEmpty() || vidRaw.isEmpty()) {
+                                rejected.add("missing civitaiModelID/civitaiVersionID");
+                                continue;
+                        }
+                        if (pathRaw.isEmpty()) {
+                                rejected.add(midRaw + "|" + vidRaw + " missing selectedPath");
+                                continue;
+                        }
+                        if ("UNKNOWN".equalsIgnoreCase(pathRaw)) {
+                                rejected.add(midRaw + "|" + vidRaw + " selectedPath=UNKNOWN");
+                                continue;
+                        }
+                        if (pathRaw.length() > 1000) { // entity column length is 1000
+                                rejected.add(midRaw + "|" + vidRaw + " selectedPath too long (" + pathRaw.length()
+                                                + ")");
+                                continue;
+                        }
+
+                        dedup.put(midRaw + "|" + vidRaw, it);
+                }
+
+                if (dedup.isEmpty()) {
+                        throw new IllegalArgumentException("No valid items to update.");
+                }
+
+                // Parse ids + collect modelIds
+                Map<String, long[]> parsedIdsByKey = new LinkedHashMap<>();
+                Set<Long> modelIds = new LinkedHashSet<>();
+
+                for (var e : dedup.entrySet()) {
+                        String key = e.getKey();
+                        var it = e.getValue();
+
+                        try {
+                                long modelId = Long.parseLong(it.civitaiModelID.trim());
+                                long versionId = Long.parseLong(it.civitaiVersionID.trim());
+                                parsedIdsByKey.put(key, new long[] { modelId, versionId });
+                                modelIds.add(modelId);
+                        } catch (NumberFormatException nfe) {
+                                rejected.add(key + " invalid numeric id(s)");
+                        }
+                }
+
+                if (modelIds.isEmpty()) {
+                        throw new IllegalArgumentException("No valid numeric ids to update.");
+                }
+
+                // Load rows for those modelIds (includes all versions for each model)
+                List<Models_Offline_Table_Entity> rows = models_Offline_Table_Repository
+                                .findAllByCivitaiModelIDIn(new ArrayList<>(modelIds));
+
+                // Index them by (modelId|versionId)
+                Map<String, Models_Offline_Table_Entity> entityByKey = new HashMap<>();
+                for (var r : rows) {
+                        if (r.getCivitaiModelID() == null || r.getCivitaiVersionID() == null)
+                                continue;
+                        entityByKey.put(r.getCivitaiModelID() + "|" + r.getCivitaiVersionID(), r);
+                }
+
+                int updatedPairs = 0;
+                List<String> notFoundPairs = new ArrayList<>();
+                List<Models_Offline_Table_Entity> toSave = new ArrayList<>();
+
+                for (var e : dedup.entrySet()) {
+                        String key = e.getKey();
+                        var it = e.getValue();
+
+                        long[] ids = parsedIdsByKey.get(key);
+                        if (ids == null)
+                                continue; // rejected earlier due to parse error
+
+                        String lookupKey = ids[0] + "|" + ids[1];
+                        Models_Offline_Table_Entity ent = entityByKey.get(lookupKey);
+
+                        if (ent == null) {
+                                notFoundPairs.add(key);
+                                continue;
+                        }
+
+                        String nextPath = it.selectedPath.trim();
+                        String prevPath = ent.getDownloadFilePath();
+
+                        // Optional: skip if no change
+                        if (prevPath != null && prevPath.trim().equals(nextPath)) {
+                                continue;
+                        }
+
+                        ent.setDownloadFilePath(nextPath);
+                        toSave.add(ent);
+                        updatedPairs++;
+                }
+
+                if (!toSave.isEmpty()) {
+                        models_Offline_Table_Repository.saveAll(toSave);
+                }
+
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("requested", items.size());
+                result.put("uniquePairs", dedup.size());
+                result.put("updatedPairs", updatedPairs);
+                result.put("savedEntities", toSave.size());
+                result.put("notFoundPairs", notFoundPairs);
+                result.put("rejected", rejected);
+                return result;
         }
 
 }

@@ -8,6 +8,7 @@ import javax.swing.text.html.Option;
 
 import org.springframework.lang.Nullable;
 
+import com.civitai.server.controllers.CivitaiSQL_Controller;
 import com.civitai.server.models.dto.FullModelRecordDTO;
 import com.civitai.server.models.dto.Models_DTO;
 import com.civitai.server.models.dto.PageResponse;
@@ -217,5 +218,8 @@ public interface CivitaiSQL_Service {
         public Map<String, Object> bulkPatchOfflineDownloadList(Map<String, Object> body);
 
         int updatePendingAiSuggestions(List<com.civitai.server.models.dto.PendingAiSuggestionDTO> items);
+
+        public Map<String, Object> bulkUpdateDownloadFilePath(
+                        List<CivitaiSQL_Controller.DownloadFilePathPatchItem> items);
 
 }
