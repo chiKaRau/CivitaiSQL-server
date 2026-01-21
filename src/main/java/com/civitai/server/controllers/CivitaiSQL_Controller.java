@@ -52,6 +52,7 @@ import com.civitai.server.services.Gemini_Service;
 import com.civitai.server.services.Jikan_Service;
 import com.civitai.server.utils.CustomResponse;
 import com.civitai.server.utils.JsonUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -66,16 +67,18 @@ public class CivitaiSQL_Controller {
     private File_Service fileService;
     private Gemini_Service gemini_Service;
     private Jikan_Service jikan_Service;
+    private ObjectMapper objectMapperforAI;
 
     @Autowired
     public CivitaiSQL_Controller(CivitaiSQL_Service civitaiSQL_Service, Civitai_Service civitai_Service,
             Gemini_Service gemini_Service, Jikan_Service jikan_Service,
-            File_Service fileService) {
+            File_Service fileService, ObjectMapper objectMapperforAI) {
         this.civitaiSQL_Service = civitaiSQL_Service;
         this.civitai_Service = civitai_Service;
         this.fileService = fileService;
         this.gemini_Service = gemini_Service;
         this.jikan_Service = jikan_Service;
+        this.objectMapperforAI = objectMapperforAI;
     }
 
     // Testing Api Route
@@ -1486,7 +1489,6 @@ public class CivitaiSQL_Controller {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
             final int p = Math.max(0, page);
             final int s = Math.min(Math.max(1, size), 500);
@@ -1521,10 +1523,11 @@ public class CivitaiSQL_Controller {
                             sortDir);
 
             // 2) Convert to JsonNode so we can read "content" without relying on getters
-            com.fasterxml.jackson.databind.JsonNode pageNode = mapper.valueToTree(pageResult);
+            JsonNode pageNode = objectMapperforAI.valueToTree(pageResult);
 
             // try root.content first, then payload.content fallback
-            com.fasterxml.jackson.databind.JsonNode contentNode = pageNode.path("content");
+            JsonNode contentNode = pageNode.path("content");
+
             if (!contentNode.isArray()) {
                 contentNode = pageNode.path("payload").path("content");
             }
