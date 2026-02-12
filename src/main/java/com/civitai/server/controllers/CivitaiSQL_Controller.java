@@ -2067,6 +2067,16 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("creatorUrlList retrieval successful", payload));
     }
 
+    @GetMapping("/get_rating_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getRatingList() {
+        List<Map<String, Object>> ratingList = civitaiSQL_Service.get_rating_list();
+
+        Map<String, List<Map<String, Object>>> payload = new HashMap<>();
+        payload.put("ratingList", ratingList);
+
+        return ResponseEntity.ok().body(CustomResponse.success("ratingList retrieval successful", payload));
+    }
+
     @SuppressWarnings("unchecked")
     @PostMapping("/update_creator_url_list")
     public ResponseEntity<CustomResponse<String>> updateCreatorUrlList(

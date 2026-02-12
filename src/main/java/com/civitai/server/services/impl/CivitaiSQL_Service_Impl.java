@@ -54,6 +54,7 @@ import com.civitai.server.models.entities.civitaiSQL.Models_Images_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Offline_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Rating_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.Creator_Table_Repository;
@@ -64,6 +65,7 @@ import com.civitai.server.repositories.civitaiSQL.Models_Offline_Table_Repositor
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Table_Repository_Specification;
 import com.civitai.server.repositories.civitaiSQL.Models_Urls_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.Rating_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Recycle_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.VisitedPath_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.impl.ModelsRepositoryFTS;
@@ -103,6 +105,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Models_Table_Repository_Specification models_Table_Repository_Specification;
         private final Models_Offline_Table_Repository models_Offline_Table_Repository;
         private final Creator_Table_Repository creator_Table_Repository;
+        private final Rating_Table_Repository rating_Table_Repository;
         private final VisitedPath_Table_Repository visitedPath_Table_Repository;
         private final ModelsRepositoryFTS modelsRepositoryFTS;
         private final Recycle_Table_Repository recycle_Table_Repository;
@@ -250,6 +253,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Models_Images_Table_Repository models_Images_Table_Repository,
                         Models_Offline_Table_Repository models_Offline_Table_Repository,
                         Creator_Table_Repository creator_Table_Repository,
+                        Rating_Table_Repository rating_Table_Repository,
                         Models_Table_Repository_Specification models_Table_Repository_Specification,
                         VisitedPath_Table_Repository visitedPath_Table_Repository,
                         Recycle_Table_Repository recycle_Table_Repository,
@@ -263,6 +267,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.models_Images_Table_Repository = models_Images_Table_Repository;
                 this.models_Offline_Table_Repository = models_Offline_Table_Repository;
                 this.creator_Table_Repository = creator_Table_Repository;
+                this.rating_Table_Repository = rating_Table_Repository;
                 this.models_Table_Repository_Specification = models_Table_Repository_Specification;
                 this.visitedPath_Table_Repository = visitedPath_Table_Repository;
                 this.recycle_Table_Repository = recycle_Table_Repository;
@@ -2357,6 +2362,30 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         return out;
                 } catch (Exception ex) {
                         log.error("Unexpected error while retrieving creator URL list (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<Map<String, Object>> get_rating_list() {
+                try {
+                        // If you have findAllByOrderByIdAsc(), use it; otherwise use findAll()
+                        List<Rating_Table_Entity> rows = rating_Table_Repository.findAll();
+
+                        if (rows.isEmpty())
+                                return Collections.emptyList();
+
+                        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+                        for (Rating_Table_Entity e : rows) {
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("rating", e.getRating());
+                                m.put("expectedMax", e.getExpectedMax());
+                                out.add(m);
+                        }
+                        return out;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving rating list (DB)", ex);
                         throw new CustomException("An unexpected error occurred", ex);
                 }
         }
