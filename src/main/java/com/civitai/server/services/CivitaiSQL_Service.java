@@ -224,4 +224,6 @@ public interface CivitaiSQL_Service {
         public Map<String, Object> bulkUpdateDownloadFilePath(
                         List<CivitaiSQL_Controller.DownloadFilePathPatchItem> items);
 
+        public List<Map<String, Object>> get_category_prefixes_list();
+
 }

@@ -47,6 +47,7 @@ import com.civitai.server.models.dto.PendingAiSuggestionDTO;
 import com.civitai.server.models.dto.Tables_DTO;
 import com.civitai.server.models.dto.TagCountDTO;
 import com.civitai.server.models.dto.TopTagsRequest;
+import com.civitai.server.models.entities.civitaiSQL.Category_Prefixes_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Creator_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Descriptions_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
@@ -57,6 +58,7 @@ import com.civitai.server.models.entities.civitaiSQL.Models_Urls_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Rating_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
+import com.civitai.server.repositories.civitaiSQL.Category_Prefixes_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Creator_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
@@ -111,6 +113,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Recycle_Table_Repository recycle_Table_Repository;
         private final ObjectMapper objectMapper;
         private final Civitai_Service civitai_Service;
+        private final Category_Prefixes_Table_Repository category_Prefixes_Table_Repository;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Service_Impl.class);
@@ -259,7 +262,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Recycle_Table_Repository recycle_Table_Repository,
                         ModelsRepositoryFTS modelsRepositoryFTS,
                         ObjectMapper objectMapper,
-                        Civitai_Service civitai_Service) {
+                        Civitai_Service civitai_Service,
+                        Category_Prefixes_Table_Repository category_Prefixes_Table_Repository) {
                 this.models_Table_Repository = models_Table_Repository;
                 this.models_Descriptions_Table_Repository = models_Descriptions_Table_Repository;
                 this.models_Urls_Table_Repository = models_Urls_Table_Repository;
@@ -274,6 +278,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.civitai_Service = civitai_Service;
                 this.objectMapper = objectMapper;
                 this.modelsRepositoryFTS = modelsRepositoryFTS;
+                this.category_Prefixes_Table_Repository = category_Prefixes_Table_Repository;
         }
 
         @Override
@@ -2362,6 +2367,36 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         return out;
                 } catch (Exception ex) {
                         log.error("Unexpected error while retrieving creator URL list (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<Map<String, Object>> get_category_prefixes_list() {
+                try {
+                        // You can use a sorted repo method if you created it; otherwise use findAll()
+                        List<Category_Prefixes_Table_Entity> rows = category_Prefixes_Table_Repository
+                                        .findAllByOrderByIdAsc();
+
+                        if (rows.isEmpty())
+                                return Collections.emptyList();
+
+                        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+                        for (Category_Prefixes_Table_Entity e : rows) {
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("id", e.getId());
+                                m.put("prefixName", e.getPrefixName());
+                                m.put("downloadFilePath", e.getDownloadFilePath());
+                                m.put("downloadPriority", e.getDownloadPriority());
+                                m.put("createdAt", e.getCreatedAt());
+                                m.put("updatedAt", e.getUpdatedAt());
+                                out.add(m);
+                        }
+                        return out;
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving category prefixes list (DB)", ex);
                         throw new CustomException("An unexpected error occurred", ex);
                 }
         }

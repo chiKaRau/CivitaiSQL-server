@@ -381,19 +381,19 @@ public class File_Controller {
         }
     }
 
-    @GetMapping("/get_categories_prefix_list")
-    public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getCategoriesPrefixsList() {
-        List<Map<String, String>> categoriesPrefixsList = fileService.get_categories_prefix_list();
+    // @GetMapping("/get_categories_prefix_list")
+    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getCategoriesPrefixsList() {
+    //     List<Map<String, String>> categoriesPrefixsList = fileService.get_categories_prefix_list();
 
-        if (!categoriesPrefixsList.isEmpty()) {
-            Map<String, List<Map<String, String>>> payload = new HashMap<>();
-            payload.put("categoriesPrefixsList", categoriesPrefixsList);
+    //     if (!categoriesPrefixsList.isEmpty()) {
+    //         Map<String, List<Map<String, String>>> payload = new HashMap<>();
+    //         payload.put("categoriesPrefixsList", categoriesPrefixsList);
 
-            return ResponseEntity.ok().body(CustomResponse.success("Categories prefix retrieval successful", payload));
-        } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("No categories found in the database"));
-        }
-    }
+    //         return ResponseEntity.ok().body(CustomResponse.success("Categories prefix retrieval successful", payload));
+    //     } else {
+    //         return ResponseEntity.ok().body(CustomResponse.failure("No categories found in the database"));
+    //     }
+    // }
 
     @GetMapping("/get_filePath_categories_list")
     public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getFilePathCategoriesList() {
