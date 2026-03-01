@@ -74,7 +74,7 @@ public class File_Service_Impl implements File_Service {
     public void createFileAtStartup() {
 
         // Create a offline_download_list if have none
-        create_offline_download_list();
+        // create_offline_download_list();
 
         // Create a folder_list if have none
         create_folder_list();
@@ -89,11 +89,11 @@ public class File_Service_Impl implements File_Service {
         create_tags_list();
 
         // Create a error_model_list if have none
-        create_error_model_list();
+        // create_error_model_list();
 
         create_pending_remove_tags_list();
 
-        create_creator_url_list();
+        // create_creator_url_list();
     }
 
     public void create_offline_download_list() {

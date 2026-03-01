@@ -395,20 +395,20 @@ public class File_Controller {
     //     }
     // }
 
-    @GetMapping("/get_filePath_categories_list")
-    public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getFilePathCategoriesList() {
-        List<Map<String, String>> filePathCategoriesList = fileService.get_filePath_categories_list();
+    // @GetMapping("/get_filePath_categories_list")
+    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, String>>>>> getFilePathCategoriesList() {
+    //     List<Map<String, String>> filePathCategoriesList = fileService.get_filePath_categories_list();
 
-        if (!filePathCategoriesList.isEmpty()) {
-            Map<String, List<Map<String, String>>> payload = new HashMap<>();
-            payload.put("filePathCategoriesList", filePathCategoriesList);
+    //     if (!filePathCategoriesList.isEmpty()) {
+    //         Map<String, List<Map<String, String>>> payload = new HashMap<>();
+    //         payload.put("filePathCategoriesList", filePathCategoriesList);
 
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("filePathCategoriesList retrieval successful", payload));
-        } else {
-            return ResponseEntity.ok().body(CustomResponse.failure("No categories found in the database"));
-        }
-    }
+    //         return ResponseEntity.ok()
+    //                 .body(CustomResponse.success("filePathCategoriesList retrieval successful", payload));
+    //     } else {
+    //         return ResponseEntity.ok().body(CustomResponse.failure("No categories found in the database"));
+    //     }
+    // }
 
     @SuppressWarnings("unchecked")
     @PostMapping("/download-file-server")
