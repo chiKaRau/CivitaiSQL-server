@@ -126,6 +126,8 @@ public interface CivitaiSQL_Service {
                         Boolean hold,
                         Integer downloadPriority);
 
+        public Map<String, Object> refresh_offline_download_record(String civitaiModelID, String civitaiVersionID);
+
         public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
 
         public long checkQuantityOfOfflineDownloadList(String civitaiModelID);

@@ -1223,6 +1223,39 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
     }
 
+    @SuppressWarnings("unchecked")
+    @PostMapping("/refresh-offline-download-record")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> refreshOfflineDownloadRecord(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String civitaiModelID = requestBody.get("civitaiModelID") != null
+                ? String.valueOf(requestBody.get("civitaiModelID")).trim()
+                : null;
+
+        String civitaiVersionID = requestBody.get("civitaiVersionID") != null
+                ? String.valueOf(requestBody.get("civitaiVersionID")).trim()
+                : null;
+
+        if (civitaiModelID == null || civitaiModelID.isEmpty() ||
+                civitaiVersionID == null || civitaiVersionID.isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        try {
+            Map<String, Object> payload = civitaiSQL_Service.refresh_offline_download_record(
+                    civitaiModelID, civitaiVersionID);
+
+            // If your CustomResponse.success(...) does NOT support payload, adjust to your
+            // existing pattern.
+            return ResponseEntity.ok(CustomResponse.success("Refresh successful", payload));
+        } catch (Exception ex) {
+            System.err
+                    .println("Refresh failed for " + civitaiModelID + "_" + civitaiVersionID + " | " + ex.getMessage());
+            ex.printStackTrace();
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Refresh failed: " + ex.getMessage()));
+        }
+    }
+
     @PostMapping(path = "/check-quantity-of-offlinedownload-list")
     public ResponseEntity<CustomResponse<Map<String, Long>>> CheckQuantityOfOfflineDownloadList(
             @RequestBody Map<String, Object> requestBody) {

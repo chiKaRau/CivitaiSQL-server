@@ -1961,6 +1961,423 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return p;
         }
 
+        // =======================
+        // Service (new function)
+        // =======================
+
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public Map<String, Object> refresh_offline_download_record(String civitaiModelID, String civitaiVersionID) {
+
+                Long modelId = parseLongOrNull(civitaiModelID);
+                Long versionId = parseLongOrNull(civitaiVersionID);
+
+                try {
+                        // 1) Load existing record
+                        Models_Offline_Table_Entity e = models_Offline_Table_Repository
+                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, versionId)
+                                        .orElseThrow(() -> new CustomException(
+                                                        "Record not found for modelId=" + civitaiModelID
+                                                                        + ", versionId=" + civitaiVersionID));
+
+                        // 2) Fetch latest model from Civitai
+                        Optional<Map<String, Object>> modelOptional = civitai_Service
+                                        .findModelByModelID(civitaiModelID);
+                        if (!modelOptional.isPresent()) {
+                                throw new CustomException("Model not found for modelID=" + civitaiModelID);
+                        }
+                        Map<String, Object> fetchedModel = modelOptional.get();
+
+                        Object versionsRaw = fetchedModel.get("modelVersions");
+                        if (!(versionsRaw instanceof List)) {
+                                throw new CustomException(
+                                                "Model has no modelVersions array (modelID=" + civitaiModelID + ")");
+                        }
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> modelVersions = (List<Map<String, Object>>) versionsRaw;
+
+                        Map<String, Object> modelVersionObject = modelVersions.stream()
+                                        .filter(v -> civitaiVersionID.equals(String.valueOf(v.get("id"))))
+                                        .findFirst()
+                                        .orElseThrow(() -> new CustomException(
+                                                        "Version " + civitaiVersionID + " not found in model "
+                                                                        + civitaiModelID));
+
+                        // Ensure mutable
+                        try {
+                                modelVersionObject.put("_check_mutable", Boolean.TRUE);
+                                modelVersionObject.remove("_check_mutable");
+                        } catch (UnsupportedOperationException uoe) {
+                                modelVersionObject = new java.util.LinkedHashMap<>(modelVersionObject);
+                        }
+
+                        // 3) EarlyAccess patch: earlyAccessEndsAt
+                        Object availabilityVal = modelVersionObject.get("availability");
+                        String availability = availabilityVal != null ? String.valueOf(availabilityVal) : null;
+
+                        if ("EarlyAccess".equalsIgnoreCase(availability)) {
+                                try {
+                                        String versionUrl = "https://civitai.com/api/v1/model-versions/"
+                                                        + civitaiVersionID;
+
+                                        org.springframework.http.client.SimpleClientHttpRequestFactory rf = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+                                        rf.setConnectTimeout(4000);
+                                        rf.setReadTimeout(4000);
+
+                                        org.springframework.web.client.RestTemplate rt = new org.springframework.web.client.RestTemplate(
+                                                        rf);
+
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> versionPayload = rt.getForObject(versionUrl, Map.class);
+
+                                        if (versionPayload != null && versionPayload.get("earlyAccessEndsAt") != null) {
+                                                modelVersionObject.put("earlyAccessEndsAt",
+                                                                versionPayload.get("earlyAccessEndsAt"));
+                                        } else {
+                                                modelVersionObject.put("earlyAccessEndsAt", null);
+                                        }
+                                } catch (Exception eaEx) {
+                                        System.err.println("Failed to fetch earlyAccessEndsAt for version "
+                                                        + civitaiVersionID
+                                                        + ": " + eaEx.getMessage());
+                                        modelVersionObject.put("earlyAccessEndsAt", null);
+                                }
+                        }
+
+                        // 4) Attach compact model + creator + modelId (same idea as your existing flow)
+                        Map<String, Object> modelSummary = new java.util.LinkedHashMap<>();
+                        modelSummary.put("id", fetchedModel.get("id"));
+                        modelSummary.put("poi", fetchedModel.get("poi"));
+                        modelSummary.put("name", fetchedModel.get("name"));
+                        modelSummary.put("nsfw", fetchedModel.get("nsfw"));
+                        modelSummary.put("type", fetchedModel.get("type"));
+                        modelVersionObject.put("model", modelSummary);
+
+                        Object creatorObj = fetchedModel.get("creator");
+                        if (creatorObj instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> creatorMap = (Map<String, Object>) creatorObj;
+                                modelVersionObject.put("creator", creatorMap);
+                        } else {
+                                modelVersionObject.put("creator", null);
+                        }
+
+                        Object modelIdValue = fetchedModel.get("id");
+                        if (modelIdValue == null) {
+                                try {
+                                        modelIdValue = Long.valueOf(civitaiModelID);
+                                } catch (NumberFormatException nfe) {
+                                        modelIdValue = civitaiModelID;
+                                }
+                        }
+                        if (!modelVersionObject.containsKey("modelId")) {
+                                modelVersionObject.put("modelId", modelIdValue);
+                        }
+
+                        // 5) Derive other “remote-sourced” fields we want to compare/update
+                        String civitaiBaseModel = modelVersionObject.get("baseModel") != null
+                                        ? String.valueOf(modelVersionObject.get("baseModel"))
+                                        : null;
+
+                        // If you want to refresh the stored file list from Civitai, use version.files
+                        // as the source
+                        List<Map<String, Object>> civitaiModelFileList = null;
+                        Object filesRaw = modelVersionObject.get("files");
+                        if (filesRaw instanceof List) {
+                                @SuppressWarnings("unchecked")
+                                List<Map<String, Object>> files = (List<Map<String, Object>>) filesRaw;
+                                civitaiModelFileList = files;
+                        }
+
+                        // Optional: refresh tags from top-level model.tags (if present)
+                        List<String> civitaiTags = null;
+                        Object tagsRaw = fetchedModel.get("tags");
+                        if (tagsRaw instanceof List) {
+                                civitaiTags = new java.util.ArrayList<>();
+                                for (Object t : (List<?>) tagsRaw) {
+                                        if (t != null)
+                                                civitaiTags.add(String.valueOf(t));
+                                }
+                        }
+
+                        String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
+
+                        // Parse earlyAccessEndsAt into LocalDateTime (same logic you already use)
+                        java.time.LocalDateTime earlyAccessEndsAt = null;
+                        try {
+                                Object ea = modelVersionObject.get("earlyAccessEndsAt");
+                                if (ea != null) {
+                                        String iso = String.valueOf(ea).trim();
+                                        if (!iso.isEmpty() && !"null".equalsIgnoreCase(iso)) {
+                                                try {
+                                                        earlyAccessEndsAt = java.time.OffsetDateTime.parse(iso)
+                                                                        .toLocalDateTime();
+                                                } catch (Exception p1) {
+                                                        try {
+                                                                earlyAccessEndsAt = java.time.LocalDateTime.parse(iso);
+                                                        } catch (Exception p2) {
+                                                                if (iso.length() >= 19) {
+                                                                        try {
+                                                                                earlyAccessEndsAt = java.time.LocalDateTime
+                                                                                                .parse(iso.substring(0,
+                                                                                                                19));
+                                                                        } catch (Exception ignore) {
+                                                                        }
+                                                                }
+                                                        }
+                                                }
+                                        }
+                                }
+                        } catch (Exception ignore) {
+                        }
+
+                        // 6) Compare + update only if different
+                        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                        java.util.List<String> changedFields = new java.util.ArrayList<>();
+
+                        java.util.function.BiPredicate<String, Object> jsonDifferent = (existingJson, nextObj) -> {
+                                try {
+                                        com.fasterxml.jackson.databind.JsonNode oldNode = (existingJson == null
+                                                        || existingJson.trim().isEmpty()) ? null
+                                                                        : om.readTree(existingJson);
+                                        com.fasterxml.jackson.databind.JsonNode newNode = (nextObj == null) ? null
+                                                        : om.valueToTree(nextObj);
+                                        return !java.util.Objects.equals(oldNode, newNode);
+                                } catch (Exception ex) {
+                                        // If we can't parse/compare reliably, treat as different so we refresh
+                                        return true;
+                                }
+                        };
+
+                        // assumes you already have:
+                        com.fasterxml.jackson.databind.ObjectWriter pretty = om.writerWithDefaultPrettyPrinter();
+
+                        // Maybe use this one for model table for the file explorer app
+                        // modelVersionObject (JSON)
+                        // if (jsonDifferent.test(e.getModelVersionObject(), modelVersionObject)) {
+                        // System.out.println("update: modelVersionObject");
+
+                        // try {
+                        // com.fasterxml.jackson.databind.JsonNode oldNode = (e
+                        // .getModelVersionObject() == null
+                        // || e.getModelVersionObject().trim().isEmpty())
+                        // ? null
+                        // : om.readTree(e.getModelVersionObject());
+                        // com.fasterxml.jackson.databind.JsonNode newNode = (modelVersionObject ==
+                        // null)
+                        // ? null
+                        // : om.valueToTree(modelVersionObject);
+
+                        // String oldPretty = (oldNode == null) ? "null"
+                        // : pretty.writeValueAsString(oldNode);
+                        // String newPretty = (newNode == null) ? "null"
+                        // : pretty.writeValueAsString(newNode);
+
+                        // // avoid exploding console
+                        // int maxLen = 12000;
+                        // if (oldPretty.length() > maxLen)
+                        // oldPretty = oldPretty.substring(0, maxLen) + "\n...(truncated)";
+                        // if (newPretty.length() > maxLen)
+                        // newPretty = newPretty.substring(0, maxLen) + "\n...(truncated)";
+
+                        // System.out.println("OLD modelVersionObject:\n" + oldPretty);
+                        // System.out.println("NEW modelVersionObject:\n" + newPretty);
+                        // } catch (Exception logEx) {
+                        // System.out.println("Could not pretty-log modelVersionObject diff: "
+                        // + logEx.getMessage());
+                        // System.out.println("OLD(modelVersionObject raw): " +
+                        // e.getModelVersionObject());
+                        // try {
+                        // String newRaw = om.writeValueAsString(modelVersionObject);
+                        // if (newRaw.length() > 12000)
+                        // newRaw = newRaw.substring(0, 12000) + "...(truncated)";
+                        // System.out.println("NEW(modelVersionObject raw): " + newRaw);
+                        // } catch (Exception ignore) {
+                        // System.out.println("NEW(modelVersionObject raw): <unprintable>");
+                        // }
+                        // }
+
+                        // e.setModelVersionObject(toJsonOrNull(modelVersionObject));
+                        // changedFields.add("modelVersionObject");
+                        // }
+
+                        // civitaiBaseModel (String)
+                        if (civitaiBaseModel != null
+                                        && !java.util.Objects.equals(e.getCivitaiBaseModel(), civitaiBaseModel)) {
+                                System.out.println("update: civitaiBaseModel");
+                                System.out.println("OLD civitaiBaseModel: " + e.getCivitaiBaseModel());
+                                System.out.println("NEW civitaiBaseModel: " + civitaiBaseModel);
+
+                                e.setCivitaiBaseModel(civitaiBaseModel);
+                                changedFields.add("civitaiBaseModel");
+                        }
+
+                        // civitaiModelFileList (JSON) - only refresh if we could derive it
+                        // if (civitaiModelFileList != null
+                        // && jsonDifferent.test(e.getCivitaiModelFileList(), civitaiModelFileList)) {
+                        // System.out.println("update: civitaiModelFileList");
+
+                        // try {
+                        // com.fasterxml.jackson.databind.JsonNode oldNode = (e
+                        // .getCivitaiModelFileList() == null
+                        // || e.getCivitaiModelFileList().trim().isEmpty())
+                        // ? null
+                        // : om.readTree(e.getCivitaiModelFileList());
+                        // com.fasterxml.jackson.databind.JsonNode newNode = om
+                        // .valueToTree(civitaiModelFileList);
+
+                        // String oldPretty = (oldNode == null) ? "null"
+                        // : pretty.writeValueAsString(oldNode);
+                        // String newPretty = (newNode == null) ? "null"
+                        // : pretty.writeValueAsString(newNode);
+
+                        // int maxLen = 12000;
+                        // if (oldPretty.length() > maxLen)
+                        // oldPretty = oldPretty.substring(0, maxLen) + "\n...(truncated)";
+                        // if (newPretty.length() > maxLen)
+                        // newPretty = newPretty.substring(0, maxLen) + "\n...(truncated)";
+
+                        // System.out.println("OLD civitaiModelFileList:\n" + oldPretty);
+                        // System.out.println("NEW civitaiModelFileList:\n" + newPretty);
+                        // } catch (Exception logEx) {
+                        // System.out.println("Could not pretty-log civitaiModelFileList diff: "
+                        // + logEx.getMessage());
+                        // System.out.println("OLD(civitaiModelFileList raw): "
+                        // + e.getCivitaiModelFileList());
+                        // try {
+                        // String newRaw = om.writeValueAsString(civitaiModelFileList);
+                        // if (newRaw.length() > 12000)
+                        // newRaw = newRaw.substring(0, 12000) + "...(truncated)";
+                        // System.out.println("NEW(civitaiModelFileList raw): " + newRaw);
+                        // } catch (Exception ignore) {
+                        // System.out.println("NEW(civitaiModelFileList raw): <unprintable>");
+                        // }
+                        // }
+
+                        // e.setCivitaiModelFileList(toJsonOrNull(civitaiModelFileList));
+                        // changedFields.add("civitaiModelFileList");
+                        // }
+
+                        // imageUrlsArray (JSON)
+                        if (jsonDifferent.test(e.getImageUrlsArray(), imageUrlsArray)) {
+                                System.out.println("update: imageUrlsArray");
+
+                                try {
+                                        com.fasterxml.jackson.databind.JsonNode oldNode = (e.getImageUrlsArray() == null
+                                                        || e.getImageUrlsArray().trim().isEmpty())
+                                                                        ? null
+                                                                        : om.readTree(e.getImageUrlsArray());
+                                        com.fasterxml.jackson.databind.JsonNode newNode = om
+                                                        .valueToTree(imageUrlsArray);
+
+                                        String oldPretty = (oldNode == null) ? "null"
+                                                        : pretty.writeValueAsString(oldNode);
+                                        String newPretty = (newNode == null) ? "null"
+                                                        : pretty.writeValueAsString(newNode);
+
+                                        int maxLen = 12000;
+                                        if (oldPretty.length() > maxLen)
+                                                oldPretty = oldPretty.substring(0, maxLen) + "\n...(truncated)";
+                                        if (newPretty.length() > maxLen)
+                                                newPretty = newPretty.substring(0, maxLen) + "\n...(truncated)";
+
+                                        System.out.println("OLD imageUrlsArray:\n" + oldPretty);
+                                        System.out.println("NEW imageUrlsArray:\n" + newPretty);
+                                } catch (Exception logEx) {
+                                        System.out.println("Could not pretty-log imageUrlsArray diff: "
+                                                        + logEx.getMessage());
+                                        System.out.println("OLD(imageUrlsArray raw): " + e.getImageUrlsArray());
+                                        try {
+                                                String newRaw = om.writeValueAsString(imageUrlsArray);
+                                                if (newRaw.length() > 12000)
+                                                        newRaw = newRaw.substring(0, 12000) + "...(truncated)";
+                                                System.out.println("NEW(imageUrlsArray raw): " + newRaw);
+                                        } catch (Exception ignore) {
+                                                System.out.println("NEW(imageUrlsArray raw): <unprintable>");
+                                        }
+                                }
+
+                                e.setImageUrlsArray(toJsonOrNull(imageUrlsArray));
+                                changedFields.add("imageUrlsArray");
+                        }
+
+                        // civitaiTags (JSON) - only refresh if we could derive it
+                        if (civitaiTags != null && jsonDifferent.test(e.getCivitaiTags(), civitaiTags)) {
+                                System.out.println("update: civitaiTags");
+
+                                try {
+                                        com.fasterxml.jackson.databind.JsonNode oldNode = (e.getCivitaiTags() == null
+                                                        || e.getCivitaiTags().trim().isEmpty())
+                                                                        ? null
+                                                                        : om.readTree(e.getCivitaiTags());
+                                        com.fasterxml.jackson.databind.JsonNode newNode = om.valueToTree(civitaiTags);
+
+                                        String oldPretty = (oldNode == null) ? "null"
+                                                        : pretty.writeValueAsString(oldNode);
+                                        String newPretty = (newNode == null) ? "null"
+                                                        : pretty.writeValueAsString(newNode);
+
+                                        int maxLen = 12000;
+                                        if (oldPretty.length() > maxLen)
+                                                oldPretty = oldPretty.substring(0, maxLen) + "\n...(truncated)";
+                                        if (newPretty.length() > maxLen)
+                                                newPretty = newPretty.substring(0, maxLen) + "\n...(truncated)";
+
+                                        System.out.println("OLD civitaiTags:\n" + oldPretty);
+                                        System.out.println("NEW civitaiTags:\n" + newPretty);
+                                } catch (Exception logEx) {
+                                        System.out.println(
+                                                        "Could not pretty-log civitaiTags diff: " + logEx.getMessage());
+                                        System.out.println("OLD(civitaiTags raw): " + e.getCivitaiTags());
+                                        try {
+                                                String newRaw = om.writeValueAsString(civitaiTags);
+                                                if (newRaw.length() > 12000)
+                                                        newRaw = newRaw.substring(0, 12000) + "...(truncated)";
+                                                System.out.println("NEW(civitaiTags raw): " + newRaw);
+                                        } catch (Exception ignore) {
+                                                System.out.println("NEW(civitaiTags raw): <unprintable>");
+                                        }
+                                }
+
+                                e.setCivitaiTags(toJsonOrNull(civitaiTags));
+                                changedFields.add("civitaiTags");
+                        }
+
+                        // earlyAccessEndsAt (LocalDateTime)
+                        if (!java.util.Objects.equals(e.getEarlyAccessEndsAt(), earlyAccessEndsAt)) {
+                                System.out.println("update: earlyAccessEndsAt");
+                                System.out.println("OLD earlyAccessEndsAt: " + e.getEarlyAccessEndsAt());
+                                System.out.println("NEW earlyAccessEndsAt: " + earlyAccessEndsAt);
+
+                                e.setEarlyAccessEndsAt(earlyAccessEndsAt);
+                                changedFields.add("earlyAccessEndsAt");
+                        }
+
+                        boolean updated = !changedFields.isEmpty();
+                        if (updated) {
+                                System.out.println("Yes, there has differences. Update now!");
+                                System.out.println("changedFields = " + changedFields);
+                                models_Offline_Table_Repository.save(e);
+                        } else {
+                                System.out.println("No differences detected. No update needed.");
+                        }
+
+                        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+                        payload.put("updated", updated);
+                        payload.put("changedFields", changedFields);
+                        payload.put("civitaiModelID", civitaiModelID);
+                        payload.put("civitaiVersionID", civitaiVersionID);
+
+                        return payload;
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error refreshing offline record (modelId={}, versionId={}): {}",
+                                        modelId, versionId, ex.getMessage(), ex);
+                        throw new CustomException("An unexpected error occurred while refreshing the offline record.",
+                                        ex);
+                }
+        }
+
         @Override
         @Transactional(rollbackFor = Exception.class)
         public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID) {
