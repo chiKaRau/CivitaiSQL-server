@@ -49,6 +49,7 @@ import com.civitai.server.models.dto.TagCountDTO;
 import com.civitai.server.models.dto.TopTagsRequest;
 import com.civitai.server.models.entities.civitaiSQL.Category_Prefixes_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Creator_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Download_File_Path_Count_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Descriptions_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Images_Table_Entity;
@@ -60,6 +61,7 @@ import com.civitai.server.models.entities.civitaiSQL.Recycle_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.Category_Prefixes_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Creator_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.Download_File_Path_Count_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Images_Table_Repository;
@@ -114,6 +116,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final ObjectMapper objectMapper;
         private final Civitai_Service civitai_Service;
         private final Category_Prefixes_Table_Repository category_Prefixes_Table_Repository;
+        private final Download_File_Path_Count_Table_Repository download_File_Path_Count_Table_Repository;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Service_Impl.class);
@@ -263,7 +266,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         ModelsRepositoryFTS modelsRepositoryFTS,
                         ObjectMapper objectMapper,
                         Civitai_Service civitai_Service,
-                        Category_Prefixes_Table_Repository category_Prefixes_Table_Repository) {
+                        Category_Prefixes_Table_Repository category_Prefixes_Table_Repository,
+                        Download_File_Path_Count_Table_Repository download_File_Path_Count_Table_Repository) {
                 this.models_Table_Repository = models_Table_Repository;
                 this.models_Descriptions_Table_Repository = models_Descriptions_Table_Repository;
                 this.models_Urls_Table_Repository = models_Urls_Table_Repository;
@@ -279,6 +283,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.objectMapper = objectMapper;
                 this.modelsRepositoryFTS = modelsRepositoryFTS;
                 this.category_Prefixes_Table_Repository = category_Prefixes_Table_Repository;
+                this.download_File_Path_Count_Table_Repository = download_File_Path_Count_Table_Repository;
         }
 
         @Override
@@ -4603,4 +4608,149 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 return result;
         }
 
+        @Override
+        @Transactional(readOnly = true)
+        public Map<String, List<Map<String, Object>>> get_download_file_path_count_list(String prefix) {
+                try {
+                        String p = (prefix == null) ? null : prefix.trim();
+
+                        LocalDateTime now = LocalDateTime.now();
+                        LocalDateTime twoMonthsAgo = now.minusMonths(2);
+
+                        List<Object[]> topRows = download_File_Path_Count_Table_Repository
+                                        .findTop10ByCountSince(p, Timestamp.valueOf(twoMonthsAgo));
+
+                        List<Object[]> recentAddedRows = download_File_Path_Count_Table_Repository
+                                        .findRecentAdded10(p);
+
+                        List<Object[]> recentUpdatedRows = download_File_Path_Count_Table_Repository
+                                        .findRecentUpdated10(p);
+
+                        List<Map<String, Object>> topTags = new ArrayList<>(topRows.size());
+                        for (Object[] r : topRows) {
+                                // r[0]=last_added, r[1]=download_file_path, r[2]=count
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("last_added", toLocalDateTime(r[0]));
+                                m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
+                                m.put("count", toInt(r[2]));
+                                topTags.add(m);
+                        }
+
+                        List<Map<String, Object>> recentAddedTags = new ArrayList<>(recentAddedRows.size());
+                        for (Object[] r : recentAddedRows) {
+                                // r[0]=last_added, r[1]=download_file_path, r[2]=count
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("last_added", toLocalDateTime(r[0]));
+                                m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
+                                m.put("count", toInt(r[2]));
+                                recentAddedTags.add(m);
+                        }
+
+                        List<Map<String, Object>> recentUpdatedTags = new ArrayList<>(recentUpdatedRows.size());
+                        for (Object[] r : recentUpdatedRows) {
+                                // r[0]=last_added, r[1]=download_file_path, r[2]=count, r[3]=updated_at
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("last_added", toLocalDateTime(r[0])); // keep same key for compatibility
+                                m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
+                                m.put("count", toInt(r[2]));
+                                m.put("updated_at", toLocalDateTime(r[3])); // new field (optional but useful)
+                                recentUpdatedTags.add(m);
+                        }
+
+                        return Map.of(
+                                        "topTags", topTags,
+                                        "recentAddedTags", recentAddedTags,
+                                        "recentUpdatedTags", recentUpdatedTags);
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving download file path count list (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        private LocalDateTime toLocalDateTime(Object v) {
+                if (v == null)
+                        return null;
+
+                if (v instanceof LocalDateTime) {
+                        return (LocalDateTime) v;
+                }
+                if (v instanceof java.sql.Timestamp) {
+                        return ((java.sql.Timestamp) v).toLocalDateTime();
+                }
+                if (v instanceof java.util.Date) {
+                        return new java.sql.Timestamp(((java.util.Date) v).getTime()).toLocalDateTime();
+                }
+
+                // last resort (should rarely happen for MySQL TIMESTAMP/DATETIME)
+                return LocalDateTime.parse(String.valueOf(v));
+        }
+
+        private int toInt(Object v) {
+                if (v == null)
+                        return 0;
+                if (v instanceof Number)
+                        return ((Number) v).intValue();
+                return Integer.parseInt(String.valueOf(v));
+        }
+
+        @Override
+        @Transactional
+        public void update_download_file_path_count(String inputPath) {
+                try {
+                        if (inputPath == null)
+                                return;
+
+                        String path = normalizePath(inputPath);
+                        if (path.isEmpty())
+                                return;
+
+                        // Same rule as your JSON version
+                        if (path.startsWith("/@scan@/Update/")) {
+                                // optional: log.debug("Ignoring path: {}", path);
+                                return;
+                        }
+
+                        download_File_Path_Count_Table_Repository.incrementPathCount(path);
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error while updating download file path count (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public Map<String, Object> remove_download_file_path_count_record(String downloadFilePath) {
+                try {
+                        if (downloadFilePath == null) {
+                                throw new CustomException("downloadFilePath is null");
+                        }
+
+                        String path = normalizePath(downloadFilePath);
+                        if (path.isEmpty()) {
+                                throw new CustomException("downloadFilePath is empty");
+                        }
+
+                        int deleted = download_File_Path_Count_Table_Repository.deleteByDownloadFilePathExact(path);
+
+                        Map<String, Object> out = new LinkedHashMap<>();
+                        out.put("downloadFilePath", path);
+                        out.put("deleted", deleted); // 1 if removed, 0 if not found
+                        return out;
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error while removing download file path count record (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        private String normalizePath(String s) {
+                if (s == null)
+                        return "";
+                String p = s.trim().replace("\\", "/");
+                if (p.isEmpty())
+                        return "";
+                return p.endsWith("/") ? p : (p + "/");
+        }
 }

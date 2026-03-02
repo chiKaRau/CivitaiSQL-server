@@ -22,10 +22,13 @@ import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,6 +64,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 @RequestMapping("/api")
 public class CivitaiSQL_Controller {
     // This is where we setup api endpoint or route
+
+    private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Controller.class);
 
     private CivitaiSQL_Service civitaiSQL_Service;
     private Civitai_Service civitai_Service;
@@ -2654,5 +2659,55 @@ public class CivitaiSQL_Controller {
 
         @JsonAlias("selectedPath")
         public String selectedPath;
+    }
+
+    @GetMapping("/get_download_file_path_count_list")
+    public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getTagsList(
+            @RequestParam(value = "prefix", required = false) String prefix) {
+
+        Map<String, List<Map<String, Object>>> tagsMap = civitaiSQL_Service.get_download_file_path_count_list(prefix);
+
+        boolean hasAny = tagsMap != null &&
+                ((tagsMap.get("topTags") != null && !tagsMap.get("topTags").isEmpty()) ||
+                        (tagsMap.get("recentAddedTags") != null && !tagsMap.get("recentAddedTags").isEmpty()) ||
+                        (tagsMap.get("recentUpdatedTags") != null && !tagsMap.get("recentUpdatedTags").isEmpty()));
+
+        if (hasAny) {
+            return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval successful", tagsMap));
+        } else {
+            // still return success or failure — your call. Keeping your existing style:
+            return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the database"));
+        }
+    }
+
+    @DeleteMapping("/delete-download-path-counts")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> deleteDownloadPathCount(
+            @RequestParam(value = "downloadFilePath") String downloadFilePath) {
+        try {
+            if (downloadFilePath == null || downloadFilePath.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(CustomResponse.failure("downloadFilePath is required"));
+            }
+
+            Map<String, Object> payload = civitaiSQL_Service.remove_download_file_path_count_record(downloadFilePath);
+
+            int deleted = 0;
+            Object d = payload.get("deleted");
+            if (d instanceof Number)
+                deleted = ((Number) d).intValue();
+
+            if (deleted > 0) {
+                return ResponseEntity.ok().body(CustomResponse.success("Delete successful", payload));
+            } else {
+                return ResponseEntity.ok().body(CustomResponse.failure("Record not found"));
+            }
+
+        } catch (Exception ex) {
+            // If you use @Slf4j, you can do log.error(...)
+            // log.error("Unexpected error while deleting download path count record (API)",
+            // ex);
+            return ResponseEntity.status(500)
+                    .body(CustomResponse.failure("Unexpected error: " + ex.getMessage()));
+        }
     }
 }

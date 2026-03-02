@@ -228,4 +228,10 @@ public interface CivitaiSQL_Service {
 
         public List<Map<String, Object>> get_category_prefixes_list();
 
+        public void update_download_file_path_count(String inputPath);
+
+        public Map<String, List<Map<String, Object>>> get_download_file_path_count_list(String prefix);
+
+        public Map<String, Object> remove_download_file_path_count_record(String downloadFilePath);
+
 }
