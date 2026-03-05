@@ -2157,6 +2157,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         // assumes you already have:
                         com.fasterxml.jackson.databind.ObjectWriter pretty = om.writerWithDefaultPrettyPrinter();
 
+                        System.out.println("Checking " + civitaiModelID + "_" + civitaiVersionID + ": ");
+
                         // Maybe use this one for model table for the file explorer app
                         // modelVersionObject (JSON)
                         // if (jsonDifferent.test(e.getModelVersionObject(), modelVersionObject)) {
