@@ -4235,6 +4235,16 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 holdPatch = Boolean.valueOf(String.valueOf(hv));
                 }
 
+                Boolean isErrorPatch = null;
+                if (patch.containsKey("isError") && patch.get("isError") != null) {
+                        Object ev = patch.get("isError");
+                        if (ev instanceof Boolean) {
+                                isErrorPatch = (Boolean) ev;
+                        } else {
+                                isErrorPatch = Boolean.valueOf(String.valueOf(ev));
+                        }
+                }
+
                 Integer prioPatch = null;
                 if (patch.containsKey("downloadPriority") && patch.get("downloadPriority") != null) {
                         Object pv = patch.get("downloadPriority");
@@ -4255,9 +4265,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 pathPatch = null; // explicit null -> no change in this API
                 }
 
-                if (holdPatch == null && prioPatch == null && pathPatch == null) {
+                if (holdPatch == null && prioPatch == null && pathPatch == null && isErrorPatch == null) {
                         throw new IllegalArgumentException("patch must include at least one non-null field");
                 }
+
                 if (pathPatch != null && pathPatch.length() > 1000) {
                         throw new IllegalArgumentException("downloadFilePath too long (max 1000)");
                 }
@@ -4333,6 +4344,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         if (pathPatch != null && !java.util.Objects.equals(e.getDownloadFilePath(), pathPatch)) {
                                 e.setDownloadFilePath(pathPatch);
+                                changed = true;
+                        }
+
+                        if (isErrorPatch != null && !java.util.Objects.equals(e.getIsError(), isErrorPatch)) {
+                                e.setIsError(isErrorPatch);
                                 changed = true;
                         }
 
