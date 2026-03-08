@@ -2714,11 +2714,27 @@ public class CivitaiSQL_Controller {
     @GetMapping("/get_model_offline_download_history_list")
     public ResponseEntity<CustomResponse<Map<String, Object>>> getModelOfflineDownloadHistoryList(
             @RequestParam(value = "page", required = false, defaultValue = "0") Integer page,
-            @RequestParam(value = "size", required = false, defaultValue = "100") Integer size) {
+            @RequestParam(value = "size", required = false, defaultValue = "100") Integer size,
+            @RequestParam(value = "createdDate", required = false) String createdDate) {
 
-        Map<String, Object> result = civitaiSQL_Service.get_model_offline_download_history_list(page, size);
+        Map<String, Object> result = civitaiSQL_Service.get_model_offline_download_history_list(
+                page,
+                size,
+                createdDate);
 
         return ResponseEntity.ok()
                 .body(CustomResponse.success("Model offline download history retrieval successful", result));
+    }
+
+    @GetMapping("/get_model_offline_download_history_available_dates")
+    public ResponseEntity<CustomResponse<List<String>>> getModelOfflineDownloadHistoryAvailableDates(
+            @RequestParam(value = "year") Integer year,
+            @RequestParam(value = "month") Integer month) {
+
+        List<String> result = civitaiSQL_Service.get_model_offline_download_history_available_dates(year, month);
+
+        return ResponseEntity.ok()
+                .body(CustomResponse.success("Model offline download history available dates retrieval successful",
+                        result));
     }
 }

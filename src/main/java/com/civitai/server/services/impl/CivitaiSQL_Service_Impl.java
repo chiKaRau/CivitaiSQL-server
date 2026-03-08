@@ -4781,15 +4781,54 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true)
-        public Map<String, Object> get_model_offline_download_history_list(Integer page, Integer size) {
+        public List<String> get_model_offline_download_history_available_dates(Integer year, Integer month) {
+                try {
+                        if (year == null || month == null) {
+                                throw new CustomException("year and month are required");
+                        }
+
+                        if (month < 1 || month > 12) {
+                                throw new CustomException("month must be between 1 and 12");
+                        }
+
+                        LocalDate firstDay = LocalDate.of(year, month, 1);
+                        LocalDateTime start = firstDay.atStartOfDay();
+                        LocalDateTime end = firstDay.plusMonths(1).atStartOfDay();
+
+                        return model_Offline_Download_History_Table_Repository
+                                        .findAvailableCreatedDatesByMonth(start, end);
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving model offline download history available dates (DB)",
+                                        ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public Map<String, Object> get_model_offline_download_history_list(
+                        Integer page,
+                        Integer size,
+                        String createdDate) {
                 try {
                         int safePage = (page == null || page < 0) ? 0 : page;
                         int safeSize = (size == null || size <= 0) ? 100 : size;
 
                         Pageable pageable = PageRequest.of(safePage, safeSize);
 
-                        Page<Object[]> pageResult = model_Offline_Download_History_Table_Repository
-                                        .findAllHistoryRows(pageable);
+                        Page<Object[]> pageResult;
+
+                        if (createdDate != null && !createdDate.trim().isEmpty()) {
+                                LocalDate targetDate = LocalDate.parse(createdDate.trim()); // yyyy-MM-dd
+                                LocalDateTime start = targetDate.atStartOfDay();
+                                LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
+
+                                pageResult = model_Offline_Download_History_Table_Repository
+                                                .findHistoryRowsByCreatedAtRange(start, end, pageable);
+                        } else {
+                                pageResult = model_Offline_Download_History_Table_Repository
+                                                .findAllHistoryRows(pageable);
+                        }
 
                         List<Map<String, Object>> content = new ArrayList<>();
 
