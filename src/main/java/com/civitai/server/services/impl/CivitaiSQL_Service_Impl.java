@@ -4781,7 +4781,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true)
-        public List<Map<String, Object>> get_model_offline_download_history_list(Integer page, Integer size) {
+        public Map<String, Object> get_model_offline_download_history_list(Integer page, Integer size) {
                 try {
                         int safePage = (page == null || page < 0) ? 0 : page;
                         int safeSize = (size == null || size <= 0) ? 100 : size;
@@ -4791,15 +4791,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         Page<Object[]> pageResult = model_Offline_Download_History_Table_Repository
                                         .findAllHistoryRows(pageable);
 
-                        List<Object[]> rows = pageResult.getContent();
+                        List<Map<String, Object>> content = new ArrayList<>();
 
-                        if (rows.isEmpty()) {
-                                return Collections.emptyList();
-                        }
-
-                        List<Map<String, Object>> out = new ArrayList<>(rows.size());
-
-                        for (Object[] row : rows) {
+                        for (Object[] row : pageResult.getContent()) {
                                 Map<String, Object> m = new LinkedHashMap<>();
                                 m.put("id", row[0]);
                                 m.put("civitaiModelID", row[1]);
@@ -4807,10 +4801,20 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("imageUrl", row[3]);
                                 m.put("createdAt", row[4]);
                                 m.put("updatedAt", row[5]);
-                                out.add(m);
+                                content.add(m);
                         }
 
-                        return out;
+                        Map<String, Object> result = new LinkedHashMap<>();
+                        result.put("content", content);
+                        result.put("totalElements", pageResult.getTotalElements());
+                        result.put("totalPages", pageResult.getTotalPages());
+                        result.put("number", pageResult.getNumber());
+                        result.put("size", pageResult.getSize());
+                        result.put("first", pageResult.isFirst());
+                        result.put("last", pageResult.isLast());
+                        result.put("numberOfElements", pageResult.getNumberOfElements());
+
+                        return result;
                 } catch (Exception ex) {
                         log.error("Unexpected error while retrieving model offline download history list (DB)", ex);
                         throw new CustomException("An unexpected error occurred", ex);

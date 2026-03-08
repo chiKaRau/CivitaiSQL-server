@@ -2712,18 +2712,13 @@ public class CivitaiSQL_Controller {
     }
 
     @GetMapping("/get_model_offline_download_history_list")
-    public ResponseEntity<CustomResponse<List<Map<String, Object>>>> getModelOfflineDownloadHistoryList(
+    public ResponseEntity<CustomResponse<Map<String, Object>>> getModelOfflineDownloadHistoryList(
             @RequestParam(value = "page", required = false, defaultValue = "0") Integer page,
             @RequestParam(value = "size", required = false, defaultValue = "100") Integer size) {
 
-        List<Map<String, Object>> rows = civitaiSQL_Service.get_model_offline_download_history_list(page, size);
+        Map<String, Object> result = civitaiSQL_Service.get_model_offline_download_history_list(page, size);
 
-        if (rows != null && !rows.isEmpty()) {
-            return ResponseEntity.ok()
-                    .body(CustomResponse.success("Model offline download history retrieval successful", rows));
-        } else {
-            return ResponseEntity.ok()
-                    .body(CustomResponse.failure("No model offline download history found in the database"));
-        }
+        return ResponseEntity.ok()
+                .body(CustomResponse.success("Model offline download history retrieval successful", result));
     }
 }

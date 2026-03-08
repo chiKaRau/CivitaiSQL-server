@@ -234,7 +234,7 @@ public interface CivitaiSQL_Service {
 
         public Map<String, Object> remove_download_file_path_count_record(String downloadFilePath);
 
-        List<Map<String, Object>> get_model_offline_download_history_list(Integer page, Integer size);
+        public Map<String, Object> get_model_offline_download_history_list(Integer page, Integer size);
 
         public Map<String, Object> insert_model_offline_download_history(
                         Long civitaiModelID,
