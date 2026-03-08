@@ -37,6 +37,9 @@ public interface Model_Offline_Download_History_Table_Repository
                             DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s') AS updated_at
                         FROM model_offline_download_history_table
                         ORDER BY created_at DESC
+                        """, countQuery = """
+                        SELECT COUNT(*)
+                        FROM model_offline_download_history_table
                         """, nativeQuery = true)
-        List<Object[]> findAllHistoryRows(Pageable pageable);
+        Page<Object[]> findAllHistoryRows(Pageable pageable);
 }

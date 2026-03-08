@@ -4781,15 +4781,19 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true)
-        public List<Map<String, Object>> get_model_offline_download_history_list(Integer page) {
+        public List<Map<String, Object>> get_model_offline_download_history_list(Integer page, Integer size) {
                 try {
                         int safePage = (page == null || page < 0) ? 0 : page;
-                        Pageable pageable = PageRequest.of(safePage, 1000);
+                        int safeSize = (size == null || size <= 0) ? 100 : size;
 
-                        List<Object[]> rows = model_Offline_Download_History_Table_Repository
+                        Pageable pageable = PageRequest.of(safePage, safeSize);
+
+                        Page<Object[]> pageResult = model_Offline_Download_History_Table_Repository
                                         .findAllHistoryRows(pageable);
 
-                        if (rows == null || rows.isEmpty()) {
+                        List<Object[]> rows = pageResult.getContent();
+
+                        if (rows.isEmpty()) {
                                 return Collections.emptyList();
                         }
 

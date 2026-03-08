@@ -2713,9 +2713,10 @@ public class CivitaiSQL_Controller {
 
     @GetMapping("/get_model_offline_download_history_list")
     public ResponseEntity<CustomResponse<List<Map<String, Object>>>> getModelOfflineDownloadHistoryList(
-            @RequestParam(value = "page", required = false, defaultValue = "0") Integer page) {
+            @RequestParam(value = "page", required = false, defaultValue = "0") Integer page,
+            @RequestParam(value = "size", required = false, defaultValue = "100") Integer size) {
 
-        List<Map<String, Object>> rows = civitaiSQL_Service.get_model_offline_download_history_list(page);
+        List<Map<String, Object>> rows = civitaiSQL_Service.get_model_offline_download_history_list(page, size);
 
         if (rows != null && !rows.isEmpty()) {
             return ResponseEntity.ok()
@@ -2725,5 +2726,4 @@ public class CivitaiSQL_Controller {
                     .body(CustomResponse.failure("No model offline download history found in the database"));
         }
     }
-
 }
