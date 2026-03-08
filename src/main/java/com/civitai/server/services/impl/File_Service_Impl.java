@@ -1131,7 +1131,6 @@ public class File_Service_Impl implements File_Service {
             // Check if the downloadPath inside the folder_list.json,
             // if not, append it
             update_folder_list(downloadFilePath);
-            update_cart_list(url);
 
             // Create the 'download' directory within the 'files' directory
             Path downloadDirectory = Paths.get("files", "download");
@@ -1347,7 +1346,6 @@ public class File_Service_Impl implements File_Service {
                     .replaceAll("/+$", "");
 
             update_folder_list(normalizedDownloadFilePath);
-            update_cart_list(url);
 
             Files.createDirectories(baseDownloadDirectory);
             System.out.println("Ensured download directory exists: " + baseDownloadDirectory);

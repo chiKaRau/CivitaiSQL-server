@@ -28,6 +28,8 @@ import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -50,6 +52,7 @@ import com.civitai.server.models.dto.TopTagsRequest;
 import com.civitai.server.models.entities.civitaiSQL.Category_Prefixes_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Creator_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Download_File_Path_Count_Table_Entity;
+import com.civitai.server.models.entities.civitaiSQL.Model_Offline_Download_History_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Descriptions_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Details_Table_Entity;
 import com.civitai.server.models.entities.civitaiSQL.Models_Images_Table_Entity;
@@ -62,6 +65,7 @@ import com.civitai.server.models.entities.civitaiSQL.VisitedPath_Table_Entity;
 import com.civitai.server.repositories.civitaiSQL.Category_Prefixes_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Creator_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Download_File_Path_Count_Table_Repository;
+import com.civitai.server.repositories.civitaiSQL.Model_Offline_Download_History_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Descriptions_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Details_Table_Repository;
 import com.civitai.server.repositories.civitaiSQL.Models_Images_Table_Repository;
@@ -117,6 +121,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         private final Civitai_Service civitai_Service;
         private final Category_Prefixes_Table_Repository category_Prefixes_Table_Repository;
         private final Download_File_Path_Count_Table_Repository download_File_Path_Count_Table_Repository;
+        private final Model_Offline_Download_History_Table_Repository model_Offline_Download_History_Table_Repository;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Service_Impl.class);
@@ -267,7 +272,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         ObjectMapper objectMapper,
                         Civitai_Service civitai_Service,
                         Category_Prefixes_Table_Repository category_Prefixes_Table_Repository,
-                        Download_File_Path_Count_Table_Repository download_File_Path_Count_Table_Repository) {
+                        Download_File_Path_Count_Table_Repository download_File_Path_Count_Table_Repository,
+                        Model_Offline_Download_History_Table_Repository model_Offline_Download_History_Table_Repository) {
                 this.models_Table_Repository = models_Table_Repository;
                 this.models_Descriptions_Table_Repository = models_Descriptions_Table_Repository;
                 this.models_Urls_Table_Repository = models_Urls_Table_Repository;
@@ -284,6 +290,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 this.modelsRepositoryFTS = modelsRepositoryFTS;
                 this.category_Prefixes_Table_Repository = category_Prefixes_Table_Repository;
                 this.download_File_Path_Count_Table_Repository = download_File_Path_Count_Table_Repository;
+                this.model_Offline_Download_History_Table_Repository = model_Offline_Download_History_Table_Repository;
         }
 
         @Override
@@ -4770,5 +4777,89 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 if (p.isEmpty())
                         return "";
                 return p.endsWith("/") ? p : (p + "/");
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<Map<String, Object>> get_model_offline_download_history_list(Integer page) {
+                try {
+                        int safePage = (page == null || page < 0) ? 0 : page;
+                        Pageable pageable = PageRequest.of(safePage, 1000);
+
+                        List<Object[]> rows = model_Offline_Download_History_Table_Repository
+                                        .findAllHistoryRows(pageable);
+
+                        if (rows == null || rows.isEmpty()) {
+                                return Collections.emptyList();
+                        }
+
+                        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+
+                        for (Object[] row : rows) {
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("id", row[0]);
+                                m.put("civitaiModelID", row[1]);
+                                m.put("civitaiVersionID", row[2]);
+                                m.put("imageUrl", row[3]);
+                                m.put("createdAt", row[4]);
+                                m.put("updatedAt", row[5]);
+                                out.add(m);
+                        }
+
+                        return out;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving model offline download history list (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public Map<String, Object> insert_model_offline_download_history(
+                        Long civitaiModelID,
+                        Long civitaiVersionID,
+                        String imageUrl) {
+                try {
+                        if (civitaiModelID == null) {
+                                throw new CustomException("civitaiModelID is required");
+                        }
+
+                        if (civitaiVersionID == null) {
+                                throw new CustomException("civitaiVersionID is required");
+                        }
+
+                        if (imageUrl == null || imageUrl.trim().isEmpty()) {
+                                throw new CustomException("imageUrl is required");
+                        }
+
+                        LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Los_Angeles"));
+
+                        Model_Offline_Download_History_Table_Entity entity = Model_Offline_Download_History_Table_Entity
+                                        .builder()
+                                        .civitaiModelID(civitaiModelID)
+                                        .civitaiVersionID(civitaiVersionID)
+                                        .imageUrl(imageUrl.trim())
+                                        .createdAt(now)
+                                        .updatedAt(now)
+                                        .build();
+
+                        Model_Offline_Download_History_Table_Entity saved = model_Offline_Download_History_Table_Repository
+                                        .save(entity);
+
+                        Map<String, Object> out = new LinkedHashMap<>();
+                        out.put("id", saved.getId());
+                        out.put("civitaiModelID", saved.getCivitaiModelID());
+                        out.put("civitaiVersionID", saved.getCivitaiVersionID());
+                        out.put("imageUrl", saved.getImageUrl());
+                        out.put("createdAt", saved.getCreatedAt());
+                        out.put("updatedAt", saved.getUpdatedAt());
+
+                        return out;
+                } catch (CustomException ex) {
+                        throw ex;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while inserting model offline download history record (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
         }
 }

@@ -220,17 +220,22 @@ public class File_Controller {
     }
 
     // @GetMapping("/get_tags_list")
-    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getTagsList(
-    //         @RequestParam(value = "prefix", required = false) String prefix) {
-    //     // Retrieve both top 10 and recent 10 lists based on prefix
-    //     Map<String, List<Map<String, Object>>> tagsMap = fileService.get_tags_list(prefix);
+    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>>
+    // getTagsList(
+    // @RequestParam(value = "prefix", required = false) String prefix) {
+    // // Retrieve both top 10 and recent 10 lists based on prefix
+    // Map<String, List<Map<String, Object>>> tagsMap =
+    // fileService.get_tags_list(prefix);
 
-    //     // Check if both lists are empty
-    //     if (!tagsMap.get("topTags").isEmpty() || !tagsMap.get("recentTags").isEmpty()) {
-    //         return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval successful", tagsMap));
-    //     } else {
-    //         return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the database"));
-    //     }
+    // // Check if both lists are empty
+    // if (!tagsMap.get("topTags").isEmpty() ||
+    // !tagsMap.get("recentTags").isEmpty()) {
+    // return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval
+    // successful", tagsMap));
+    // } else {
+    // return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the
+    // database"));
+    // }
     // }
 
     @SuppressWarnings("unchecked")
@@ -278,7 +283,6 @@ public class File_Controller {
         }
 
         fileService.update_folder_list(downloadFilePath);
-        fileService.update_cart_list(url);
         civitaiSQL_Service.update_download_file_path_count(downloadFilePath);
         // fileService.remove_from_offline_download_list(civitaiModelID,
         // civitaiVersionID);
@@ -350,6 +354,18 @@ public class File_Controller {
                 fileService.download_file_by_server_v2(civitaiFileName, civitaiModelFileList, downloadFilePath,
                         modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
                         (String) modelVersionObject.get("baseModel"), imageUrlsArray);
+
+                String firstImageUrl = (imageUrlsArray != null
+                        && imageUrlsArray.length > 0
+                        && imageUrlsArray[0] != null
+                        && !imageUrlsArray[0].trim().isEmpty())
+                                ? imageUrlsArray[0].trim()
+                                : "https://placehold.co/400";
+
+                civitaiSQL_Service.insert_model_offline_download_history(
+                        Long.valueOf(civitaiModelID),
+                        Long.valueOf(civitaiVersionID),
+                        firstImageUrl);
 
                 civitaiSQL_Service.update_download_file_path_count(downloadFilePath);
                 // fileService.remove_from_offline_download_list(civitaiModelID,
@@ -434,6 +450,18 @@ public class File_Controller {
                     civitaiUrl,
                     baseModel,
                     imageUrlsArray);
+
+            String firstImageUrl = (imageUrlsArray != null
+                    && imageUrlsArray.length > 0
+                    && imageUrlsArray[0] != null
+                    && !imageUrlsArray[0].trim().isEmpty())
+                            ? imageUrlsArray[0].trim()
+                            : "https://placehold.co/400";
+
+            civitaiSQL_Service.insert_model_offline_download_history(
+                    Long.valueOf(civitaiModelID),
+                    Long.valueOf(civitaiVersionID),
+                    firstImageUrl);
 
             return ResponseEntity.ok(CustomResponse.success("Success download file"));
         } catch (Exception ex) {

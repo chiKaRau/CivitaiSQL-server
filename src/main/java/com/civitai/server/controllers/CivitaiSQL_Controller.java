@@ -2710,4 +2710,20 @@ public class CivitaiSQL_Controller {
                     .body(CustomResponse.failure("Unexpected error: " + ex.getMessage()));
         }
     }
+
+    @GetMapping("/get_model_offline_download_history_list")
+    public ResponseEntity<CustomResponse<List<Map<String, Object>>>> getModelOfflineDownloadHistoryList(
+            @RequestParam(value = "page", required = false, defaultValue = "0") Integer page) {
+
+        List<Map<String, Object>> rows = civitaiSQL_Service.get_model_offline_download_history_list(page);
+
+        if (rows != null && !rows.isEmpty()) {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("Model offline download history retrieval successful", rows));
+        } else {
+            return ResponseEntity.ok()
+                    .body(CustomResponse.failure("No model offline download history found in the database"));
+        }
+    }
+
 }
