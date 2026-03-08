@@ -2733,7 +2733,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Transactional(readOnly = true, rollbackFor = Exception.class)
         public java.util.List<java.util.Map<String, Object>> get_error_model_list() {
                 var entities = models_Offline_Table_Repository
-                                .findAllByIsErrorTrueOrderByIdAsc();
+                                .findAllByIsErrorTrueOrderByUpdatedAtDesc();
 
                 var out = new java.util.ArrayList<java.util.Map<String, Object>>(entities.size());
                 for (var e : entities) {

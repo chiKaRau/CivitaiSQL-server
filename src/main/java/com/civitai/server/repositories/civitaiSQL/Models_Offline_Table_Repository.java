@@ -39,7 +39,7 @@ public interface Models_Offline_Table_Repository extends
                         @Param("isError") Boolean isError);
 
         // assumes your entity field is named "id" and mapped to column `_id`
-        List<Models_Offline_Table_Entity> findAllByIsErrorTrueOrderByIdAsc();
+        List<Models_Offline_Table_Entity> findAllByIsErrorTrueOrderByUpdatedAtDesc();
 
         // fetch all rows whose modelId is in the list (we’ll filter versions in memory)
         List<Models_Offline_Table_Entity> findAllByCivitaiModelIDIn(List<Long> modelIds);
