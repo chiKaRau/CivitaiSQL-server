@@ -750,34 +750,42 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         public Optional<List<Models_DTO>> find_List_of_models_DTO_from_all_tables_by_alike_tagsList(
                         List<String> tagsList) {
+
                 List<Models_Table_Entity> entityList;
 
                 if (useFts) {
                         String booleanQuery = buildBooleanQueryForLikeEquivalence(tagsList);
 
-                        // 1) Fast path: FTS
                         List<Models_Table_Entity> fts = modelsRepositoryFTS.searchAllByBooleanFTS(booleanQuery);
 
-                        // 2) Fallback/top-up: old Specification (to keep behavior identical)
-                        // Use it only if FTS is empty OR you want to preserve any edge cases (short
-                        // tokens, non-token substrings).
-                        if (fts.isEmpty()) {
-                                Specification<Models_Table_Entity> spec = Models_Table_Specification
-                                                .findByTagsList(tagsList);
-                                entityList = models_Table_Repository_Specification.findAll(spec);
-                        } else {
-                                entityList = fts;
+                        Specification<Models_Table_Entity> spec = Models_Table_Specification.findByTagsList(tagsList);
+                        List<Models_Table_Entity> likeResults = models_Table_Repository_Specification.findAll(spec);
+
+                        java.util.Map<Integer, Models_Table_Entity> merged = new java.util.LinkedHashMap<>();
+
+                        for (Models_Table_Entity e : fts) {
+                                merged.put(e.getId(), e);
                         }
+
+                        for (Models_Table_Entity e : likeResults) {
+                                merged.putIfAbsent(e.getId(), e);
+                        }
+
+                        entityList = new java.util.ArrayList<>(merged.values());
+
                 } else {
-                        // Original behavior
                         Specification<Models_Table_Entity> spec = Models_Table_Specification.findByTagsList(tagsList);
                         entityList = models_Table_Repository_Specification.findAll(spec);
                 }
 
-                if (entityList.isEmpty())
+                if (entityList.isEmpty()) {
                         return Optional.empty();
+                }
 
-                return Optional.of(entityList.stream().map(this::convertToDTO).collect(Collectors.toList()));
+                return Optional.of(
+                                entityList.stream()
+                                                .map(this::convertToDTO)
+                                                .collect(Collectors.toList()));
         }
 
         @Override
