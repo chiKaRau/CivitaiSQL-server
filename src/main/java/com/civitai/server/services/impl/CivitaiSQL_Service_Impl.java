@@ -3304,6 +3304,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         int size,
                         boolean filterEmptyBaseModel,
                         List<String> prefixes,
+                        List<String> excludedPrefixes,
                         String search,
                         String op,
                         String status,
@@ -3351,7 +3352,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         // Build path expr once; use coalesce("") so LIKE works even if null
                         var pathExpr = root.get("downloadFilePath").as(String.class);
-                        var pathLower = cb.lower(cb.coalesce(pathExpr, ""));
+                        var normalizedPath = cb.lower(
+                                        cb.function(
+                                                        "replace",
+                                                        String.class,
+                                                        cb.coalesce(pathExpr, ""),
+                                                        cb.literal("\\"),
+                                                        cb.literal("/")));
 
                         // 0a) HOLD filter: when includeHold == false, only show non-hold entries
                         if (!includeHold) {
@@ -3397,12 +3404,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 0));
                         }
 
-                        // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
-                        // (case-insensitive)
-                        // Also include backslash form in case you persist Windows-style paths.
-                        var pendingSlash = cb.like(pathLower, "/@scan@/acg/pending%");
-                        var pendingBack = cb.like(pathLower, "\\@scan\\@\\acg\\pending%");
-                        var isPending = cb.or(pendingSlash, pendingBack);
+                        var isPending = cb.like(normalizedPath, "/@scan@/acg/pending%");
 
                         // 0) status filter (pending / non-pending / both) – derived from path
                         String statusNorm = (status == null ? "both" : status)
@@ -3424,17 +3426,52 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         }
 
                         // 2) prefixes (case-insensitive; “Updates” is contains)
-                        if (prefixes != null && !prefixes.isEmpty()) {
-                                var ors = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
-                                for (String pref : prefixes) {
-                                        if ("/@scan@/Update/".equalsIgnoreCase(pref)) {
-                                                ors.add(cb.like(pathLower, "%/@scan@/update/%"));
-                                        } else {
-                                                ors.add(cb.like(pathLower, pref.toLowerCase() + "%"));
+                        // 2) include prefixes + exclude prefixes (case-insensitive)
+                        if ((prefixes != null && !prefixes.isEmpty()) ||
+                                        (excludedPrefixes != null && !excludedPrefixes.isEmpty())) {
+
+                                java.util.function.Function<String, String> normalizePrefix = rawPrefix -> {
+                                        if (rawPrefix == null)
+                                                return null;
+
+                                        String normalized = rawPrefix.trim()
+                                                        .replace('\\', '/')
+                                                        .toLowerCase(java.util.Locale.ROOT);
+
+                                        if (!normalized.endsWith("/")) {
+                                                normalized += "/";
+                                        }
+
+                                        return normalized;
+                                };
+
+                                // INCLUDE
+                                if (prefixes != null && !prefixes.isEmpty()) {
+                                        var includePreds = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+                                        for (String raw : prefixes) {
+                                                String pref = normalizePrefix.apply(raw);
+                                                if (pref == null || pref.isBlank())
+                                                        continue;
+
+                                                includePreds.add(cb.like(normalizedPath, pref + "%"));
+                                        }
+
+                                        if (!includePreds.isEmpty()) {
+                                                ands.add(cb.or(includePreds.toArray(
+                                                                jakarta.persistence.criteria.Predicate[]::new)));
                                         }
                                 }
-                                if (!ors.isEmpty()) {
-                                        ands.add(cb.or(ors.toArray(jakarta.persistence.criteria.Predicate[]::new)));
+
+                                // EXCLUDE
+                                if (excludedPrefixes != null && !excludedPrefixes.isEmpty()) {
+                                        for (String raw : excludedPrefixes) {
+                                                String pref = normalizePrefix.apply(raw);
+                                                if (pref == null || pref.isBlank())
+                                                        continue;
+
+                                                ands.add(cb.notLike(normalizedPath, pref + "%"));
+                                        }
                                 }
                         }
 
@@ -3575,6 +3612,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         int size,
                         boolean filterEmptyBaseModel,
                         List<String> prefixes,
+                        List<String> excludedPrefixes,
                         String search,
                         String op,
                         String status,
@@ -3628,7 +3666,13 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         // Build path expr once; use coalesce("") so LIKE works even if null
                         var pathExpr = root.get("downloadFilePath").as(String.class);
-                        var pathLower = cb.lower(cb.coalesce(pathExpr, ""));
+                        var normalizedPath = cb.lower(
+                                        cb.function(
+                                                        "replace",
+                                                        String.class,
+                                                        cb.coalesce(pathExpr, ""),
+                                                        cb.literal("\\"),
+                                                        cb.literal("/")));
 
                         // 0a) HOLD filter: when includeHold == false, only show non-hold entries
                         if (!includeHold) {
@@ -3673,9 +3717,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         // Treat "Pending" as any path that starts with /@scan@/ACG/Pending
                         // (case-insensitive)
                         // Also include backslash form in case you persist Windows-style paths.
-                        var pendingSlash = cb.like(pathLower, "/@scan@/acg/pending%");
-                        var pendingBack = cb.like(pathLower, "\\@scan\\@\\acg\\pending%");
-                        var isPending = cb.or(pendingSlash, pendingBack);
+                        var isPending = cb.like(normalizedPath, "/@scan@/acg/pending%");
 
                         // 0) status filter (pending / non-pending / both) – derived from path
                         String statusNorm = (status == null ? "both" : status)
@@ -3695,17 +3737,52 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         }
 
                         // 2) prefixes (case-insensitive; “Updates” is contains)
-                        if (prefixes != null && !prefixes.isEmpty()) {
-                                var ors = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
-                                for (String pref : prefixes) {
-                                        if ("/@scan@/Update/".equalsIgnoreCase(pref)) {
-                                                ors.add(cb.like(pathLower, "%/@scan@/update/%"));
-                                        } else {
-                                                ors.add(cb.like(pathLower, pref.toLowerCase() + "%"));
+                        // 2) include prefixes + exclude prefixes
+                        if ((prefixes != null && !prefixes.isEmpty()) ||
+                                        (excludedPrefixes != null && !excludedPrefixes.isEmpty())) {
+
+                                java.util.function.Function<String, String> normalizePrefix = rawPrefix -> {
+                                        if (rawPrefix == null)
+                                                return null;
+
+                                        String normalized = rawPrefix.trim()
+                                                        .replace('\\', '/')
+                                                        .toLowerCase(java.util.Locale.ROOT);
+
+                                        if (!normalized.endsWith("/")) {
+                                                normalized += "/";
+                                        }
+
+                                        return normalized;
+                                };
+
+                                // INCLUDE
+                                if (prefixes != null && !prefixes.isEmpty()) {
+                                        var includePreds = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+                                        for (String raw : prefixes) {
+                                                String pref = normalizePrefix.apply(raw);
+                                                if (pref == null || pref.isBlank())
+                                                        continue;
+
+                                                includePreds.add(cb.like(normalizedPath, pref + "%"));
+                                        }
+
+                                        if (!includePreds.isEmpty()) {
+                                                ands.add(cb.or(includePreds.toArray(
+                                                                jakarta.persistence.criteria.Predicate[]::new)));
                                         }
                                 }
-                                if (!ors.isEmpty()) {
-                                        ands.add(cb.or(ors.toArray(jakarta.persistence.criteria.Predicate[]::new)));
+
+                                // EXCLUDE
+                                if (excludedPrefixes != null && !excludedPrefixes.isEmpty()) {
+                                        for (String raw : excludedPrefixes) {
+                                                String pref = normalizePrefix.apply(raw);
+                                                if (pref == null || pref.isBlank())
+                                                        continue;
+
+                                                ands.add(cb.notLike(normalizedPath, pref + "%"));
+                                        }
                                 }
                         }
 

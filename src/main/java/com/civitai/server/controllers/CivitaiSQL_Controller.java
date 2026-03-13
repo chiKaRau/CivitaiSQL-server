@@ -1419,6 +1419,7 @@ public class CivitaiSQL_Controller {
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(defaultValue = "false") boolean filterEmptyBaseModel,
             @RequestParam(name = "prefix", required = false) java.util.List<String> prefixes,
+            @RequestParam(name = "excludePrefix", required = false) java.util.List<String> excludedPrefixes,
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "op", defaultValue = "contains") String op,
             @RequestParam(name = "status", defaultValue = "both") String status,
@@ -1453,11 +1454,14 @@ public class CivitaiSQL_Controller {
             }
         }
 
+        System.out.println("excludedPrefixes = " + (excludedPrefixes == null ? "<null>" : excludedPrefixes));
+
         var result = civitaiSQL_Service.get_offline_download_list_paged(
                 page,
                 size,
                 filterEmptyBaseModel,
                 prefixes,
+                excludedPrefixes,
                 search,
                 op,
                 status,
@@ -1466,6 +1470,7 @@ public class CivitaiSQL_Controller {
                 includeErrors,
                 aiSuggestedOnly,
                 sortDir);
+
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
     }
 
@@ -1482,6 +1487,7 @@ public class CivitaiSQL_Controller {
         final List<String> prefixes = Arrays.asList(
                 "/@scan@/ACG/Pending",
                 "/@scan@/ACG/Pending/");
+        final List<String> excludedPrefixes = java.util.List.of();
         final String search = null;
         final String op = "contains";
         final String status = "pending";
@@ -1503,12 +1509,14 @@ public class CivitaiSQL_Controller {
         System.out.println("search = <null>");
         System.out.println("prefixes.size = " + prefixes.size());
         System.out.println("prefixes = " + prefixes);
+        System.out.println("excludedPrefixes = " + excludedPrefixes);
 
         var result = civitaiSQL_Service.get_offline_download_list_paged(
                 p,
                 s,
                 filterEmptyBaseModel,
                 prefixes,
+                excludedPrefixes,
                 search,
                 op,
                 status,
@@ -1536,6 +1544,7 @@ public class CivitaiSQL_Controller {
             final java.util.List<String> prefixes = java.util.Arrays.asList(
                     "/@scan@/ACG/Pending",
                     "/@scan@/ACG/Pending/");
+            final java.util.List<String> excludedPrefixes = java.util.List.of();
             final String search = null;
             final String op = "contains";
             final String status = "pending";
@@ -1551,6 +1560,7 @@ public class CivitaiSQL_Controller {
                             p, s,
                             filterEmptyBaseModel,
                             prefixes,
+                            excludedPrefixes,
                             search,
                             op,
                             status,
