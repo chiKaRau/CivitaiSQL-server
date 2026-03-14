@@ -2073,7 +2073,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         modelSummary.put("type", fetchedModel.get("type"));
                         modelVersionObject.put("model", modelSummary);
 
+                        Object oldCreator = modelVersionObject.get("creator");
                         Object creatorObj = fetchedModel.get("creator");
+                        System.out.println("OLD creator in modelVersionObject: " + oldCreator);
+                        System.out.println("NEW creator from fetchedModel: " + creatorObj);
+
                         if (creatorObj instanceof Map) {
                                 @SuppressWarnings("unchecked")
                                 Map<String, Object> creatorMap = (Map<String, Object>) creatorObj;
@@ -2222,6 +2226,55 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         // e.setModelVersionObject(toJsonOrNull(modelVersionObject));
                         // changedFields.add("modelVersionObject");
                         // }
+
+                        try {
+                                Map<String, Object> existingModelVersionObject = null;
+
+                                if (e.getModelVersionObject() != null && !e.getModelVersionObject().trim().isEmpty()) {
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> parsed = om.readValue(e.getModelVersionObject(),
+                                                        java.util.Map.class);
+                                        existingModelVersionObject = new java.util.LinkedHashMap<>(parsed);
+                                } else {
+                                        existingModelVersionObject = new java.util.LinkedHashMap<>();
+                                }
+
+                                Object oldCreatorObj = existingModelVersionObject.get("creator");
+                                String oldCreatorUsername = null;
+                                if (oldCreatorObj instanceof Map) {
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> oldCreatorMap = (Map<String, Object>) oldCreatorObj;
+                                        if (oldCreatorMap.get("username") != null) {
+                                                oldCreatorUsername = String.valueOf(oldCreatorMap.get("username"));
+                                        }
+                                }
+
+                                String newCreatorUsername = null;
+                                if (creatorObj instanceof Map) {
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> newCreatorMap = (Map<String, Object>) creatorObj;
+                                        if (newCreatorMap.get("username") != null) {
+                                                newCreatorUsername = String.valueOf(newCreatorMap.get("username"));
+                                        }
+                                }
+
+                                System.out.println(
+                                                "OLD creator.username in DB modelVersionObject: " + oldCreatorUsername);
+                                System.out.println("NEW creator.username from fetchedModel: " + newCreatorUsername);
+
+                                if (!java.util.Objects.equals(oldCreatorUsername, newCreatorUsername)) {
+                                        System.out.println("update: creator.username");
+                                        System.out.println("OLD creator: " + oldCreatorObj);
+                                        System.out.println("NEW creator: " + creatorObj);
+
+                                        existingModelVersionObject.put("creator", creatorObj);
+                                        e.setModelVersionObject(toJsonOrNull(existingModelVersionObject));
+                                        changedFields.add("creator");
+                                }
+
+                        } catch (Exception ex) {
+                                System.out.println("Could not compare/update creator.username: " + ex.getMessage());
+                        }
 
                         // civitaiBaseModel (String)
                         if (civitaiBaseModel != null
