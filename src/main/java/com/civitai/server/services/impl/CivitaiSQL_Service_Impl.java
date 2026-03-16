@@ -3365,22 +3365,37 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         boolean includeEarlyAccess,
                         boolean includeErrors,
                         boolean aiSuggestedOnly,
+                        String sortBy,
                         String sortDir) {
 
                 final int p = Math.max(0, page);
                 final int s = Math.min(Math.max(1, size), 500);
 
+                String sortByNorm = (sortBy == null ? "priority" : sortBy)
+                                .trim()
+                                .toLowerCase(java.util.Locale.ROOT);
+
+                boolean asc = "asc".equalsIgnoreCase(sortDir);
+
                 org.springframework.data.domain.Sort sort;
-                if ("asc".equalsIgnoreCase(sortDir)) {
-                        // lowest priority first (probably not what you want, but supported)
-                        sort = org.springframework.data.domain.Sort.by(
-                                        org.springframework.data.domain.Sort.Order.asc("downloadPriority"),
-                                        org.springframework.data.domain.Sort.Order.asc("id"));
+
+                if ("id".equals(sortByNorm)) {
+                        sort = asc
+                                        ? org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order.asc("id"))
+                                        : org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order.desc("id"));
                 } else {
-                        // default: highest priority first, newest id first
-                        sort = org.springframework.data.domain.Sort.by(
-                                        org.springframework.data.domain.Sort.Order.desc("downloadPriority"),
-                                        org.springframework.data.domain.Sort.Order.desc("id"));
+                        // default: priority
+                        sort = asc
+                                        ? org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order
+                                                                        .asc("downloadPriority"),
+                                                        org.springframework.data.domain.Sort.Order.asc("id"))
+                                        : org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order
+                                                                        .desc("downloadPriority"),
+                                                        org.springframework.data.domain.Sort.Order.desc("id"));
                 }
 
                 var pageable = org.springframework.data.domain.PageRequest.of(p, s, sort);
@@ -3673,20 +3688,37 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         boolean includeEarlyAccess,
                         boolean includeErrors,
                         boolean aiSuggestedOnly,
+                        String sortBy,
                         String sortDir) {
 
                 final int p = Math.max(0, page);
                 final int s = Math.min(Math.max(1, size), 500);
 
+                String sortByNorm = (sortBy == null ? "priority" : sortBy)
+                                .trim()
+                                .toLowerCase(java.util.Locale.ROOT);
+
+                boolean asc = "asc".equalsIgnoreCase(sortDir);
+
                 org.springframework.data.domain.Sort sort;
-                if ("asc".equalsIgnoreCase(sortDir)) {
-                        sort = org.springframework.data.domain.Sort.by(
-                                        org.springframework.data.domain.Sort.Order.asc("downloadPriority"),
-                                        org.springframework.data.domain.Sort.Order.asc("id"));
+
+                if ("id".equals(sortByNorm)) {
+                        sort = asc
+                                        ? org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order.asc("id"))
+                                        : org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order.desc("id"));
                 } else {
-                        sort = org.springframework.data.domain.Sort.by(
-                                        org.springframework.data.domain.Sort.Order.desc("downloadPriority"),
-                                        org.springframework.data.domain.Sort.Order.desc("id"));
+                        // default: priority
+                        sort = asc
+                                        ? org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order
+                                                                        .asc("downloadPriority"),
+                                                        org.springframework.data.domain.Sort.Order.asc("id"))
+                                        : org.springframework.data.domain.Sort.by(
+                                                        org.springframework.data.domain.Sort.Order
+                                                                        .desc("downloadPriority"),
+                                                        org.springframework.data.domain.Sort.Order.desc("id"));
                 }
 
                 var pageable = org.springframework.data.domain.PageRequest.of(p, s, sort);

@@ -1427,6 +1427,7 @@ public class CivitaiSQL_Controller {
             @RequestParam(name = "includeEarlyAccess", defaultValue = "true") boolean includeEarlyAccess,
             @RequestParam(name = "includeErrors", defaultValue = "true") boolean includeErrors,
             @RequestParam(name = "aiSuggestedOnly", defaultValue = "false") boolean aiSuggestedOnly,
+            @RequestParam(name = "sortBy", defaultValue = "priority") String sortBy,
             @RequestParam(name = "sortDir", defaultValue = "desc") String sortDir) {
 
         final int p = Math.max(0, page);
@@ -1440,6 +1441,7 @@ public class CivitaiSQL_Controller {
         System.out.println("status = " + status);
         System.out.println("includeHold = " + includeHold);
         System.out.println("includeEarlyAccess = " + includeEarlyAccess);
+        System.out.println("sortBy = " + sortBy);
         System.out.println("sortDir = " + sortDir);
         System.out.println("search = " + (search == null ? "<null>" : ('"' + search + '"')));
 
@@ -1469,6 +1471,7 @@ public class CivitaiSQL_Controller {
                 includeEarlyAccess,
                 includeErrors,
                 aiSuggestedOnly,
+                sortBy,
                 sortDir);
 
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
@@ -1496,6 +1499,7 @@ public class CivitaiSQL_Controller {
         final boolean includeErrors = true;
         final boolean aiSuggestedOnly = false;
         final String sortDir = "desc";
+        final String sortBy = "priority";
 
         System.out.println("---- GET /get_pending_from_offline_download_list-in-page ----");
         System.out.println("page = " + page + " (normalized=" + p + ")");
@@ -1506,6 +1510,7 @@ public class CivitaiSQL_Controller {
         System.out.println("includeHold = " + includeHold);
         System.out.println("includeEarlyAccess = " + includeEarlyAccess);
         System.out.println("sortDir = " + sortDir);
+        System.out.println("sortBy = " + sortBy);
         System.out.println("search = <null>");
         System.out.println("prefixes.size = " + prefixes.size());
         System.out.println("prefixes = " + prefixes);
@@ -1524,6 +1529,7 @@ public class CivitaiSQL_Controller {
                 includeEarlyAccess,
                 includeErrors,
                 aiSuggestedOnly,
+                sortBy,
                 sortDir);
 
         return ResponseEntity.ok().body(CustomResponse.success("OK", result));
@@ -1553,6 +1559,7 @@ public class CivitaiSQL_Controller {
             final boolean includeErrors = true;
             final boolean aiSuggestedOnly = false;
             final String sortDir = "desc";
+            final String sortBy = "priority";
 
             // 1) Fetch
             PageResponse<java.util.Map<String, Object>> pageResult = civitaiSQL_Service
@@ -1568,7 +1575,8 @@ public class CivitaiSQL_Controller {
                             includeEarlyAccess,
                             includeErrors,
                             aiSuggestedOnly,
-                            sortDir);
+                            sortDir,
+                            sortBy);
 
             // 2) Convert to JsonNode so we can read "content" without relying on getters
             JsonNode pageNode = objectMapperforAI.valueToTree(pageResult);

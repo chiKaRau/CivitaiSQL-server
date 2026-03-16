@@ -185,6 +185,7 @@ public interface CivitaiSQL_Service {
                         boolean includeEarlyAccess,
                         boolean includeErrors,
                         boolean aiSuggestedOnly,
+                        String sortBy,
                         String sortDir);
 
         public PageResponse<Map<String, Object>> get_offline_download_list_paged_aiSuggestedArtworkTitleEmpty(
@@ -200,6 +201,7 @@ public interface CivitaiSQL_Service {
                         boolean includeEarlyAccess,
                         boolean includeErrors,
                         boolean aiSuggestedOnly,
+                        String sortBy,
                         String sortDir);
 
         PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
