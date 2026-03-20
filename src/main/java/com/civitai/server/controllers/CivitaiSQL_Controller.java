@@ -2135,21 +2135,19 @@ public class CivitaiSQL_Controller {
         String status = (String) requestBody.get("status");
         Boolean lastChecked = (Boolean) requestBody.get("lastChecked");
         String rating = (String) requestBody.getOrDefault("rating", "N/A");
-        // Validate null or empty
-        if (creatorUrl == null || creatorUrl == "") {
+
+        if (creatorUrl == null || creatorUrl.isBlank()) {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
         try {
-
-            civitaiSQL_Service.update_creator_url_list(creatorUrl, status, lastChecked, rating);
+            String savedRating = civitaiSQL_Service.update_creator_url_list(creatorUrl, status, lastChecked, rating);
 
             return ResponseEntity.ok()
-                    .body(CustomResponse.success("Success updating creator url list"));
+                    .body(CustomResponse.success(savedRating, "Success : " + savedRating));
 
         } catch (Exception ex) {
-            System.err.println("Error - " + creatorUrl + " : "
-                    + ex.getMessage());
+            System.err.println("Error - " + creatorUrl + " : " + ex.getMessage());
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
     }

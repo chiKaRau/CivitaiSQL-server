@@ -2919,7 +2919,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional
-        public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating) {
+        public String update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating) {
                 if (creatorUrl == null || creatorUrl.isBlank()) {
                         throw new CustomException("creatorUrl is required");
                 }
@@ -2927,7 +2927,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 log.info("[creator-url] INPUT >> url='{}', status='{}', lastChecked={}, rating='{}'",
                                 creatorUrl, status, lastChecked, rating);
 
-                // Per-URL lock: serialize read/modify/save for the same URL
                 synchronized (creatorUrl.intern()) {
                         try {
                                 if (Boolean.TRUE.equals(lastChecked)) {
@@ -2942,7 +2941,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                                 boolean changed = false;
 
-                                // 1) Status: update only if changed
                                 if (status != null) {
                                         String cur = e.getStatus();
                                         if (cur == null || !cur.equalsIgnoreCase(status)) {
@@ -2956,11 +2954,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         }
                                 }
 
-                                // Always handle lastChecked true (and timestamp)
                                 if (Boolean.TRUE.equals(lastChecked)) {
                                         e.setLastChecked(true);
                                         e.setLastCheckedDate(LocalDateTime.now());
-                                        changed = true; // ensure we persist the timestamp
+                                        changed = true;
                                 }
 
                                 if (rating != null) {
@@ -2985,12 +2982,14 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 }
 
                                 if (changed || existing.isEmpty()) {
-                                        creator_Table_Repository.save(e);
+                                        e = creator_Table_Repository.save(e);
                                         log.info("[creator-url] SAVED id={} url='{}'", e.getId(), creatorUrl);
                                 } else {
                                         log.info("[creator-url] NO CHANGE id={} url='{}' -> skip save", e.getId(),
                                                         creatorUrl);
                                 }
+
+                                return e.getRating() == null ? "N/A" : e.getRating();
 
                         } catch (Exception ex) {
                                 log.error("[creator-url] update failed for {}: {}", creatorUrl, ex.getMessage(), ex);
