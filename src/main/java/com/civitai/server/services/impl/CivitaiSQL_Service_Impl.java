@@ -126,6 +126,10 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final Logger log = LoggerFactory.getLogger(CivitaiSQL_Service_Impl.class);
 
+        @PersistenceContext
+        private EntityManager entityManager;
+
+        @Transactional
         @PostConstruct
         public void civitaiSQL_Service_Startup() {
                 // System.out.println("civitaiSQL_Service_Startup");
@@ -2580,7 +2584,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                         new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
                                                         });
                                         m.put("imageUrlsArray", urls.toArray(new String[0]));
-                                } else {
+                                } else
+
+                                {
                                         m.put("imageUrlsArray", null);
                                 }
 
@@ -4069,7 +4075,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                 e.getCivitaiTags(),
                                                 new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
                                                 }));
-                        } else {
+                        } else
+
+                        {
                                 m.put("civitaiTags", null);
                         }
 
@@ -5006,7 +5014,20 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("id", row[0]);
                                 m.put("civitaiModelID", row[1]);
                                 m.put("civitaiVersionID", row[2]);
-                                m.put("imageUrl", row[3]);
+
+                                List<String> imageUrlList = new ArrayList<>();
+                                if (row[3] != null) {
+                                        String imageUrlListJson = String.valueOf(row[3]);
+                                        if (!imageUrlListJson.trim().isEmpty()
+                                                        && !"null".equalsIgnoreCase(imageUrlListJson.trim())) {
+                                                imageUrlList = objectMapper.readValue(
+                                                                imageUrlListJson,
+                                                                new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+                                                                });
+                                        }
+                                }
+
+                                m.put("imageUrlList", imageUrlList);
                                 m.put("createdAt", row[4]);
                                 m.put("updatedAt", row[5]);
                                 content.add(m);
@@ -5034,7 +5055,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         public Map<String, Object> insert_model_offline_download_history(
                         Long civitaiModelID,
                         Long civitaiVersionID,
-                        String imageUrl) {
+                        List<String> imageUrlList) {
                 try {
                         if (civitaiModelID == null) {
                                 throw new CustomException("civitaiModelID is required");
@@ -5044,8 +5065,19 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 throw new CustomException("civitaiVersionID is required");
                         }
 
-                        if (imageUrl == null || imageUrl.trim().isEmpty()) {
-                                throw new CustomException("imageUrl is required");
+                        if (imageUrlList == null || imageUrlList.isEmpty()) {
+                                throw new CustomException("imageUrlList is required");
+                        }
+
+                        List<String> cleanedImageUrlList = imageUrlList.stream()
+                                        .filter(java.util.Objects::nonNull)
+                                        .map(String::trim)
+                                        .filter(s -> !s.isEmpty())
+                                        .distinct()
+                                        .toList();
+
+                        if (cleanedImageUrlList.isEmpty()) {
+                                throw new CustomException("imageUrlList is required");
                         }
 
                         LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Los_Angeles"));
@@ -5054,7 +5086,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         .builder()
                                         .civitaiModelID(civitaiModelID)
                                         .civitaiVersionID(civitaiVersionID)
-                                        .imageUrl(imageUrl.trim())
+                                        .imageUrlList(cleanedImageUrlList)
                                         .createdAt(now)
                                         .updatedAt(now)
                                         .build();
@@ -5066,7 +5098,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         out.put("id", saved.getId());
                         out.put("civitaiModelID", saved.getCivitaiModelID());
                         out.put("civitaiVersionID", saved.getCivitaiVersionID());
-                        out.put("imageUrl", saved.getImageUrl());
+                        out.put("imageUrlList", saved.getImageUrlList());
                         out.put("createdAt", saved.getCreatedAt());
                         out.put("updatedAt", saved.getUpdatedAt());
 

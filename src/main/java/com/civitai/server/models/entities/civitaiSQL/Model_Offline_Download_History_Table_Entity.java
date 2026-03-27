@@ -2,8 +2,11 @@ package com.civitai.server.models.entities.civitaiSQL;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -24,8 +27,9 @@ public class Model_Offline_Download_History_Table_Entity {
     @Column(name = "civitai_model_id")
     private Long civitaiModelID;
 
-    @Column(name = "image_url", columnDefinition = "TEXT")
-    private String imageUrl;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "image_url_list", columnDefinition = "JSON")
+    private List<String> imageUrlList;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

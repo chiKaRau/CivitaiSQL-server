@@ -245,5 +245,5 @@ public interface CivitaiSQL_Service {
         public Map<String, Object> insert_model_offline_download_history(
                         Long civitaiModelID,
                         Long civitaiVersionID,
-                        String imageUrl);
+                        List<String> imageUrlList);
 }

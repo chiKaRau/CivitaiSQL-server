@@ -355,17 +355,10 @@ public class File_Controller {
                         modelVersionObject, civitaiModelID, civitaiVersionID, civitaiUrl,
                         (String) modelVersionObject.get("baseModel"), imageUrlsArray);
 
-                String firstImageUrl = (imageUrlsArray != null
-                        && imageUrlsArray.length > 0
-                        && imageUrlsArray[0] != null
-                        && !imageUrlsArray[0].trim().isEmpty())
-                                ? imageUrlsArray[0].trim()
-                                : "https://placehold.co/400";
-
                 civitaiSQL_Service.insert_model_offline_download_history(
                         Long.valueOf(civitaiModelID),
                         Long.valueOf(civitaiVersionID),
-                        firstImageUrl);
+                        Arrays.asList(imageUrlsArray));
 
                 civitaiSQL_Service.update_download_file_path_count(downloadFilePath);
                 // fileService.remove_from_offline_download_list(civitaiModelID,
@@ -451,17 +444,10 @@ public class File_Controller {
                     baseModel,
                     imageUrlsArray);
 
-            String firstImageUrl = (imageUrlsArray != null
-                    && imageUrlsArray.length > 0
-                    && imageUrlsArray[0] != null
-                    && !imageUrlsArray[0].trim().isEmpty())
-                            ? imageUrlsArray[0].trim()
-                            : "https://placehold.co/400";
-
             civitaiSQL_Service.insert_model_offline_download_history(
                     Long.valueOf(civitaiModelID),
                     Long.valueOf(civitaiVersionID),
-                    firstImageUrl);
+                    Arrays.asList(imageUrlsArray));
 
             return ResponseEntity.ok(CustomResponse.success("Success download file"));
         } catch (Exception ex) {
