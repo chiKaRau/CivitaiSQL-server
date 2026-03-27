@@ -2430,6 +2430,16 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                                 e.setEarlyAccessEndsAt(earlyAccessEndsAt);
                                 changedFields.add("earlyAccessEndsAt");
+
+                                if (earlyAccessEndsAt != null
+                                                && !java.util.Objects.equals(e.getDownloadPriority(), 8)) {
+                                        System.out.println("update: downloadPriority");
+                                        System.out.println("OLD downloadPriority: " + e.getDownloadPriority());
+                                        System.out.println("NEW downloadPriority: 8");
+
+                                        e.setDownloadPriority(8);
+                                        changedFields.add("downloadPriority");
+                                }
                         }
 
                         boolean updated = !changedFields.isEmpty();
