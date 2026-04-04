@@ -5040,6 +5040,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("imageUrlList", imageUrlList);
                                 m.put("createdAt", row[4]);
                                 m.put("updatedAt", row[5]);
+                                m.put("localPath", row[6]);
+
                                 content.add(m);
                         }
 

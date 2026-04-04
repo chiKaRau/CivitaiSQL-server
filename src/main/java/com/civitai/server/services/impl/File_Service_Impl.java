@@ -2004,4 +2004,110 @@ public class File_Service_Impl implements File_Service {
         }
     }
 
+    @Override
+    public Boolean check_model_version_file_exists(String modelID, String versionID) {
+        try {
+            if (modelID == null || modelID.trim().isEmpty() ||
+                    versionID == null || versionID.trim().isEmpty()) {
+                return false;
+            }
+
+            String normalizedModelID = modelID.trim();
+            String normalizedVersionID = versionID.trim();
+            String filePrefix = normalizedModelID + "_" + normalizedVersionID + "_";
+
+            Path downloadRoot = Paths.get("files", "download");
+
+            if (!Files.exists(downloadRoot) || !Files.isDirectory(downloadRoot)) {
+                return false;
+            }
+
+            try (Stream<Path> walk = Files.walk(downloadRoot)) {
+                return walk
+                        .filter(Files::isRegularFile)
+                        .map(path -> path.getFileName().toString())
+                        .anyMatch(fileName -> fileName.startsWith(filePrefix));
+            }
+
+        } catch (IOException e) {
+            log.error("Unexpected error while checking model/version file existence", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    @Override
+    public int move_model_version_files_to_delete(String modelID, String versionID) {
+        try {
+            if (modelID == null || modelID.trim().isEmpty()
+                    || versionID == null || versionID.trim().isEmpty()) {
+                return 0;
+            }
+
+            String normalizedModelID = modelID.trim();
+            String normalizedVersionID = versionID.trim();
+            String filePrefix = normalizedModelID + "_" + normalizedVersionID + "_";
+
+            Path downloadRoot = Paths.get("files", "download");
+            Path deleteRoot = Paths.get("files", "download", "@scan@", "delete");
+
+            if (!Files.exists(downloadRoot) || !Files.isDirectory(downloadRoot)) {
+                return 0;
+            }
+
+            if (!Files.exists(deleteRoot)) {
+                Files.createDirectories(deleteRoot);
+            }
+
+            List<Path> matchedFiles;
+            try (Stream<Path> walk = Files.walk(downloadRoot)) {
+                matchedFiles = walk
+                        .filter(Files::isRegularFile)
+                        .filter(path -> path.getFileName().toString().startsWith(filePrefix))
+                        .collect(Collectors.toList());
+            }
+
+            int movedCount = 0;
+
+            for (Path sourcePath : matchedFiles) {
+                String fileName = sourcePath.getFileName().toString();
+                Path targetPath = buildUniqueDeleteTargetPath(deleteRoot, fileName);
+
+                Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                movedCount++;
+            }
+
+            return movedCount;
+
+        } catch (IOException e) {
+            log.error("Unexpected error while moving model/version files to delete folder", e);
+            throw new CustomException("An unexpected error occurred", e);
+        }
+    }
+
+    private Path buildUniqueDeleteTargetPath(Path deleteRoot, String fileName) throws IOException {
+        Path candidate = deleteRoot.resolve(fileName);
+
+        if (!Files.exists(candidate)) {
+            return candidate;
+        }
+
+        String baseName = fileName;
+        String extension = "";
+
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            baseName = fileName.substring(0, dotIndex);
+            extension = fileName.substring(dotIndex);
+        }
+
+        int counter = 1;
+        while (true) {
+            Path nextCandidate = deleteRoot.resolve(baseName + " (" + counter + ")" + extension);
+            if (!Files.exists(nextCandidate)) {
+                return nextCandidate;
+            }
+            counter++;
+        }
+    }
+
 }

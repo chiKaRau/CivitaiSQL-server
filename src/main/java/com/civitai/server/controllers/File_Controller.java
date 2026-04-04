@@ -444,10 +444,12 @@ public class File_Controller {
                     baseModel,
                     imageUrlsArray);
 
-            civitaiSQL_Service.insert_model_offline_download_history(
-                    Long.valueOf(civitaiModelID),
-                    Long.valueOf(civitaiVersionID),
-                    Arrays.asList(imageUrlsArray));
+            /*
+             * civitaiSQL_Service.insert_model_offline_download_history(
+             * Long.valueOf(civitaiModelID),
+             * Long.valueOf(civitaiVersionID),
+             * Arrays.asList(imageUrlsArray));
+             */
 
             return ResponseEntity.ok(CustomResponse.success("Success download file"));
         } catch (Exception ex) {
@@ -458,6 +460,48 @@ public class File_Controller {
                     .status(500)
                     .body(CustomResponse.failure("Server error: " + ex.getMessage()));
         }
+    }
+
+    @PostMapping("/check-model-version-file-exists")
+    public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkModelVersionFileExists(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelID = (String) requestBody.get("modelID");
+        String versionID = (String) requestBody.get("versionID");
+
+        if (modelID == null || modelID.trim().isEmpty() ||
+                versionID == null || versionID.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        Boolean exists = fileService.check_model_version_file_exists(modelID, versionID);
+
+        Map<String, Boolean> payload = new HashMap<>();
+        payload.put("exists", exists);
+
+        return ResponseEntity.ok().body(CustomResponse.success("File existence check successful", payload));
+    }
+
+    @PostMapping("/move-model-version-files-to-delete")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> moveModelVersionFilesToDelete(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String modelID = (String) requestBody.get("modelID");
+        String versionID = (String) requestBody.get("versionID");
+
+        if (modelID == null || modelID.trim().isEmpty()
+                || versionID == null || versionID.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
+
+        int movedCount = fileService.move_model_version_files_to_delete(modelID, versionID);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("isMoved", movedCount > 0);
+        payload.put("movedCount", movedCount);
+
+        return ResponseEntity.ok().body(
+                CustomResponse.success("Move to delete folder completed", payload));
     }
 
 }

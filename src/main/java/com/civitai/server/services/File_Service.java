@@ -23,22 +23,24 @@ public interface File_Service {
         public Map<String, List<Map<String, Object>>> get_tags_list(String prefix);
 
         // public void update_offline_download_list(
-        //                 String civitaiFileName,
-        //                 List<Map<String, Object>> civitaiModelFileList,
-        //                 String downloadFilePath,
-        //                 Map<String, Object> modelVersionObject,
-        //                 String civitaiModelID,
-        //                 String civitaiVersionID,
-        //                 String civitaiUrl,
-        //                 String civitaiBaseModel,
-        //                 String[] imageUrlsArray,
-        //                 String selectedCategory,
-        //                 List<String> civitaiTags,
-        //                 Boolean isModifyMode);
+        // String civitaiFileName,
+        // List<Map<String, Object>> civitaiModelFileList,
+        // String downloadFilePath,
+        // Map<String, Object> modelVersionObject,
+        // String civitaiModelID,
+        // String civitaiVersionID,
+        // String civitaiUrl,
+        // String civitaiBaseModel,
+        // String[] imageUrlsArray,
+        // String selectedCategory,
+        // List<String> civitaiTags,
+        // Boolean isModifyMode);
 
-        // public boolean backupOfflineDownloadList(); //ignore if you move from txt to sql
+        // public boolean backupOfflineDownloadList(); //ignore if you move from txt to
+        // sql
 
-        // public void remove_from_offline_download_list(String civitaiModelID, String civitaiVersionID);
+        // public void remove_from_offline_download_list(String civitaiModelID, String
+        // civitaiVersionID);
 
         // public long checkQuantityOfOfflineDownloadList(String civitaiModelID);
 
@@ -57,6 +59,7 @@ public interface File_Service {
         // public void update_error_model_list(String url);
 
         public void open_download_directory();
+
         public void open_model_downloaded_directory(String modelDownloadPath);
 
         public void create_tags_list();
@@ -67,7 +70,8 @@ public interface File_Service {
 
         // public List<Map<String, Object>> get_creator_url_list();
 
-        // public void update_creator_url_list(String creatorUrl, String status, Boolean lastChecked, String rating);
+        // public void update_creator_url_list(String creatorUrl, String status, Boolean
+        // lastChecked, String rating);
 
         // public void remove_creator_url(String creatorUrl);
 
@@ -83,7 +87,12 @@ public interface File_Service {
                         String downloadFilePath, Map<String, Object> modelVersionObject, String civitaiModelID,
                         String civitaiVersionID, String civitaiUrl, String civitaiBaseModel, String[] imageUrlsArray);
 
-        // public List<Map<String, Object>> searchOfflineDownloads(List<String> keywords);
+        // public List<Map<String, Object>> searchOfflineDownloads(List<String>
+        // keywords);
 
         public void updateAllPngs(Path downloadFolder) throws IOException, InterruptedException;
+
+        Boolean check_model_version_file_exists(String modelID, String versionID);
+
+        int move_model_version_files_to_delete(String modelID, String versionID);
 }
