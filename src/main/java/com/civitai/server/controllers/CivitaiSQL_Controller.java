@@ -643,6 +643,19 @@ public class CivitaiSQL_Controller {
     public ResponseEntity<CustomResponse<String>> createRecordToAllTablesInCustom(
             @RequestBody Models_DTO modelsDTO) {
 
+        System.out.println(
+                "Incoming modelsDTO -> "
+                        + "name=" + modelsDTO.getName()
+                        + ", mainModelName=" + modelsDTO.getMainModelName()
+                        + ", url=" + modelsDTO.getUrl()
+                        + ", category=" + modelsDTO.getCategory()
+                        + ", versionNumber=" + modelsDTO.getVersionNumber()
+                        + ", modelNumber=" + modelsDTO.getModelNumber()
+                        + ", type=" + modelsDTO.getType()
+                        + ", baseModel=" + modelsDTO.getBaseModel()
+                        + ", imageUrls=" + modelsDTO.getImageUrls()
+                        + ", localPath=" + modelsDTO.getLocalPath());
+
         // Validate required fields
         if (modelsDTO.getName() == null || modelsDTO.getName().isEmpty()
                 || modelsDTO.getMainModelName() == null || modelsDTO.getMainModelName().isEmpty()
@@ -2735,5 +2748,91 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok()
                 .body(CustomResponse.success("Model offline download history available dates retrieval successful",
                         result));
+    }
+
+    @PostMapping("/update-version-id-from-offline-download-list")
+    public ResponseEntity<CustomResponse<String>> updateVersionIdFromOfflineDownloadList(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String civitaiModelID = requestBody.get("civitaiModelID") != null
+                ? requestBody.get("civitaiModelID").toString()
+                : null;
+
+        String oldCivitaiVersionID = requestBody.get("oldCivitaiVersionID") != null
+                ? requestBody.get("oldCivitaiVersionID").toString()
+                : null;
+
+        String newCivitaiVersionID = requestBody.get("newCivitaiVersionID") != null
+                ? requestBody.get("newCivitaiVersionID").toString()
+                : null;
+
+        if (civitaiModelID == null || civitaiModelID.isBlank()
+                || oldCivitaiVersionID == null || oldCivitaiVersionID.isBlank()
+                || newCivitaiVersionID == null || newCivitaiVersionID.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure(
+                            "Invalid input: civitaiModelID, oldCivitaiVersionID, and newCivitaiVersionID are required"));
+        }
+
+        boolean updated = civitaiSQL_Service.update_version_id_from_offline_download_list(
+                civitaiModelID, oldCivitaiVersionID, newCivitaiVersionID);
+
+        if (!updated) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(CustomResponse.failure("Record not found or IDs invalid"));
+        }
+
+        return ResponseEntity.ok(CustomResponse.success("civitaiVersionID updated"));
+    }
+
+    @PostMapping("/refresh-model-version-object-from-offline-table")
+    public ResponseEntity<CustomResponse<String>> refreshModelVersionObjectFromOfflineTable(
+            @RequestBody Map<String, Object> requestBody) {
+
+        try {
+            Object modelIdObj = requestBody.get("civitaiModelID");
+            Object versionIdObj = requestBody.get("civitaiVersionID");
+
+            if (modelIdObj == null || versionIdObj == null) {
+                return ResponseEntity.badRequest()
+                        .body(CustomResponse.failure("civitaiModelID and civitaiVersionID are required."));
+            }
+
+            Long civitaiModelID = Long.valueOf(String.valueOf(modelIdObj));
+            Long civitaiVersionID = Long.valueOf(String.valueOf(versionIdObj));
+
+            String result = civitaiSQL_Service.refreshModelVersionObjectFromOfflineTable(
+                    civitaiModelID,
+                    civitaiVersionID);
+
+            return ResponseEntity.ok(CustomResponse.success(result));
+
+        } catch (NumberFormatException ex) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("civitaiModelID and civitaiVersionID must be valid numbers."));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(CustomResponse.failure("Failed updating modelVersionObject: " + ex.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/delete-model-offline-download-history-record")
+    public ResponseEntity<CustomResponse<String>> deleteModelOfflineDownloadHistoryRecord(
+            @RequestParam("id") Long id) {
+
+        if (id == null) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("id is required"));
+        }
+
+        boolean deleted = civitaiSQL_Service.delete_model_offline_download_history_record(id);
+
+        if (!deleted) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(CustomResponse.failure("History record not found"));
+        }
+
+        return ResponseEntity.ok(CustomResponse.success("History record deleted successfully"));
     }
 }

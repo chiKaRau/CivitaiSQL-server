@@ -5122,4 +5122,129 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         throw new CustomException("An unexpected error occurred", ex);
                 }
         }
+
+        @Override
+        @Transactional
+        public boolean update_version_id_from_offline_download_list(
+                        String civitaiModelID,
+                        String oldCivitaiVersionID,
+                        String newCivitaiVersionID) {
+
+                try {
+                        Long modelId = parseLongOrNull(civitaiModelID);
+                        Long oldVersionId = parseLongOrNull(oldCivitaiVersionID);
+                        Long newVersionId = parseLongOrNull(newCivitaiVersionID);
+
+                        if (modelId == null || oldVersionId == null || newVersionId == null) {
+                                return false;
+                        }
+
+                        if (oldVersionId.equals(newVersionId)) {
+                                return true;
+                        }
+
+                        // prevent duplicate target row
+                        boolean targetExists = models_Offline_Table_Repository
+                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(modelId, newVersionId)
+                                        .isPresent();
+
+                        if (targetExists) {
+                                throw new CustomException(
+                                                "Cannot update version ID because the target model/version already exists in offline table.");
+                        }
+
+                        int updated = models_Offline_Table_Repository
+                                        .updateVersionIdByModelAndVersion(modelId, oldVersionId, newVersionId);
+
+                        return updated > 0;
+
+                } catch (CustomException ex) {
+                        throw ex;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while updating offline version ID (modelId={}, oldVersionId={}, newVersionId={})",
+                                        civitaiModelID, oldCivitaiVersionID, newCivitaiVersionID, ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public String refreshModelVersionObjectFromOfflineTable(Long civitaiModelID, Long civitaiVersionID) {
+                try {
+                        if (civitaiModelID == null || civitaiVersionID == null) {
+                                throw new RuntimeException("civitaiModelID and civitaiVersionID are required.");
+                        }
+
+                        Models_Offline_Table_Entity entity = models_Offline_Table_Repository
+                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(civitaiModelID, civitaiVersionID)
+                                        .orElseThrow(() -> new RuntimeException(
+                                                        "Offline record not found for modelID=" + civitaiModelID +
+                                                                        ", versionID=" + civitaiVersionID));
+
+                        Object latestVersionObjectRaw = civitai_Service
+                                        .findModelByVersionID(String.valueOf(civitaiVersionID));
+
+                        System.out.println(civitaiModelID + "_" + civitaiVersionID);
+
+                        System.out.println("latestVersionObjectRaw");
+                        System.out.println(latestVersionObjectRaw);
+
+                        Object latestVersionObject = latestVersionObjectRaw;
+
+                        if (latestVersionObjectRaw instanceof java.util.Optional<?>) {
+                                java.util.Optional<?> opt = (java.util.Optional<?>) latestVersionObjectRaw;
+
+                                if (!opt.isPresent()) {
+                                        throw new RuntimeException(
+                                                        "No version object returned from Civitai for versionID="
+                                                                        + civitaiVersionID);
+                                }
+
+                                latestVersionObject = opt.get();
+                        }
+
+                        if (latestVersionObject == null) {
+                                throw new RuntimeException(
+                                                "No version object returned from Civitai for versionID="
+                                                                + civitaiVersionID);
+                        }
+
+                        String latestVersionObjectJson = new com.fasterxml.jackson.databind.ObjectMapper()
+                                        .writeValueAsString(latestVersionObject);
+
+                        System.out.println("latestVersionObjectJson");
+                        System.out.println(latestVersionObjectJson);
+
+                        entity.setModelVersionObject(latestVersionObjectJson);
+                        models_Offline_Table_Repository.save(entity);
+
+                        return "modelVersionObject updated successfully for modelID=" + civitaiModelID
+                                        + ", versionID=" + civitaiVersionID;
+
+                } catch (Exception ex) {
+                        throw new RuntimeException("Failed updating modelVersionObject: " + ex.getMessage(), ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public boolean delete_model_offline_download_history_record(Long id) {
+                try {
+                        if (id == null) {
+                                return false;
+                        }
+
+                        if (!model_Offline_Download_History_Table_Repository.existsById(id)) {
+                                return false;
+                        }
+
+                        model_Offline_Download_History_Table_Repository.deleteById(id);
+                        return true;
+
+                } catch (Exception ex) {
+                        log.error("Unexpected error while deleting model offline download history record (id={})", id,
+                                        ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
 }

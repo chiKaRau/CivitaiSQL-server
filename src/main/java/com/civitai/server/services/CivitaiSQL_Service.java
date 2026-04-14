@@ -246,4 +246,13 @@ public interface CivitaiSQL_Service {
                         Long civitaiModelID,
                         Long civitaiVersionID,
                         List<String> imageUrlList);
+
+        boolean update_version_id_from_offline_download_list(
+                        String civitaiModelID,
+                        String oldCivitaiVersionID,
+                        String newCivitaiVersionID);
+
+        String refreshModelVersionObjectFromOfflineTable(Long civitaiModelID, Long civitaiVersionID);
+
+        boolean delete_model_offline_download_history_record(Long id);
 }

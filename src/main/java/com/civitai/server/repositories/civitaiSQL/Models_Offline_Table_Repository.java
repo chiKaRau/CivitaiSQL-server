@@ -56,4 +56,16 @@ public interface Models_Offline_Table_Repository extends
                         LocalDateTime now);
 
         List<Models_Offline_Table_Entity> findAllByCivitaiVersionIDIn(List<Long> versionIds);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query("""
+                            update Models_Offline_Table_Entity e
+                            set e.civitaiVersionID = :newVersionId
+                            where e.civitaiModelID = :modelId
+                              and e.civitaiVersionID = :oldVersionId
+                        """)
+        int updateVersionIdByModelAndVersion(
+                        @Param("modelId") Long modelId,
+                        @Param("oldVersionId") Long oldVersionId,
+                        @Param("newVersionId") Long newVersionId);
 }
