@@ -219,7 +219,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         String modelNumber = (String) row[0];
                         Integer id = (Integer) row[1];
                         String category = (String) row[2];
-                        String url = "https://civitai.com/models/" + modelNumber;
+                        String url = "https://civitai.red/models/" + modelNumber;
 
                         try {
                                 // Call the external service and update the model
@@ -2041,7 +2041,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         if ("EarlyAccess".equalsIgnoreCase(availability)) {
                                 try {
-                                        String versionUrl = "https://civitai.com/api/v1/model-versions/"
+                                        String versionUrl = "https://civitai.red/api/v1/model-versions/"
                                                         + civitaiVersionID;
 
                                         org.springframework.http.client.SimpleClientHttpRequestFactory rf = new org.springframework.http.client.SimpleClientHttpRequestFactory();

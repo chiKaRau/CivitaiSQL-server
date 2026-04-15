@@ -1106,7 +1106,7 @@ public class CivitaiSQL_Controller {
                 if ("EarlyAccess".equalsIgnoreCase(availability)) {
                     try {
                         // Build the endpoint for the version details
-                        String versionUrl = "https://civitai.com/api/v1/model-versions/" + civitaiVersionID;
+                        String versionUrl = "https://civitai.red/api/v1/model-versions/" + civitaiVersionID;
 
                         // A tiny RestTemplate with short timeouts so it won't hang your whole request
                         org.springframework.http.client.SimpleClientHttpRequestFactory rf = new org.springframework.http.client.SimpleClientHttpRequestFactory();
