@@ -2153,8 +2153,6 @@ public class CivitaiSQL_Controller {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        creatorUrl = creatorUrl.replace("https://civitai.com/", "https://civitai.red/");
-
         try {
             String savedRating = civitaiSQL_Service.update_creator_url_list(creatorUrl, status, lastChecked, rating);
 
