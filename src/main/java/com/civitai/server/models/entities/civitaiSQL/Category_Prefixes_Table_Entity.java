@@ -26,6 +26,10 @@ public class Category_Prefixes_Table_Entity {
     @Column(name = "download_priority")
     private Integer downloadPriority;
 
+    @Builder.Default
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

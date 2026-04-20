@@ -2883,7 +2883,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Transactional(readOnly = true)
         public List<Map<String, Object>> get_category_prefixes_list() {
                 try {
-                        // You can use a sorted repo method if you created it; otherwise use findAll()
                         List<Category_Prefixes_Table_Entity> rows = category_Prefixes_Table_Repository
                                         .findAllByOrderByIdAsc();
 
@@ -2897,6 +2896,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("prefixName", e.getPrefixName());
                                 m.put("downloadFilePath", e.getDownloadFilePath());
                                 m.put("downloadPriority", e.getDownloadPriority());
+                                m.put("active", e.getActive());
                                 m.put("createdAt", e.getCreatedAt());
                                 m.put("updatedAt", e.getUpdatedAt());
                                 out.add(m);
@@ -2905,6 +2905,37 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                 } catch (Exception ex) {
                         log.error("Unexpected error while retrieving category prefixes list (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @Transactional
+        public String update_category_prefix_active(String prefixName, Boolean active) {
+                try {
+                        if (prefixName == null || prefixName.trim().isEmpty()) {
+                                throw new CustomException("prefixName is required");
+                        }
+
+                        if (active == null) {
+                                throw new CustomException("active is required");
+                        }
+
+                        Category_Prefixes_Table_Entity entity = category_Prefixes_Table_Repository
+                                        .findByPrefixName(prefixName.trim())
+                                        .orElseThrow(() -> new CustomException(
+                                                        "Category prefix not found for prefixName: " + prefixName));
+
+                        entity.setActive(active);
+                        category_Prefixes_Table_Repository.save(entity);
+
+                        return "Category prefix active updated successfully";
+
+                } catch (CustomException ex) {
+                        throw ex;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while updating category prefix active field. prefixName={}, active={}",
+                                        prefixName, active, ex);
                         throw new CustomException("An unexpected error occurred", ex);
                 }
         }

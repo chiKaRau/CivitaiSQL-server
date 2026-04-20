@@ -232,6 +232,8 @@ public interface CivitaiSQL_Service {
 
         public List<Map<String, Object>> get_category_prefixes_list();
 
+        String update_category_prefix_active(String prefixName, Boolean active);
+
         public void update_download_file_path_count(String inputPath);
 
         public Map<String, List<Map<String, Object>>> get_download_file_path_count_list(String prefix);

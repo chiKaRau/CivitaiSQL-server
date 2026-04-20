@@ -2129,6 +2129,28 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok().body(CustomResponse.success("categoryPrefixesList retrieval successful", payload));
     }
 
+    @PostMapping("/update_category_prefix_active")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> updateCategoryPrefixActive(
+            @RequestBody Map<String, Object> requestBody) {
+
+        String prefixName = requestBody.get("prefixName") != null
+                ? String.valueOf(requestBody.get("prefixName"))
+                : null;
+
+        Boolean active = requestBody.get("active") != null
+                ? Boolean.valueOf(String.valueOf(requestBody.get("active")))
+                : null;
+
+        String result = civitaiSQL_Service.update_category_prefix_active(prefixName, active);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("prefixName", prefixName);
+        payload.put("active", active);
+
+        return ResponseEntity.ok().body(
+                CustomResponse.success(result, payload));
+    }
+
     @GetMapping("/get_rating_list")
     public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>> getRatingList() {
         List<Map<String, Object>> ratingList = civitaiSQL_Service.get_rating_list();
