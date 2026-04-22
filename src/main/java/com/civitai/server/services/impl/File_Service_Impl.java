@@ -2005,11 +2005,11 @@ public class File_Service_Impl implements File_Service {
     }
 
     @Override
-    public Boolean check_model_version_file_exists(String modelID, String versionID) {
+    public String check_model_version_file_exists(String modelID, String versionID) {
         try {
             if (modelID == null || modelID.trim().isEmpty() ||
                     versionID == null || versionID.trim().isEmpty()) {
-                return false;
+                return null;
             }
 
             String normalizedModelID = modelID.trim();
@@ -2019,14 +2019,16 @@ public class File_Service_Impl implements File_Service {
             Path downloadRoot = Paths.get("files", "download");
 
             if (!Files.exists(downloadRoot) || !Files.isDirectory(downloadRoot)) {
-                return false;
+                return null;
             }
 
             try (Stream<Path> walk = Files.walk(downloadRoot)) {
                 return walk
                         .filter(Files::isRegularFile)
-                        .map(path -> path.getFileName().toString())
-                        .anyMatch(fileName -> fileName.startsWith(filePrefix));
+                        .filter(path -> path.getFileName().toString().startsWith(filePrefix))
+                        .map(path -> path.toAbsolutePath().normalize().toString())
+                        .findFirst()
+                        .orElse(null);
             }
 
         } catch (IOException e) {

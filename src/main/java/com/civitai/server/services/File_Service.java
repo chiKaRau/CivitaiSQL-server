@@ -92,7 +92,7 @@ public interface File_Service {
 
         public void updateAllPngs(Path downloadFolder) throws IOException, InterruptedException;
 
-        Boolean check_model_version_file_exists(String modelID, String versionID);
+        String check_model_version_file_exists(String modelID, String versionID);
 
         int move_model_version_files_to_delete(String modelID, String versionID);
 }

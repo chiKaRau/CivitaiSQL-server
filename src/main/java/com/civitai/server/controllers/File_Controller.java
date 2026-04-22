@@ -463,7 +463,7 @@ public class File_Controller {
     }
 
     @PostMapping("/check-model-version-file-exists")
-    public ResponseEntity<CustomResponse<Map<String, Boolean>>> checkModelVersionFileExists(
+    public ResponseEntity<CustomResponse<Map<String, String>>> checkModelVersionFileExists(
             @RequestBody Map<String, Object> requestBody) {
 
         String modelID = (String) requestBody.get("modelID");
@@ -474,12 +474,13 @@ public class File_Controller {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        Boolean exists = fileService.check_model_version_file_exists(modelID, versionID);
+        String filePath = fileService.check_model_version_file_exists(modelID, versionID);
 
-        Map<String, Boolean> payload = new HashMap<>();
-        payload.put("exists", exists);
+        Map<String, String> payload = new HashMap<>();
+        payload.put("filePath", filePath);
 
-        return ResponseEntity.ok().body(CustomResponse.success("File existence check successful", payload));
+        return ResponseEntity.ok().body(
+                CustomResponse.success("File existence check successful", payload));
     }
 
     @PostMapping("/move-model-version-files-to-delete")
