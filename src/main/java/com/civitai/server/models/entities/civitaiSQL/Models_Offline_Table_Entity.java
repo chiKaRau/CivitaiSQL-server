@@ -78,6 +78,12 @@ public class Models_Offline_Table_Entity {
     @Column(name = "is_error", columnDefinition = "TINYINT(1)")
     private Boolean isError;
 
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
+    @Column(name = "error_at")
+    private LocalDateTime errorAt;
+
     @Column(name = "hold", nullable = false, columnDefinition = "TINYINT(1)")
     @Builder.Default
     private Boolean hold = false;

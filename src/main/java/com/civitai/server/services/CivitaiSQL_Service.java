@@ -138,7 +138,11 @@ public interface CivitaiSQL_Service {
 
         public Optional<List<String>> getCivitaiVersionIds(String civitaiModelID);
 
-        public void update_error_model_offline_list(String civitaiModelID, String civitaiVersionID, Boolean isError);
+        public void update_error_model_offline_list(
+                        String civitaiModelID,
+                        String civitaiVersionID,
+                        Boolean isError,
+                        String errorMessage);
 
         public List<Map<String, Object>> get_creator_url_list();
 

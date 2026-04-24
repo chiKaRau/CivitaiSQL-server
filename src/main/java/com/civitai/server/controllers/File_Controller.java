@@ -47,25 +47,24 @@ public class File_Controller {
     private Civitai_Service civitai_Service;
     private CivitaiSQL_Service civitaiSQL_Service;
 
-    // ---------------------------------------------------------------
-    // The "raw byte" download in the same class for convenience
-    // ---------------------------------------------------------------
-    private void downloadImage(String imageUrl, Path outputPath) throws Exception {
-        URL url = new URL(imageUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
+    private String getDeepErrorMessage(Throwable ex) {
+        if (ex == null)
+            return "Unknown error";
 
-        // If you need auth headers, do it here:
-        // connection.setRequestProperty("Authorization", "Bearer <token>");
-
-        try (InputStream inputStream = connection.getInputStream();
-                FileOutputStream fileOutputStream = new FileOutputStream(outputPath.toFile())) {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                fileOutputStream.write(buffer, 0, bytesRead);
-            }
+        Throwable root = ex;
+        while (root.getCause() != null) {
+            root = root.getCause();
         }
+
+        if (root.getMessage() != null && !root.getMessage().isBlank()) {
+            return root.getMessage();
+        }
+
+        if (ex.getMessage() != null && !ex.getMessage().isBlank()) {
+            return ex.getMessage();
+        }
+
+        return root.getClass().getSimpleName();
     }
 
     @Autowired
@@ -219,59 +218,6 @@ public class File_Controller {
         return ResponseEntity.ok(CustomResponse.success("Filtered combinations retrieved", payload));
     }
 
-    // @GetMapping("/get_tags_list")
-    // public ResponseEntity<CustomResponse<Map<String, List<Map<String, Object>>>>>
-    // getTagsList(
-    // @RequestParam(value = "prefix", required = false) String prefix) {
-    // // Retrieve both top 10 and recent 10 lists based on prefix
-    // Map<String, List<Map<String, Object>>> tagsMap =
-    // fileService.get_tags_list(prefix);
-
-    // // Check if both lists are empty
-    // if (!tagsMap.get("topTags").isEmpty() ||
-    // !tagsMap.get("recentTags").isEmpty()) {
-    // return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval
-    // successful", tagsMap));
-    // } else {
-    // return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the
-    // database"));
-    // }
-    // }
-
-    @SuppressWarnings("unchecked")
-    @PostMapping("/download-file-server")
-    public ResponseEntity<CustomResponse<String>> downloadFileServer(@RequestBody Map<String, Object> requestBody) {
-        /*
-         * {
-         * "modelID": "123",
-         * "loraFileName": "example.txt",
-         * "versionID": "1.0",
-         * "downloadFilePath": "/downloads",
-         * "nameAndDownloadUrlArray": [
-         * {"name": "file1", "downloadUrl": "https://example.com/file1"},
-         * {"name": "file2", "downloadUrl": "https://example.com/file2"}
-         * ],
-         * "loraURL": "https://example.com/lora"
-         * }
-         */
-        String url = (String) requestBody.get("url");
-        String name = ((String) requestBody.get("name")).split("\\.")[0];
-        String modelID = (String) requestBody.get("modelID");
-        String versionID = (String) requestBody.get("versionID");
-        String downloadFilePath = (String) requestBody.get("downloadFilePath");
-        List<Map<String, Object>> filesList = (List<Map<String, Object>>) requestBody.get("filesList");
-
-        // Validate null or empty
-        if (url == null || url == "" || name == null || name == "" ||
-                modelID == null || modelID == "" || versionID == null || versionID == "" ||
-                downloadFilePath == null || downloadFilePath == "" || filesList == null || filesList.isEmpty()) {
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
-        }
-
-        fileService.download_file_by_server(name, modelID, versionID, downloadFilePath, filesList, url);
-        return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
-    }
-
     @PostMapping("/download-file-browser")
     public ResponseEntity<CustomResponse<String>> downloadFileBrowser(@RequestBody Map<String, Object> requestBody) {
         String downloadFilePath = (String) requestBody.get("downloadFilePath");
@@ -338,7 +284,11 @@ public class File_Controller {
 
             // Map<String, Object> modelVersionObject = modelVersionOptional.get();
 
-            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, true);
+            civitaiSQL_Service.update_error_model_offline_list(
+                    civitaiModelID,
+                    civitaiVersionID,
+                    true,
+                    "Download failed: " + getDeepErrorMessage(ex));
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
@@ -363,7 +313,8 @@ public class File_Controller {
                 civitaiSQL_Service.update_download_file_path_count(downloadFilePath);
                 // fileService.remove_from_offline_download_list(civitaiModelID,
                 // civitaiVersionID);
-                civitaiSQL_Service.remove_from_offline_download_list(civitaiModelID, civitaiVersionID);
+                // civitaiSQL_Service.remove_from_offline_download_list(civitaiModelID,
+                // civitaiVersionID);
                 return ResponseEntity.ok().body(CustomResponse.success("Success download file"));
             }
 
@@ -374,7 +325,11 @@ public class File_Controller {
 
             // Map<String, Object> modelVersionObject = modelVersionOptional.get();
 
-            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, true);
+            civitaiSQL_Service.update_error_model_offline_list(
+                    civitaiModelID,
+                    civitaiVersionID,
+                    true,
+                    "Download failed: " + getDeepErrorMessage(ex));
             // List<String> emptyList = new ArrayList<>();
             // fileService.update_error_model_list_v2(civitaiFileName, civitaiModelFileList,
             // downloadFilePath, modelObject,
@@ -454,7 +409,11 @@ public class File_Controller {
             return ResponseEntity.ok(CustomResponse.success("Success download file"));
         } catch (Exception ex) {
             String modelName = civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName;
-            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, true);
+            civitaiSQL_Service.update_error_model_offline_list(
+                    civitaiModelID,
+                    civitaiVersionID,
+                    true,
+                    "Download failed: " + getDeepErrorMessage(ex));
             ex.printStackTrace();
             return ResponseEntity
                     .status(500)

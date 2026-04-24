@@ -2080,24 +2080,32 @@ public class CivitaiSQL_Controller {
             @RequestBody Map<String, Object> requestBody) {
 
         Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
-        String civitaiModelID = (String) modelObject.get("civitaiModelID");
-        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
-        // Validate null or empty
-        if (civitaiModelID == null || civitaiModelID == "" ||
-                civitaiVersionID == null || civitaiVersionID == "") {
+
+        if (modelObject == null) {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 
-        System.out.println(civitaiModelID + "  " + civitaiVersionID);
+        String civitaiModelID = (String) modelObject.get("civitaiModelID");
+        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+
+        if (civitaiModelID == null || civitaiModelID.trim().isEmpty() ||
+                civitaiVersionID == null || civitaiVersionID.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+        }
 
         try {
-            civitaiSQL_Service.update_error_model_offline_list(civitaiModelID, civitaiVersionID, false);
+            civitaiSQL_Service.update_error_model_offline_list(
+                    civitaiModelID,
+                    civitaiVersionID,
+                    false,
+                    null);
+
             return ResponseEntity.ok()
-                    .body(CustomResponse.success("Success remove download file from offline download list"));
+                    .body(CustomResponse.success("Success removed model from error list"));
 
         } catch (Exception ex) {
             System.err.println("An error occurred: " + ex.getMessage());
-            return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
+            return ResponseEntity.badRequest().body(CustomResponse.failure(ex.getMessage()));
         }
     }
 

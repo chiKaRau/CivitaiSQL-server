@@ -2559,6 +2559,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("downloadPriority", e.getDownloadPriority());
                                 m.put("hold", e.getHold());
                                 m.put("isError", e.getIsError());
+                                m.put("errorMessage", e.getErrorMessage());
+                                m.put("errorAt", e.getErrorAt());
 
                                 // parse JSON columns (DB stores valid JSON; null-safe here)
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
@@ -2658,6 +2660,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("downloadPriority", e.getDownloadPriority());
                                 m.put("hold", e.getHold());
                                 m.put("isError", e.getIsError());
+                                m.put("errorMessage", e.getErrorMessage());
+                                m.put("errorAt", e.getErrorAt());
 
                                 // parse JSON columns inline
                                 List<Map<String, Object>> fileList = null;
@@ -2821,7 +2825,12 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional
-        public void update_error_model_offline_list(String civitaiModelID, String civitaiVersionID, Boolean isError) {
+        public void update_error_model_offline_list(
+                        String civitaiModelID,
+                        String civitaiVersionID,
+                        Boolean isError,
+                        String errorMessage) {
+
                 System.out.println("=== update_error_model_list ===");
                 System.out.println("civitaiModelID   : " + civitaiModelID);
                 System.out.println("civitaiVersionID : " + civitaiVersionID);
@@ -2830,15 +2839,20 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                 Long modelId = parseLongOrNull(civitaiModelID);
                 Long versionId = parseLongOrNull(civitaiVersionID);
+
                 if (modelId == null || versionId == null) {
                         log.warn("Invalid IDs; nothing updated. modelId={}, versionId={}", modelId, versionId);
                         return;
                 }
 
-                boolean flag = Boolean.TRUE.equals(isError); // default null -> false
+                boolean flag = Boolean.TRUE.equals(isError);
 
-                int updated = models_Offline_Table_Repository
-                                .updateIsErrorByModelAndVersion(modelId, versionId, flag);
+                int updated = models_Offline_Table_Repository.updateErrorByModelAndVersion(
+                                modelId,
+                                versionId,
+                                flag,
+                                flag ? errorMessage : null,
+                                flag ? LocalDateTime.now() : null);
 
                 if (updated > 0) {
                         log.info("is_error set to {} for modelId={}, versionId={}", flag, modelId, versionId);
@@ -3669,6 +3683,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         m.put("downloadPriority", e.getDownloadPriority());
                         m.put("hold", e.getHold());
                         m.put("isError", e.getIsError());
+                        m.put("errorMessage", e.getErrorMessage());
+                        m.put("errorAt", e.getErrorAt());
 
                         try {
                                 if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
@@ -3994,6 +4010,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         m.put("downloadPriority", e.getDownloadPriority());
                         m.put("hold", e.getHold());
                         m.put("isError", e.getIsError());
+                        m.put("errorMessage", e.getErrorMessage());
+                        m.put("errorAt", e.getErrorAt());
 
                         // (optional) include this field too since it’s relevant for this endpoint
                         m.put("aiSuggestedArtworkTitle", e.getAiSuggestedArtworkTitle());
@@ -4091,6 +4109,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 m.put("downloadPriority", e.getDownloadPriority());
                 m.put("hold", e.getHold());
                 m.put("isError", e.getIsError());
+                m.put("errorMessage", e.getErrorMessage());
+                m.put("errorAt", e.getErrorAt());
 
                 try {
                         if (e.getCivitaiModelFileList() != null && !e.getCivitaiModelFileList().isBlank()) {
@@ -4470,6 +4490,15 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         }
                 }
 
+                String errorMessagePatch = null;
+                boolean hasErrorMessagePatch = false;
+
+                if (patch.containsKey("errorMessage")) {
+                        hasErrorMessagePatch = true;
+                        Object msg = patch.get("errorMessage");
+                        errorMessagePatch = msg == null ? null : String.valueOf(msg);
+                }
+
                 Integer prioPatch = null;
                 if (patch.containsKey("downloadPriority") && patch.get("downloadPriority") != null) {
                         Object pv = patch.get("downloadPriority");
@@ -4490,7 +4519,8 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 pathPatch = null; // explicit null -> no change in this API
                 }
 
-                if (holdPatch == null && prioPatch == null && pathPatch == null && isErrorPatch == null) {
+                if (holdPatch == null && prioPatch == null && pathPatch == null && isErrorPatch == null
+                                && !hasErrorMessagePatch) {
                         throw new IllegalArgumentException("patch must include at least one non-null field");
                 }
 
@@ -4574,6 +4604,28 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                         if (isErrorPatch != null && !java.util.Objects.equals(e.getIsError(), isErrorPatch)) {
                                 e.setIsError(isErrorPatch);
+                                changed = true;
+                        }
+
+                        if (isErrorPatch != null) {
+                                if (Boolean.FALSE.equals(isErrorPatch)) {
+                                        if (e.getErrorMessage() != null) {
+                                                e.setErrorMessage(null);
+                                                changed = true;
+                                        }
+
+                                        if (e.getErrorAt() != null) {
+                                                e.setErrorAt(null);
+                                                changed = true;
+                                        }
+                                } else if (Boolean.TRUE.equals(isErrorPatch) && e.getErrorAt() == null) {
+                                        e.setErrorAt(LocalDateTime.now());
+                                        changed = true;
+                                }
+                        }
+
+                        if (hasErrorMessagePatch && !java.util.Objects.equals(e.getErrorMessage(), errorMessagePatch)) {
+                                e.setErrorMessage(errorMessagePatch);
                                 changed = true;
                         }
 

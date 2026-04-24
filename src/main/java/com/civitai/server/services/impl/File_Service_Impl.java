@@ -1631,8 +1631,28 @@ public class File_Service_Impl implements File_Service {
                     System.err.println("Failed to delete unique directory: " + uniqueDirectory);
                 }
             }
-            throw new CustomException("An unexpected error occurred", e);
+            throw new CustomException("Download processing failed: " + getDeepErrorMessage(e), e);
         }
+    }
+
+    private String getDeepErrorMessage(Throwable ex) {
+        if (ex == null)
+            return "Unknown error";
+
+        Throwable root = ex;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+
+        if (root.getMessage() != null && !root.getMessage().isBlank()) {
+            return root.getMessage();
+        }
+
+        if (ex.getMessage() != null && !ex.getMessage().isBlank()) {
+            return ex.getMessage();
+        }
+
+        return root.getClass().getSimpleName();
     }
 
     // ------------------------------------------------------------------------
