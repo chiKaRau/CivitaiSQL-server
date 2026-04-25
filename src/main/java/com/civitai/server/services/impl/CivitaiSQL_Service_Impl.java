@@ -2064,7 +2064,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         System.err.println("Failed to fetch earlyAccessEndsAt for version "
                                                         + civitaiVersionID
                                                         + ": " + eaEx.getMessage());
-                                        modelVersionObject.put("earlyAccessEndsAt", null);
+
+                                        throw new CustomException(
+                                                        "Failed to fetch earlyAccessEndsAt for version "
+                                                                        + civitaiVersionID,
+                                                        eaEx);
                                 }
                         }
 
