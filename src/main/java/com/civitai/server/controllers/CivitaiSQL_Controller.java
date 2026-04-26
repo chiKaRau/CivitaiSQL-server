@@ -2865,4 +2865,42 @@ public class CivitaiSQL_Controller {
 
         return ResponseEntity.ok(CustomResponse.success("History record deleted successfully"));
     }
+
+    @SuppressWarnings("unchecked")
+    @PostMapping("/get-history-model-version-db-details")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> getHistoryModelVersionDbDetails(
+            @RequestBody Map<String, Object> requestBody) {
+
+        Object itemsObject = requestBody.get("items");
+
+        if (!(itemsObject instanceof List<?>)) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: items array is required"));
+        }
+
+        List<?> rawItems = (List<?>) itemsObject;
+
+        if (rawItems.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: items array cannot be empty"));
+        }
+
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+
+        for (Object rawItem : rawItems) {
+            if (rawItem instanceof Map<?, ?>) {
+                items.add((Map<String, Object>) rawItem);
+            }
+        }
+
+        if (items.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input: items must contain objects"));
+        }
+
+        Map<String, Object> payload = civitaiSQL_Service.get_history_model_version_db_details(items);
+
+        return ResponseEntity.ok(
+                CustomResponse.success("History model/version DB details retrieved", payload));
+    }
 }

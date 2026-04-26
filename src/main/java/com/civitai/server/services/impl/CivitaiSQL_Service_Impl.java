@@ -5127,7 +5127,6 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 m.put("imageUrlList", imageUrlList);
                                 m.put("createdAt", row[4]);
                                 m.put("updatedAt", row[5]);
-                                m.put("localPath", row[6]);
 
                                 content.add(m);
                         }
@@ -5332,6 +5331,154 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         log.error("Unexpected error while deleting model offline download history record (id={})", id,
                                         ex);
                         throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        @Transactional(readOnly = true)
+        public Map<String, Object> get_history_model_version_db_details(List<Map<String, Object>> items) {
+                Map<String, Object> result = new java.util.LinkedHashMap<>();
+                java.util.List<Map<String, String>> cleanItems = new java.util.ArrayList<>();
+                java.util.Set<String> seenKeys = new java.util.LinkedHashSet<>();
+
+                try {
+                        for (Map<String, Object> item : items) {
+                                Object modelIdObj = item.get("civitaiModelID") != null
+                                                ? item.get("civitaiModelID")
+                                                : item.get("civitai_model_id");
+
+                                Object versionIdObj = item.get("civitaiVersionID") != null
+                                                ? item.get("civitaiVersionID")
+                                                : item.get("civitai_version_id");
+
+                                String modelID = modelIdObj != null ? String.valueOf(modelIdObj).trim() : "";
+                                String versionID = versionIdObj != null ? String.valueOf(versionIdObj).trim() : "";
+
+                                if (modelID.isEmpty() || versionID.isEmpty()) {
+                                        continue;
+                                }
+
+                                String key = modelID + "_" + versionID;
+
+                                if (!seenKeys.add(key)) {
+                                        continue;
+                                }
+
+                                Map<String, String> cleanItem = new java.util.LinkedHashMap<>();
+                                cleanItem.put("civitaiModelID", modelID);
+                                cleanItem.put("civitaiVersionID", versionID);
+                                cleanItems.add(cleanItem);
+
+                                Map<String, Object> defaultInfo = new java.util.LinkedHashMap<>();
+                                defaultInfo.put("civitaiModelID", modelID);
+                                defaultInfo.put("civitaiVersionID", versionID);
+                                defaultInfo.put("modelTableId", null);
+                                defaultInfo.put("modelRecordExists", false);
+                                defaultInfo.put("localPath", "");
+                                defaultInfo.put("creatorName", "");
+                                defaultInfo.put("offlineRecordExists", false);
+                                defaultInfo.put("isError", false);
+                                defaultInfo.put("errorMessage", null);
+                                defaultInfo.put("errorAt", null);
+
+                                result.put(key, defaultInfo);
+                        }
+
+                        if (cleanItems.isEmpty()) {
+                                return result;
+                        }
+
+                        String itemsJson = objectMapper.writeValueAsString(cleanItems);
+
+                        List<Object[]> rows = entityManager.createNativeQuery("""
+                                        SELECT
+                                            req.civitai_model_id,
+                                            req.civitai_version_id,
+                                            m._id AS model_table_id,
+                                            CASE WHEN m._id IS NULL THEN 0 ELSE 1 END AS model_record_exists,
+                                            m.local_path,
+                                            d.creator_name,
+                                            CASE WHEN o._id IS NULL THEN 0 ELSE 1 END AS offline_record_exists,
+                                            COALESCE(o.is_error, 0) AS is_error,
+                                            o.error_message,
+                                            DATE_FORMAT(o.error_at, '%Y-%m-%dT%H:%i:%s') AS error_at
+                                        FROM JSON_TABLE(
+                                            :itemsJson,
+                                            '$[*]' COLUMNS (
+                                                civitai_model_id BIGINT PATH '$.civitaiModelID',
+                                                civitai_version_id BIGINT PATH '$.civitaiVersionID'
+                                            )
+                                        ) req
+                                        LEFT JOIN models_table m
+                                          ON CAST(m.model_number AS UNSIGNED) = req.civitai_model_id
+                                         AND CAST(m.version_number AS UNSIGNED) = req.civitai_version_id
+                                        LEFT JOIN models_details_table d
+                                          ON d._id = m._id
+                                        LEFT JOIN (
+                                            SELECT
+                                                civitai_model_id,
+                                                civitai_version_id,
+                                                MAX(_id) AS max_id
+                                            FROM model_offline_table
+                                            GROUP BY civitai_model_id, civitai_version_id
+                                        ) ox
+                                          ON ox.civitai_model_id = req.civitai_model_id
+                                         AND ox.civitai_version_id = req.civitai_version_id
+                                        LEFT JOIN model_offline_table o
+                                          ON o._id = ox.max_id
+                                        """)
+                                        .setParameter("itemsJson", itemsJson)
+                                        .getResultList();
+
+                        for (Object[] row : rows) {
+                                String modelID = row[0] != null ? String.valueOf(row[0]).trim() : "";
+                                String versionID = row[1] != null ? String.valueOf(row[1]).trim() : "";
+
+                                if (modelID.isEmpty() || versionID.isEmpty()) {
+                                        continue;
+                                }
+
+                                String key = modelID + "_" + versionID;
+
+                                Map<String, Object> info = result.get(key) instanceof Map
+                                                ? (Map<String, Object>) result.get(key)
+                                                : new java.util.LinkedHashMap<>();
+
+                                info.put("civitaiModelID", modelID);
+                                info.put("civitaiVersionID", versionID);
+                                info.put("modelTableId", row[2]);
+
+                                boolean modelRecordExists = row[3] != null
+                                                && !"0".equals(String.valueOf(row[3]))
+                                                && !"false".equalsIgnoreCase(String.valueOf(row[3]));
+
+                                info.put("modelRecordExists", modelRecordExists);
+
+                                info.put("localPath", row[4] != null ? String.valueOf(row[4]) : "");
+                                info.put("creatorName", row[5] != null ? String.valueOf(row[5]) : "");
+
+                                boolean offlineRecordExists = row[6] != null
+                                                && !"0".equals(String.valueOf(row[6]))
+                                                && !"false".equalsIgnoreCase(String.valueOf(row[6]));
+
+                                boolean isError = row[7] != null
+                                                && !"0".equals(String.valueOf(row[7]))
+                                                && !"false".equalsIgnoreCase(String.valueOf(row[7]));
+
+                                info.put("offlineRecordExists", offlineRecordExists);
+                                info.put("isError", isError);
+                                info.put("errorMessage", row[8] != null ? String.valueOf(row[8]) : null);
+                                info.put("errorAt", row[9] != null ? String.valueOf(row[9]) : null);
+
+                                result.put(key, info);
+                        }
+
+                        return result;
+                } catch (Exception ex) {
+                        log.error("Failed to retrieve history model/version DB details", ex);
+                        throw new RuntimeException(
+                                        "Failed to retrieve history model/version DB details: " + ex.getMessage(), ex);
                 }
         }
 }

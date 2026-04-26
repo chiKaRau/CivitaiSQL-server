@@ -50,31 +50,28 @@ public interface Model_Offline_Download_History_Table_Repository
   Page<Object[]> findAllHistoryRows(Pageable pageable);
 
   @Query(value = """
-      SELECT
-          h._id,
-          h.civitai_model_id,
-          h.civitai_version_id,
-          h.image_url_list,
-          DATE_FORMAT(h.created_at, '%Y-%m-%dT%H:%i:%s') AS created_at,
-          DATE_FORMAT(h.updated_at, '%Y-%m-%dT%H:%i:%s') AS updated_at,
-          m.local_path
-      FROM model_offline_download_history_table h
-      LEFT JOIN models_table m
-        ON CAST(m.model_number AS UNSIGNED) = h.civitai_model_id
-       AND CAST(m.version_number AS UNSIGNED) = h.civitai_version_id
-      WHERE h.created_at >= :start
-        AND h.created_at < :end
-      ORDER BY h.created_at DESC
-      """, countQuery = """
-      SELECT COUNT(*)
-      FROM model_offline_download_history_table h
-      WHERE h.created_at >= :start
-        AND h.created_at < :end
-      """, nativeQuery = true)
-  Page<Object[]> findHistoryRowsByCreatedAtRange(
-      @Param("start") LocalDateTime start,
-      @Param("end") LocalDateTime end,
-      Pageable pageable);
+    SELECT
+        h._id,
+        h.civitai_model_id,
+        h.civitai_version_id,
+        h.image_url_list,
+        DATE_FORMAT(h.created_at, '%Y-%m-%dT%H:%i:%s') AS created_at,
+        DATE_FORMAT(h.updated_at, '%Y-%m-%dT%H:%i:%s') AS updated_at,
+        '' AS local_path
+    FROM model_offline_download_history_table h
+    WHERE h.created_at >= :start
+      AND h.created_at < :end
+    ORDER BY h.created_at DESC
+    """, countQuery = """
+    SELECT COUNT(*)
+    FROM model_offline_download_history_table h
+    WHERE h.created_at >= :start
+      AND h.created_at < :end
+    """, nativeQuery = true)
+Page<Object[]> findHistoryRowsByCreatedAtRange(
+    @Param("start") LocalDateTime start,
+    @Param("end") LocalDateTime end,
+    Pageable pageable);
 
   @Query(value = """
       SELECT DISTINCT DATE_FORMAT(created_at, '%Y-%m-%d') AS created_date
