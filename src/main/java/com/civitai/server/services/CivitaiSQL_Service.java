@@ -263,4 +263,6 @@ public interface CivitaiSQL_Service {
         boolean delete_model_offline_download_history_record(Long id);
 
         Map<String, Object> get_history_model_version_db_details(List<Map<String, Object>> items);
+
+        Map<String, Object> get_model_offline_download_history_stats(String createdDate);
 }

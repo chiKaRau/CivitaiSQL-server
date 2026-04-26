@@ -2903,4 +2903,20 @@ public class CivitaiSQL_Controller {
         return ResponseEntity.ok(
                 CustomResponse.success("History model/version DB details retrieved", payload));
     }
+
+    @GetMapping("/get-model-offline-download-history-status-summary")
+    public ResponseEntity<CustomResponse<Map<String, Object>>> getModelOfflineDownloadHistoryStats(
+            @RequestParam(value = "createdDate", required = false) String createdDate) {
+
+        System.out.println("call me");
+
+        Map<String, Object> payload = civitaiSQL_Service
+                .get_model_offline_download_history_stats(createdDate);
+
+        System.out.println(createdDate);
+        System.out.println(payload);
+
+        return ResponseEntity.ok(
+                CustomResponse.success("History stats retrieved successfully", payload));
+    }
 }

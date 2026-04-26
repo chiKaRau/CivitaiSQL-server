@@ -5481,4 +5481,166 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         "Failed to retrieve history model/version DB details: " + ex.getMessage(), ex);
                 }
         }
+
+        @Override
+        @Transactional(readOnly = true)
+        public Map<String, Object> get_model_offline_download_history_stats(String createdDate) {
+                try {
+                        boolean hasCreatedDate = createdDate != null && !createdDate.trim().isEmpty();
+
+                        LocalDateTime start = null;
+                        LocalDateTime end = null;
+
+                        if (hasCreatedDate) {
+                                LocalDate targetDate = LocalDate.parse(createdDate.trim());
+                                start = targetDate.atStartOfDay();
+                                end = targetDate.plusDays(1).atStartOfDay();
+                        }
+
+                        String sql = """
+                                        SELECT
+                                            COUNT(*) AS total_rows,
+
+                                            SUM(
+                                                CASE
+                                                    WHEN m.local_path IS NULL
+                                                      OR TRIM(m.local_path) = ''
+                                                      OR UPPER(TRIM(m.local_path)) = 'N/A'
+                                                    THEN 1
+                                                    ELSE 0
+                                                END
+                                            ) AS missing_local_path_count,
+
+                                            SUM(
+                                                CASE
+                                                    WHEN COALESCE(o.is_error, 0) <> 0
+                                                    THEN 1
+                                                    ELSE 0
+                                                END
+                                            ) AS error_count,
+
+                                            SUM(
+                                                CASE
+                                                    WHEN (
+                                                        m.local_path IS NULL
+                                                        OR TRIM(m.local_path) = ''
+                                                        OR UPPER(TRIM(m.local_path)) = 'N/A'
+                                                    )
+                                                    OR COALESCE(o.is_error, 0) <> 0
+                                                    THEN 1
+                                                    ELSE 0
+                                                END
+                                            ) AS missing_local_path_or_error_count,
+
+                                            SUM(
+                                                CASE
+                                                    WHEN m._id IS NULL
+                                                    THEN 0
+                                                    ELSE 1
+                                                END
+                                            ) AS model_record_exists_count,
+
+                                            SUM(
+                                                CASE
+                                                    WHEN o._id IS NULL
+                                                    THEN 0
+                                                    ELSE 1
+                                                END
+                                            ) AS offline_record_exists_count
+
+                                        FROM model_offline_download_history_table h
+
+                                        LEFT JOIN (
+                                            SELECT
+                                                CAST(model_number AS UNSIGNED) AS model_number_u,
+                                                CAST(version_number AS UNSIGNED) AS version_number_u,
+                                                MAX(_id) AS max_id
+                                            FROM models_table
+                                            GROUP BY
+                                                CAST(model_number AS UNSIGNED),
+                                                CAST(version_number AS UNSIGNED)
+                                        ) mx
+                                          ON mx.model_number_u = h.civitai_model_id
+                                         AND mx.version_number_u = h.civitai_version_id
+
+                                        LEFT JOIN models_table m
+                                          ON m._id = mx.max_id
+
+                                        LEFT JOIN (
+                                            SELECT
+                                                civitai_model_id,
+                                                civitai_version_id,
+                                                MAX(_id) AS max_id
+                                            FROM model_offline_table
+                                            GROUP BY
+                                                civitai_model_id,
+                                                civitai_version_id
+                                        ) ox
+                                          ON ox.civitai_model_id = h.civitai_model_id
+                                         AND ox.civitai_version_id = h.civitai_version_id
+
+                                        LEFT JOIN model_offline_table o
+                                          ON o._id = ox.max_id
+                                        """;
+
+                        if (hasCreatedDate) {
+                                sql += """
+                                                WHERE h.created_at >= :start
+                                                  AND h.created_at < :end
+                                                """;
+                        }
+
+                        jakarta.persistence.Query query = entityManager.createNativeQuery(sql);
+
+                        if (hasCreatedDate) {
+                                query.setParameter("start", start);
+                                query.setParameter("end", end);
+                        }
+
+                        Object[] row = (Object[]) query.getSingleResult();
+
+                        long totalRows = toLongCount(row[0]);
+                        long missingLocalPathCount = toLongCount(row[1]);
+                        long errorCount = toLongCount(row[2]);
+                        long missingLocalPathOrErrorCount = toLongCount(row[3]);
+                        long modelRecordExistsCount = toLongCount(row[4]);
+                        long offlineRecordExistsCount = toLongCount(row[5]);
+
+                        Map<String, Object> result = new LinkedHashMap<>();
+                        result.put("createdDate", hasCreatedDate ? createdDate.trim() : null);
+
+                        result.put("totalRows", totalRows);
+                        result.put("missingLocalPathCount", missingLocalPathCount);
+                        result.put("errorCount", errorCount);
+                        result.put("missingLocalPathOrErrorCount", missingLocalPathOrErrorCount);
+
+                        result.put("modelRecordExistsCount", modelRecordExistsCount);
+                        result.put("offlineRecordExistsCount", offlineRecordExistsCount);
+
+                        result.put("normalRowsCount", Math.max(0, totalRows - missingLocalPathOrErrorCount));
+
+                        return result;
+                } catch (Exception ex) {
+                        log.error("Unexpected error while retrieving model offline download history stats (DB)", ex);
+                        throw new CustomException("An unexpected error occurred", ex);
+                }
+        }
+
+        private long toLongCount(Object value) {
+                if (value == null) {
+                        return 0L;
+                }
+
+                if (value instanceof Number) {
+                        return ((Number) value).longValue();
+                }
+
+                String text = String.valueOf(value).trim();
+
+                if (text.isEmpty()) {
+                        return 0L;
+                }
+
+                return Long.parseLong(text);
+        }
 }
