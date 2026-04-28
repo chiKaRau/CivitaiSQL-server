@@ -1,6 +1,8 @@
 package com.civitai.server.services.impl;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,6 +24,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -3066,20 +3069,85 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         @Transactional
         public void remove_creator_url(String creatorUrl) {
-                if (creatorUrl == null || creatorUrl.isBlank()) {
+                if (creatorUrl == null || creatorUrl.trim().isEmpty()) {
                         throw new CustomException("creatorUrl is required");
                 }
 
                 try {
-                        long deleted = creator_Table_Repository.deleteByCivitaiUrl(creatorUrl);
-                        if (deleted > 0) {
-                                log.info("[creator-url] deleted {} row(s) for url='{}'", deleted, creatorUrl);
+                        String creator = extractCreatorFromUserUrl(creatorUrl);
+                        long deleted = 0;
+
+                        if (creator != null && !creator.trim().isEmpty()) {
+                                List<String> urlsToDelete = buildCreatorUrlDeleteCandidates(creator);
+
+                                for (String url : urlsToDelete) {
+                                        deleted += creator_Table_Repository.deleteByCivitaiUrl(url);
+                                }
                         } else {
-                                log.info("[creator-url] no rows deleted for url='{}'", creatorUrl);
+                                deleted = creator_Table_Repository.deleteByCivitaiUrl(creatorUrl.trim());
                         }
+
+                        if (deleted > 0) {
+                                log.info("[creator-url] deleted {} row(s) for input='{}'", deleted, creatorUrl);
+                        } else {
+                                log.info("[creator-url] no rows deleted for input='{}'", creatorUrl);
+                        }
+
                 } catch (Exception ex) {
                         log.error("[creator-url] delete failed for {}: {}", creatorUrl, ex.getMessage(), ex);
                         throw new CustomException("Error removing creator URL", ex);
+                }
+        }
+
+        private String extractCreatorFromUserUrl(String creatorUrl) {
+                try {
+                        URI uri = new URI(creatorUrl.trim());
+                        String path = uri.getPath();
+
+                        // Accept:
+                        // /user/abc
+                        // /user/abc/
+                        // /user/abc/models
+                        // /user/abc/models/
+                        Pattern pattern = Pattern.compile("^/user/([^/]+)(?:/models)?/?$", Pattern.CASE_INSENSITIVE);
+                        Matcher matcher = pattern.matcher(path);
+
+                        if (!matcher.matches()) {
+                                return "";
+                        }
+
+                        return URLDecoder.decode(matcher.group(1), "UTF-8");
+                } catch (Exception ex) {
+                        return "";
+                }
+        }
+
+        private List<String> buildCreatorUrlDeleteCandidates(String creator) {
+                String encodedCreator = encodeUrlPathPart(creator);
+
+                List<String> urls = new ArrayList<>();
+
+                String[] domains = {
+                                "https://civitai.com",
+                                "https://civitai.red",
+                                "https://civitai.green"
+                };
+
+                for (String domain : domains) {
+                        urls.add(domain + "/user/" + encodedCreator + "/models");
+                        urls.add(domain + "/user/" + encodedCreator + "/models/");
+                        urls.add(domain + "/user/" + encodedCreator);
+                        urls.add(domain + "/user/" + encodedCreator + "/");
+                }
+
+                return urls;
+        }
+
+        private String encodeUrlPathPart(String value) {
+                try {
+                        return URLEncoder.encode(value, "UTF-8").replace("+", "%20");
+                } catch (Exception ex) {
+                        return value;
                 }
         }
 

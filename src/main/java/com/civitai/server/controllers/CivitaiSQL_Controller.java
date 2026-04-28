@@ -2203,7 +2203,7 @@ public class CivitaiSQL_Controller {
         String creatorUrl = (String) requestBody.get("creatorUrl");
 
         // Validate null or empty
-        if (creatorUrl == null || creatorUrl == "") {
+        if (creatorUrl == null || creatorUrl.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(CustomResponse.failure("Invalid input"));
         }
 

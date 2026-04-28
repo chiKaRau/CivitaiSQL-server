@@ -348,8 +348,8 @@ public class File_Controller {
     public ResponseEntity<CustomResponse<String>> downloadFileServerV2forCustom(
             @RequestBody Map<String, Object> requestBody) {
 
-        // 1) Pull modelObject off the request
         Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
+
         String civitaiFileName = (String) modelObject.get("civitaiFileName");
         String downloadFilePath = (String) modelObject.get("downloadFilePath");
         String civitaiUrl = (String) modelObject.get("civitaiUrl");
@@ -357,14 +357,17 @@ public class File_Controller {
         String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
         String baseModel = (String) modelObject.get("baseModel");
 
-        // 2) Front end now passes an array of URL strings here:
-        @SuppressWarnings("unchecked")
+        Map<String, Object> modelVersionObject = null;
+        Object rawModelVersionObject = modelObject.get("modelVersionObject");
+
+        if (rawModelVersionObject instanceof Map) {
+            modelVersionObject = (Map<String, Object>) rawModelVersionObject;
+        }
+
         List<String> imageUrlsList = (List<String>) modelObject.get("imageUrls");
 
-        // 3) And your single file’s download URL lives here:
         String downloadUrl = (String) modelObject.get("downloadUrl");
 
-        // 4) Validate
         if (downloadFilePath == null || downloadFilePath.isEmpty()
                 || civitaiModelID == null || civitaiModelID.isEmpty()
                 || civitaiVersionID == null || civitaiVersionID.isEmpty()
@@ -377,44 +380,37 @@ public class File_Controller {
         }
 
         try {
-            // 5) Build the one‐entry download list
             List<Map<String, Object>> civitaiModelFileList = new ArrayList<>();
+
             Map<String, Object> fileEntry = new HashMap<>();
             fileEntry.put("name", civitaiFileName);
             fileEntry.put("downloadUrl", downloadUrl);
             civitaiModelFileList.add(fileEntry);
 
-            // 6) Convert the List<String> into a String[] for previews
             String[] imageUrlsArray = imageUrlsList.toArray(new String[0]);
 
-            // 7) Call your existing v2 download
             fileService.download_file_by_server_v2(
                     civitaiFileName,
                     civitaiModelFileList,
                     downloadFilePath,
-                    null, // skip modelVersionObject
+                    modelVersionObject,
                     civitaiModelID,
                     civitaiVersionID,
                     civitaiUrl,
                     baseModel,
                     imageUrlsArray);
 
-            /*
-             * civitaiSQL_Service.insert_model_offline_download_history(
-             * Long.valueOf(civitaiModelID),
-             * Long.valueOf(civitaiVersionID),
-             * Arrays.asList(imageUrlsArray));
-             */
-
             return ResponseEntity.ok(CustomResponse.success("Success download file"));
+
         } catch (Exception ex) {
-            String modelName = civitaiModelID + "_" + civitaiVersionID + "_" + civitaiFileName;
             civitaiSQL_Service.update_error_model_offline_list(
                     civitaiModelID,
                     civitaiVersionID,
                     true,
                     "Download failed: " + getDeepErrorMessage(ex));
+
             ex.printStackTrace();
+
             return ResponseEntity
                     .status(500)
                     .body(CustomResponse.failure("Server error: " + ex.getMessage()));
