@@ -14,74 +14,86 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface Models_Offline_Table_Repository extends
-    JpaRepository<Models_Offline_Table_Entity, Long>,
-    org.springframework.data.jpa.repository.JpaSpecificationExecutor<Models_Offline_Table_Entity> {
+        JpaRepository<Models_Offline_Table_Entity, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<Models_Offline_Table_Entity> {
 
-  Optional<Models_Offline_Table_Entity> findFirstByCivitaiModelIDAndCivitaiVersionID(
-      Long civitaiModelID, Long civitaiVersionID);
+    Optional<Models_Offline_Table_Entity> findFirstByCivitaiModelIDAndCivitaiVersionID(
+            Long civitaiModelID, Long civitaiVersionID);
 
-  // deletes all matches; returns number of rows removed
-  long deleteByCivitaiModelIDAndCivitaiVersionID(Long civitaiModelID, Long civitaiVersionID);
+    // deletes all matches; returns number of rows removed
+    long deleteByCivitaiModelIDAndCivitaiVersionID(Long civitaiModelID, Long civitaiVersionID);
 
-  long countByCivitaiModelID(Long civitaiModelID);
+    long countByCivitaiModelID(Long civitaiModelID);
 
-  @Query("select e.civitaiVersionID " +
-      "from Models_Offline_Table_Entity e " +
-      "where e.civitaiModelID = :modelId and e.civitaiVersionID is not null")
-  List<Long> findVersionIdsByModelId(@Param("modelId") Long modelId);
+    @Query("select e.civitaiVersionID " +
+            "from Models_Offline_Table_Entity e " +
+            "where e.civitaiModelID = :modelId and e.civitaiVersionID is not null")
+    List<Long> findVersionIdsByModelId(@Param("modelId") Long modelId);
 
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query("update Models_Offline_Table_Entity e " +
-      "set e.isError = :isError " +
-      "where e.civitaiModelID = :modelId and e.civitaiVersionID = :versionId")
-  int updateIsErrorByModelAndVersion(@Param("modelId") Long modelId,
-      @Param("versionId") Long versionId,
-      @Param("isError") Boolean isError);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Models_Offline_Table_Entity e " +
+            "set e.isError = :isError " +
+            "where e.civitaiModelID = :modelId and e.civitaiVersionID = :versionId")
+    int updateIsErrorByModelAndVersion(@Param("modelId") Long modelId,
+            @Param("versionId") Long versionId,
+            @Param("isError") Boolean isError);
 
-  // assumes your entity field is named "id" and mapped to column `_id`
-  List<Models_Offline_Table_Entity> findAllByIsErrorTrueOrderByUpdatedAtDesc();
+    // assumes your entity field is named "id" and mapped to column `_id`
+    List<Models_Offline_Table_Entity> findAllByIsErrorTrueOrderByUpdatedAtDesc();
 
-  // fetch all rows whose modelId is in the list (we’ll filter versions in memory)
-  List<Models_Offline_Table_Entity> findAllByCivitaiModelIDIn(List<Long> modelIds);
+    // fetch all rows whose modelId is in the list (we’ll filter versions in memory)
+    List<Models_Offline_Table_Entity> findAllByCivitaiModelIDIn(List<Long> modelIds);
 
-  // in Models_Offline_Table_Repository
-  org.springframework.data.domain.Page<Models_Offline_Table_Entity> findByEarlyAccessEndsAtIsNull(
-      org.springframework.data.domain.Pageable pageable);
+    // in Models_Offline_Table_Repository
+    org.springframework.data.domain.Page<Models_Offline_Table_Entity> findByEarlyAccessEndsAtIsNull(
+            org.springframework.data.domain.Pageable pageable);
 
-  // All records where hold = true, highest priority first, newest id first
-  java.util.List<Models_Offline_Table_Entity> findAllByHoldTrueOrderByDownloadPriorityDescIdDesc();
+    // All records where hold = true, highest priority first, newest id first
+    java.util.List<Models_Offline_Table_Entity> findAllByHoldTrueOrderByDownloadPriorityDescIdDesc();
 
-  // All records where earlyAccessEndsAt is in the future (active early access)
-  java.util.List<Models_Offline_Table_Entity> findAllByEarlyAccessEndsAtAfterOrderByEarlyAccessEndsAtAscIdDesc(
-      LocalDateTime now);
+    // All records where earlyAccessEndsAt is in the future (active early access)
+    java.util.List<Models_Offline_Table_Entity> findAllByEarlyAccessEndsAtAfterOrderByEarlyAccessEndsAtAscIdDesc(
+            LocalDateTime now);
 
-  List<Models_Offline_Table_Entity> findAllByCivitaiVersionIDIn(List<Long> versionIds);
+    // Active early access, excluding hold=true and error=true
+    @Query("""
+                select e
+                from Models_Offline_Table_Entity e
+                where e.earlyAccessEndsAt > :now
+                  and e.hold = false
+                  and (e.isError = false or e.isError is null)
+                order by e.earlyAccessEndsAt asc, e.id desc
+            """)
+    java.util.List<Models_Offline_Table_Entity> findActiveEarlyAccessNotHoldNotError(
+            @Param("now") LocalDateTime now);
 
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query("""
-          update Models_Offline_Table_Entity e
-          set e.civitaiVersionID = :newVersionId
-          where e.civitaiModelID = :modelId
-            and e.civitaiVersionID = :oldVersionId
-      """)
-  int updateVersionIdByModelAndVersion(
-      @Param("modelId") Long modelId,
-      @Param("oldVersionId") Long oldVersionId,
-      @Param("newVersionId") Long newVersionId);
+    List<Models_Offline_Table_Entity> findAllByCivitaiVersionIDIn(List<Long> versionIds);
 
-  @Modifying
-  @Query("""
-          UPDATE Models_Offline_Table_Entity m
-          SET m.isError = :isError,
-              m.errorMessage = :errorMessage,
-              m.errorAt = :errorAt
-          WHERE m.civitaiModelID = :modelId
-            AND m.civitaiVersionID = :versionId
-      """)
-  int updateErrorByModelAndVersion(
-      @Param("modelId") Long modelId,
-      @Param("versionId") Long versionId,
-      @Param("isError") Boolean isError,
-      @Param("errorMessage") String errorMessage,
-      @Param("errorAt") LocalDateTime errorAt);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+                update Models_Offline_Table_Entity e
+                set e.civitaiVersionID = :newVersionId
+                where e.civitaiModelID = :modelId
+                  and e.civitaiVersionID = :oldVersionId
+            """)
+    int updateVersionIdByModelAndVersion(
+            @Param("modelId") Long modelId,
+            @Param("oldVersionId") Long oldVersionId,
+            @Param("newVersionId") Long newVersionId);
+
+    @Modifying
+    @Query("""
+                UPDATE Models_Offline_Table_Entity m
+                SET m.isError = :isError,
+                    m.errorMessage = :errorMessage,
+                    m.errorAt = :errorAt
+                WHERE m.civitaiModelID = :modelId
+                  AND m.civitaiVersionID = :versionId
+            """)
+    int updateErrorByModelAndVersion(
+            @Param("modelId") Long modelId,
+            @Param("versionId") Long versionId,
+            @Param("isError") Boolean isError,
+            @Param("errorMessage") String errorMessage,
+            @Param("errorAt") LocalDateTime errorAt);
 }

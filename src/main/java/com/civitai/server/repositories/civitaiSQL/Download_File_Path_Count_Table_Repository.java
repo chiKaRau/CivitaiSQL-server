@@ -41,11 +41,11 @@ public interface Download_File_Path_Count_Table_Repository
                         @Param("prefix") String prefix,
                         @Param("since") Timestamp since);
 
-        @Query(value = "SELECT last_added, download_file_path, `count` " +
+        @Query(value = "SELECT created_at, download_file_path, `count`, last_added " +
                         "FROM download_file_path_count_table " +
                         "WHERE download_file_path NOT LIKE '%/@scan@/Update/%' " +
                         "  AND (:prefix IS NULL OR :prefix = '' OR download_file_path LIKE CONCAT(:prefix, '%')) " +
-                        "ORDER BY last_added DESC " +
+                        "ORDER BY created_at DESC " +
                         "LIMIT 10", nativeQuery = true)
         List<Object[]> findRecentAdded10(@Param("prefix") String prefix);
 
@@ -56,6 +56,36 @@ public interface Download_File_Path_Count_Table_Repository
                         "ORDER BY updated_at DESC " +
                         "LIMIT 10", nativeQuery = true)
         List<Object[]> findRecentUpdated10(@Param("prefix") String prefix);
+
+        @Query(value = "SELECT last_added, download_file_path, `count` " +
+                        "FROM download_file_path_count_table " +
+                        "WHERE download_file_path NOT LIKE '%/@scan@/Update/%' " +
+                        "  AND (:prefixName IS NULL OR :prefixName = '' OR LOWER(download_file_path) LIKE CONCAT('%', LOWER(:prefixName), '%')) "
+                        +
+                        "  AND last_added >= :since " +
+                        "ORDER BY `count` DESC " +
+                        "LIMIT 10", nativeQuery = true)
+        List<Object[]> findTop10ByPrefixNameSince(
+                        @Param("prefixName") String prefixName,
+                        @Param("since") Timestamp since);
+
+        @Query(value = "SELECT created_at, download_file_path, `count`, last_added " +
+                        "FROM download_file_path_count_table " +
+                        "WHERE download_file_path NOT LIKE '%/@scan@/Update/%' " +
+                        "  AND (:prefixName IS NULL OR :prefixName = '' OR LOWER(download_file_path) LIKE CONCAT('%', LOWER(:prefixName), '%')) "
+                        +
+                        "ORDER BY created_at DESC " +
+                        "LIMIT 10", nativeQuery = true)
+        List<Object[]> findRecentAdded10ByPrefixName(@Param("prefixName") String prefixName);
+
+        @Query(value = "SELECT last_added, download_file_path, `count`, updated_at " +
+                        "FROM download_file_path_count_table " +
+                        "WHERE download_file_path NOT LIKE '%/@scan@/Update/%' " +
+                        "  AND (:prefixName IS NULL OR :prefixName = '' OR LOWER(download_file_path) LIKE CONCAT('%', LOWER(:prefixName), '%')) "
+                        +
+                        "ORDER BY updated_at DESC " +
+                        "LIMIT 10", nativeQuery = true)
+        List<Object[]> findRecentUpdated10ByPrefixName(@Param("prefixName") String prefixName);
 
         @Modifying
         @Transactional

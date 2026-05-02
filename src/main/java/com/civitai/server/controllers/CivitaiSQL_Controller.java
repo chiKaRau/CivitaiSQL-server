@@ -2710,15 +2710,14 @@ public class CivitaiSQL_Controller {
         Map<String, List<Map<String, Object>>> tagsMap = civitaiSQL_Service.get_download_file_path_count_list(prefix);
 
         boolean hasAny = tagsMap != null &&
-                ((tagsMap.get("topTags") != null && !tagsMap.get("topTags").isEmpty()) ||
-                        (tagsMap.get("recentAddedTags") != null && !tagsMap.get("recentAddedTags").isEmpty()) ||
-                        (tagsMap.get("recentUpdatedTags") != null && !tagsMap.get("recentUpdatedTags").isEmpty()));
+                tagsMap.values().stream().anyMatch(list -> list != null && !list.isEmpty());
 
         if (hasAny) {
-            return ResponseEntity.ok().body(CustomResponse.success("TagsList retrieval successful", tagsMap));
+            return ResponseEntity.ok()
+                    .body(CustomResponse.success("TagsList retrieval successful", tagsMap));
         } else {
-            // still return success or failure — your call. Keeping your existing style:
-            return ResponseEntity.ok().body(CustomResponse.failure("No tags found in the database"));
+            return ResponseEntity.ok()
+                    .body(CustomResponse.failure("No tags found in the database"));
         }
     }
 

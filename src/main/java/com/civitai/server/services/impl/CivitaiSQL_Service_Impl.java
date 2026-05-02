@@ -4157,7 +4157,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 var now = java.time.LocalDateTime.now();
 
                 var entities = models_Offline_Table_Repository
-                                .findAllByEarlyAccessEndsAtAfterOrderByEarlyAccessEndsAtAscIdDesc(now);
+                                .findActiveEarlyAccessNotHoldNotError(now);
 
                 var out = new java.util.ArrayList<java.util.Map<String, Object>>(entities.size());
                 for (var e : entities) {
@@ -4980,6 +4980,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         public Map<String, List<Map<String, Object>>> get_download_file_path_count_list(String prefix) {
                 try {
                         String p = (prefix == null) ? null : prefix.trim();
+                        String prefixName = extractPrefixNameFromPath(p);
 
                         LocalDateTime now = LocalDateTime.now();
                         LocalDateTime twoMonthsAgo = now.minusMonths(2);
@@ -4993,46 +4994,97 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         List<Object[]> recentUpdatedRows = download_File_Path_Count_Table_Repository
                                         .findRecentUpdated10(p);
 
-                        List<Map<String, Object>> topTags = new ArrayList<>(topRows.size());
-                        for (Object[] r : topRows) {
-                                // r[0]=last_added, r[1]=download_file_path, r[2]=count
-                                Map<String, Object> m = new LinkedHashMap<>();
-                                m.put("last_added", toLocalDateTime(r[0]));
-                                m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
-                                m.put("count", toInt(r[2]));
-                                topTags.add(m);
-                        }
+                        List<Object[]> prefixNameTopRows = download_File_Path_Count_Table_Repository
+                                        .findTop10ByPrefixNameSince(prefixName, Timestamp.valueOf(twoMonthsAgo));
 
-                        List<Map<String, Object>> recentAddedTags = new ArrayList<>(recentAddedRows.size());
-                        for (Object[] r : recentAddedRows) {
-                                // r[0]=last_added, r[1]=download_file_path, r[2]=count
-                                Map<String, Object> m = new LinkedHashMap<>();
-                                m.put("last_added", toLocalDateTime(r[0]));
-                                m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
-                                m.put("count", toInt(r[2]));
-                                recentAddedTags.add(m);
-                        }
+                        List<Object[]> prefixNameRecentAddedRows = download_File_Path_Count_Table_Repository
+                                        .findRecentAdded10ByPrefixName(prefixName);
 
-                        List<Map<String, Object>> recentUpdatedTags = new ArrayList<>(recentUpdatedRows.size());
-                        for (Object[] r : recentUpdatedRows) {
-                                // r[0]=last_added, r[1]=download_file_path, r[2]=count, r[3]=updated_at
-                                Map<String, Object> m = new LinkedHashMap<>();
-                                m.put("last_added", toLocalDateTime(r[0])); // keep same key for compatibility
-                                m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
-                                m.put("count", toInt(r[2]));
-                                m.put("updated_at", toLocalDateTime(r[3])); // new field (optional but useful)
-                                recentUpdatedTags.add(m);
-                        }
+                        List<Object[]> prefixNameRecentUpdatedRows = download_File_Path_Count_Table_Repository
+                                        .findRecentUpdated10ByPrefixName(prefixName);
 
-                        return Map.of(
-                                        "topTags", topTags,
-                                        "recentAddedTags", recentAddedTags,
-                                        "recentUpdatedTags", recentUpdatedTags);
+                        Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
+
+                        out.put("topTags", mapStandardRows(topRows));
+                        out.put("recentAddedTags", mapRecentAddedRows(recentAddedRows));
+                        out.put("recentUpdatedTags", mapRecentUpdatedRows(recentUpdatedRows));
+
+                        out.put("prefixNameTopTags", mapStandardRows(prefixNameTopRows));
+                        out.put("prefixNameRecentAddedTags", mapRecentAddedRows(prefixNameRecentAddedRows));
+                        out.put("prefixNameRecentUpdatedTags", mapRecentUpdatedRows(prefixNameRecentUpdatedRows));
+
+                        return out;
 
                 } catch (Exception ex) {
                         log.error("Unexpected error while retrieving download file path count list (DB)", ex);
                         throw new CustomException("An unexpected error occurred", ex);
                 }
+        }
+
+        private String extractPrefixNameFromPath(String prefix) {
+                if (prefix == null || prefix.trim().isEmpty()) {
+                        return null;
+                }
+
+                String p = prefix.trim().replace("\\", "/");
+
+                while (p.endsWith("/") && p.length() > 1) {
+                        p = p.substring(0, p.length() - 1);
+                }
+
+                int lastSlash = p.lastIndexOf("/");
+                if (lastSlash >= 0 && lastSlash + 1 < p.length()) {
+                        return p.substring(lastSlash + 1);
+                }
+
+                return p;
+        }
+
+        private List<Map<String, Object>> mapStandardRows(List<Object[]> rows) {
+                List<Map<String, Object>> list = new ArrayList<>(rows.size());
+
+                for (Object[] r : rows) {
+                        // r[0]=last_added, r[1]=download_file_path, r[2]=count
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("last_added", toLocalDateTime(r[0]));
+                        m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
+                        m.put("count", toInt(r[2]));
+                        list.add(m);
+                }
+
+                return list;
+        }
+
+        private List<Map<String, Object>> mapRecentAddedRows(List<Object[]> rows) {
+                List<Map<String, Object>> list = new ArrayList<>(rows.size());
+
+                for (Object[] r : rows) {
+                        // r[0]=created_at, r[1]=download_file_path, r[2]=count, r[3]=last_added
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("created_at", toLocalDateTime(r[0]));
+                        m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
+                        m.put("count", toInt(r[2]));
+                        m.put("last_added", toLocalDateTime(r[3]));
+                        list.add(m);
+                }
+
+                return list;
+        }
+
+        private List<Map<String, Object>> mapRecentUpdatedRows(List<Object[]> rows) {
+                List<Map<String, Object>> list = new ArrayList<>(rows.size());
+
+                for (Object[] r : rows) {
+                        // r[0]=last_added, r[1]=download_file_path, r[2]=count, r[3]=updated_at
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("last_added", toLocalDateTime(r[0]));
+                        m.put("string_value", r[1] != null ? String.valueOf(r[1]) : null);
+                        m.put("count", toInt(r[2]));
+                        m.put("updated_at", toLocalDateTime(r[3]));
+                        list.add(m);
+                }
+
+                return list;
         }
 
         private LocalDateTime toLocalDateTime(Object v) {
