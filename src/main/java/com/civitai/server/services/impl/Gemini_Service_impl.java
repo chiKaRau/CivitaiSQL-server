@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @Service
 public class Gemini_Service_impl implements Gemini_Service {
 
-        private static final String MODEL = "gemini-robotics-er-1.5-preview";
+        private static final String MODEL = "gemini-2.5-flash";
         // If your chosen model complains about responseSchema/JSON, switch to a
         // mainline model
         // like "gemini-2.5-flash". :contentReference[oaicite:1]{index=1}
@@ -165,7 +165,7 @@ public class Gemini_Service_impl implements Gemini_Service {
                                                                 .build()))
                                 .responseMimeType("application/json")
                                 .responseSchema(responseSchema)
-                                .candidateCount(1)
+//                                .candidateCount(1)
                                 .build();
 
                 // 3) Build prompt with JSON input

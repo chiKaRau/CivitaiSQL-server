@@ -1242,6 +1242,346 @@ public class CivitaiSQL_Controller {
     }
 
     @SuppressWarnings("unchecked")
+    @PostMapping("/add-offline-download-file-into-offline-download-list-version-api")
+    public ResponseEntity<CustomResponse<String>> addOfflineDownloadFileIntoOfflineDownloadListVersionApi(
+            @RequestBody Map<String, Object> requestBody) {
+
+        // Extract modelObject
+        Map<String, Object> modelObject = (Map<String, Object>) requestBody.get("modelObject");
+
+        if (modelObject == null) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input"));
+        }
+
+        String civitaiFileName = (String) modelObject.get("civitaiFileName");
+
+        List<Map<String, Object>> civitaiModelFileList = (List<Map<String, Object>>) modelObject.get(
+                "civitaiModelFileList");
+
+        String downloadFilePath = (String) modelObject.get("downloadFilePath");
+
+        String civitaiUrl = (String) modelObject.get("civitaiUrl");
+
+        String civitaiModelID = (String) modelObject.get("civitaiModelID");
+
+        String civitaiVersionID = (String) modelObject.get("civitaiVersionID");
+
+        String selectedCategory = (String) modelObject.get("selectedCategory");
+
+        Boolean isModifyMode = (Boolean) requestBody.get("isModifyMode");
+
+        // Tags are optional
+        List<String> civitaiTags = modelObject.get("civitaiTags") != null
+                ? (List<String>) modelObject.get("civitaiTags")
+                : new ArrayList<>();
+
+        // Hold
+        Boolean hold = null;
+        Object holdObj = modelObject.get("hold");
+
+        if (holdObj instanceof Boolean) {
+            hold = (Boolean) holdObj;
+        } else if (holdObj != null) {
+            hold = Boolean.valueOf(String.valueOf(holdObj));
+        }
+
+        // Download priority
+        Integer downloadPriority = null;
+        Object dpObj = modelObject.get("downloadPriority");
+
+        if (dpObj instanceof Number) {
+            downloadPriority = ((Number) dpObj).intValue();
+        } else if (dpObj != null) {
+            try {
+                downloadPriority = Integer.parseInt(String.valueOf(dpObj).trim());
+            } catch (NumberFormatException ignore) {
+                // Service can apply its default value
+            }
+        }
+
+        // Validate required input
+        if (civitaiUrl == null ||
+                civitaiUrl.isEmpty() ||
+
+                downloadFilePath == null ||
+                downloadFilePath.isEmpty() ||
+
+                civitaiModelID == null ||
+                civitaiModelID.isEmpty() ||
+
+                civitaiVersionID == null ||
+                civitaiVersionID.isEmpty() ||
+
+                selectedCategory == null ||
+                selectedCategory.isEmpty() ||
+
+                civitaiModelFileList == null ||
+                civitaiModelFileList.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(CustomResponse.failure("Invalid input"));
+        }
+
+        final int maxAttempts = 5;
+
+        boolean success = false;
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                /*
+                 * Fetch the specific version directly.
+                 *
+                 * Important:
+                 * This endpoint does not call findModelByModelID().
+                 */
+                Optional<Map<String, Object>> versionOptional = civitai_Service.findModelByVersionID(
+                        civitaiVersionID);
+
+                if (!versionOptional.isPresent()) {
+                    throw new Exception(
+                            "Version not found for versionID=" +
+                                    civitaiVersionID);
+                }
+
+                // Always make a mutable copy
+                Map<String, Object> modelVersionObject = new java.util.LinkedHashMap<>(
+                        versionOptional.get());
+
+                /*
+                 * Confirm that the version endpoint returned the
+                 * requested version.
+                 */
+                Object returnedVersionId = modelVersionObject.get("id");
+
+                if (returnedVersionId == null ||
+                        !civitaiVersionID.equals(
+                                String.valueOf(returnedVersionId))) {
+                    throw new Exception(
+                            "Version API returned unexpected version ID. " +
+                                    "Expected=" + civitaiVersionID +
+                                    ", returned=" + returnedVersionId);
+                }
+
+                /*
+                 * Determine the model ID returned by the version API.
+                 *
+                 * Depending on the response shape, it may be:
+                 *
+                 * modelVersionObject.modelId
+                 *
+                 * or:
+                 *
+                 * modelVersionObject.model.id
+                 */
+                Object returnedModelId = modelVersionObject.get("modelId");
+
+                Object nestedModelObject = modelVersionObject.get("model");
+
+                if (returnedModelId == null &&
+                        nestedModelObject instanceof Map) {
+                    Map<String, Object> nestedModel = (Map<String, Object>) nestedModelObject;
+
+                    returnedModelId = nestedModel.get("id");
+                }
+
+                /*
+                 * Only validate the model ID when the version API
+                 * actually returns one.
+                 */
+                if (returnedModelId != null &&
+                        !civitaiModelID.equals(
+                                String.valueOf(returnedModelId))) {
+                    throw new Exception(
+                            "Version " + civitaiVersionID +
+                                    " belongs to model " + returnedModelId +
+                                    ", not staged model " + civitaiModelID);
+                }
+
+                /*
+                 * Ensure modelId exists directly on the version object.
+                 * Your existing stored structure expects this field.
+                 */
+                if (!modelVersionObject.containsKey("modelId")) {
+                    try {
+                        modelVersionObject.put(
+                                "modelId",
+                                Long.valueOf(civitaiModelID));
+                    } catch (NumberFormatException ex) {
+                        modelVersionObject.put(
+                                "modelId",
+                                civitaiModelID);
+                    }
+                }
+
+                /*
+                 * Preserve or normalize the nested model summary.
+                 *
+                 * If the version API already returns model information,
+                 * retain its useful fields.
+                 */
+                Map<String, Object> modelSummary = new java.util.LinkedHashMap<>();
+
+                if (nestedModelObject instanceof Map) {
+                    Map<String, Object> nestedModel = (Map<String, Object>) nestedModelObject;
+
+                    modelSummary.put(
+                            "id",
+                            nestedModel.get("id") != null
+                                    ? nestedModel.get("id")
+                                    : modelVersionObject.get("modelId"));
+
+                    modelSummary.put(
+                            "poi",
+                            nestedModel.get("poi"));
+
+                    modelSummary.put(
+                            "name",
+                            nestedModel.get("name"));
+
+                    modelSummary.put(
+                            "nsfw",
+                            nestedModel.get("nsfw"));
+
+                    modelSummary.put(
+                            "type",
+                            nestedModel.get("type"));
+                } else {
+                    modelSummary.put(
+                            "id",
+                            modelVersionObject.get("modelId"));
+
+                    modelSummary.put("poi", null);
+                    modelSummary.put("name", null);
+                    modelSummary.put("nsfw", null);
+                    modelSummary.put("type", null);
+                }
+
+                modelVersionObject.put(
+                        "model",
+                        modelSummary);
+
+                /*
+                 * Preserve creator when the version API provides it.
+                 *
+                 * It may exist directly on the version object or inside
+                 * the nested model object.
+                 */
+                Object creatorObject = modelVersionObject.get("creator");
+
+                if (!(creatorObject instanceof Map) &&
+                        nestedModelObject instanceof Map) {
+                    Map<String, Object> nestedModel = (Map<String, Object>) nestedModelObject;
+
+                    Object nestedCreator = nestedModel.get("creator");
+
+                    if (nestedCreator instanceof Map) {
+                        modelVersionObject.put(
+                                "creator",
+                                nestedCreator);
+                    }
+                }
+
+                if (!modelVersionObject.containsKey("creator")) {
+                    modelVersionObject.put("creator", null);
+                }
+
+                /*
+                 * The version endpoint itself should already provide:
+                 *
+                 * - baseModel
+                 * - files
+                 * - images
+                 * - availability
+                 * - earlyAccessEndsAt, when applicable
+                 */
+                String[] imageUrlsArray = JsonUtils.extractImageUrls(
+                        modelVersionObject);
+
+                civitaiSQL_Service.update_offline_download_list(
+                        civitaiFileName,
+                        civitaiModelFileList,
+                        downloadFilePath,
+                        modelVersionObject,
+                        civitaiModelID,
+                        civitaiVersionID,
+                        civitaiUrl,
+                        (String) modelVersionObject.get("baseModel"),
+                        imageUrlsArray,
+                        selectedCategory,
+                        civitaiTags,
+                        isModifyMode,
+                        hold,
+                        downloadPriority);
+
+                fileService.update_folder_list(
+                        downloadFilePath);
+
+                System.out.println(
+                        "Updated the offline List using version API for: " +
+                                civitaiModelID + "_" +
+                                civitaiVersionID + "_" +
+                                civitaiFileName);
+
+                System.out.println("URL: " + civitaiUrl);
+
+                success = true;
+                break;
+
+            } catch (Exception ex) {
+                lastException = ex;
+
+                System.err.println(
+                        "Version API attempt " + attempt +
+                                " failed for " +
+                                civitaiModelID + "_" +
+                                civitaiVersionID + "_" +
+                                civitaiFileName +
+                                " | reason: " +
+                                ex.getMessage());
+
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!success) {
+            System.err.println(
+                    "Error - Failed updating the offline List " +
+                            "using version API for: " +
+                            civitaiModelID + "_" +
+                            civitaiVersionID + "_" +
+                            civitaiFileName);
+
+            System.err.println("URL: " + civitaiUrl);
+
+            System.err.println(
+                    "Final error: " +
+                            (lastException != null
+                                    ? lastException.getMessage()
+                                    : "Unknown error"));
+
+            return ResponseEntity.badRequest()
+                    .body(
+                            CustomResponse.failure(
+                                    lastException != null
+                                            ? lastException.getMessage()
+                                            : "Failed using version API"));
+        }
+
+        return ResponseEntity.ok()
+                .body(
+                        CustomResponse.success(
+                                "Success download file using version API"));
+    }
+
+    @SuppressWarnings("unchecked")
     @PostMapping("/refresh-offline-download-record")
     public ResponseEntity<CustomResponse<Map<String, Object>>> refreshOfflineDownloadRecord(
             @RequestBody Map<String, Object> requestBody) {
