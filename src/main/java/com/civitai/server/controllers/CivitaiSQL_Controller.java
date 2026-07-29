@@ -1889,6 +1889,21 @@ public class CivitaiSQL_Controller {
     }
 
     @CrossOrigin(origins = "*")
+    @GetMapping("/get_error_model_list-in-page")
+    public ResponseEntity<CustomResponse<PageResponse<Map<String, Object>>>> getErrorModelListInPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+
+        final int p = Math.max(0, page);
+        final int s = Math.min(Math.max(1, size), 500);
+
+        var result = civitaiSQL_Service.get_error_model_list_paged(p, s);
+
+        return ResponseEntity.ok(
+                CustomResponse.success("OK", result));
+    }
+
+    @CrossOrigin(origins = "*")
     @PostMapping("/run_pending_from_offline_download_list-ai_suggestion")
     public ResponseEntity<CustomResponse<List<String>>> runPendingFromOfflineDownloadListAiSuggestion(
             @RequestParam(defaultValue = "0") int page,

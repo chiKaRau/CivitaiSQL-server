@@ -210,6 +210,10 @@ public interface CivitaiSQL_Service {
 
         PageResponse<TagCountDTO> get_top_tags_page(TopTagsRequest req);
 
+        PageResponse<Map<String, Object>> get_error_model_list_paged(
+                        int page,
+                        int size);
+
         public boolean update_hold_from_offline_download_list(String civitaiModelID, String civitaiVersionID,
                         boolean hold);
 

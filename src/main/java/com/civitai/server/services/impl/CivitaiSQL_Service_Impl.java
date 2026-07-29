@@ -3809,6 +3809,136 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
         @Override
         @Transactional(readOnly = true, rollbackFor = Exception.class)
+        public PageResponse<Map<String, Object>> get_error_model_list_paged(
+                        int page,
+                        int size) {
+
+                final int p = Math.max(0, page);
+                final int s = Math.min(Math.max(1, size), 500);
+
+                // ID sorting is less likely to require an expensive filesort.
+                var sort = org.springframework.data.domain.Sort.by(
+                                org.springframework.data.domain.Sort.Order.desc("id"));
+
+                var pageable = org.springframework.data.domain.PageRequest.of(p, s, sort);
+
+                Specification<Models_Offline_Table_Entity> errorSpec = (root, query, cb) -> cb
+                                .isTrue(root.get("isError"));
+
+                var pageResult = models_Offline_Table_Repository.findAll(
+                                errorSpec,
+                                pageable);
+
+                var mapped = new java.util.ArrayList<Map<String, Object>>(
+                                pageResult.getNumberOfElements());
+
+                for (var e : pageResult.getContent()) {
+                        var m = new java.util.HashMap<String, Object>();
+
+                        m.put("civitaiFileName", e.getCivitaiFileName());
+                        m.put("downloadFilePath", e.getDownloadFilePath());
+                        m.put("civitaiUrl", e.getCivitaiUrl());
+                        m.put("civitaiBaseModel", e.getCivitaiBaseModel());
+                        m.put("aiSuggestedDownloadFilePath", e.getAiSuggestedDownloadFilePath());
+                        m.put("jikanSuggestedDownloadFilePath", e.getJikanSuggestedDownloadFilePath());
+                        m.put("localSuggestedDownloadFilePath", e.getLocalSuggestedDownloadFilePath());
+                        m.put("aiSuggestedArtworkTitle", e.getAiSuggestedArtworkTitle());
+                        m.put("jikanNormalizedArtworkTitle", e.getJikanNormalizedArtworkTitle());
+                        m.put("selectedCategory", e.getSelectedCategory());
+
+                        m.put(
+                                        "civitaiModelID",
+                                        e.getCivitaiModelID() == null
+                                                        ? null
+                                                        : String.valueOf(e.getCivitaiModelID()));
+
+                        m.put(
+                                        "civitaiVersionID",
+                                        e.getCivitaiVersionID() == null
+                                                        ? null
+                                                        : String.valueOf(e.getCivitaiVersionID()));
+
+                        m.put("earlyAccessEndsAt", e.getEarlyAccessEndsAt());
+                        m.put("downloadPriority", e.getDownloadPriority());
+                        m.put("hold", e.getHold());
+                        m.put("isError", e.getIsError());
+                        m.put("errorMessage", e.getErrorMessage());
+                        m.put("errorAt", e.getErrorAt());
+
+                        try {
+                                if (e.getCivitaiModelFileList() != null &&
+                                                !e.getCivitaiModelFileList().isBlank()) {
+
+                                        m.put(
+                                                        "civitaiModelFileList",
+                                                        objectMapper.readValue(
+                                                                        e.getCivitaiModelFileList(),
+                                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {
+                                                                        }));
+                                } else {
+                                        m.put("civitaiModelFileList", null);
+                                }
+
+                                if (e.getModelVersionObject() != null &&
+                                                !e.getModelVersionObject().isBlank()) {
+
+                                        m.put(
+                                                        "modelVersionObject",
+                                                        objectMapper.readValue(
+                                                                        e.getModelVersionObject(),
+                                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {
+                                                                        }));
+                                } else {
+                                        m.put("modelVersionObject", null);
+                                }
+
+                                if (e.getCivitaiTags() != null &&
+                                                !e.getCivitaiTags().isBlank()) {
+
+                                        m.put(
+                                                        "civitaiTags",
+                                                        objectMapper.readValue(
+                                                                        e.getCivitaiTags(),
+                                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                                        }));
+                                } else {
+                                        m.put("civitaiTags", null);
+                                }
+
+                                if (e.getImageUrlsArray() != null &&
+                                                !e.getImageUrlsArray().isBlank()) {
+
+                                        var urls = objectMapper.readValue(
+                                                        e.getImageUrlsArray(),
+                                                        new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                                                        });
+
+                                        m.put("imageUrlsArray", urls.toArray(new String[0]));
+                                } else {
+                                        m.put("imageUrlsArray", null);
+                                }
+                        } catch (Exception exception) {
+                                // Preserve the same behavior as the existing paged method.
+                        }
+
+                        mapped.add(m);
+                }
+
+                var out = new PageResponse<Map<String, Object>>();
+
+                out.content = mapped;
+                out.page = p;
+                out.size = s;
+                out.totalElements = pageResult.getTotalElements();
+                out.totalPages = pageResult.getTotalPages();
+                out.hasNext = pageResult.hasNext();
+                out.hasPrevious = pageResult.hasPrevious();
+
+                return out;
+        }
+
+        @Override
+        @Transactional(readOnly = true, rollbackFor = Exception.class)
         public PageResponse<Map<String, Object>> get_offline_download_list_paged_aiSuggestedArtworkTitleEmpty(
                         int page,
                         int size,
