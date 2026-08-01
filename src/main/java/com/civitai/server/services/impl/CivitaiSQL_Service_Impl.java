@@ -1846,33 +1846,9 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                 // inside update_offline_download_list(...) — right after you parse
                 // modelId/versionId
-                java.time.LocalDateTime earlyAccessEndsAt = null;
-                try {
-                        Object ea = (modelVersionObject != null) ? modelVersionObject.get("earlyAccessEndsAt") : null;
-                        if (ea != null) {
-                                String iso = String.valueOf(ea).trim();
-                                if (!iso.isEmpty() && !"null".equalsIgnoreCase(iso)) {
-                                        try {
-                                                earlyAccessEndsAt = java.time.OffsetDateTime.parse(iso)
-                                                                .toLocalDateTime();
-                                        } catch (Exception p1) {
-                                                try {
-                                                        earlyAccessEndsAt = java.time.LocalDateTime.parse(iso);
-                                                } catch (Exception p2) {
-                                                        if (iso.length() >= 19) {
-                                                                try {
-                                                                        earlyAccessEndsAt = java.time.LocalDateTime
-                                                                                        .parse(iso.substring(0, 19));
-                                                                } catch (Exception ignore) {
-                                                                }
-                                                        }
-                                                }
-                                        }
-                                }
-                        }
-                } catch (Exception ignore) {
-                        /* leave as null if unparsable */
-                }
+                Object accessEndsAtRaw = extractAccessEndsAt(modelVersionObject);
+
+                java.time.LocalDateTime earlyAccessEndsAt = parseAccessEndsAt(accessEndsAtRaw);
 
                 // (optional) quick param dump
                 System.out.println("=== update_offline_download_list() ===");
@@ -2038,42 +2014,11 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                 modelVersionObject = new java.util.LinkedHashMap<>(modelVersionObject);
                         }
 
-                        // 3) EarlyAccess patch: earlyAccessEndsAt
-                        Object availabilityVal = modelVersionObject.get("availability");
-                        String availability = availabilityVal != null ? String.valueOf(availabilityVal) : null;
+                        // New paidAccess format with legacy compatibility
+                        Object accessEndsAtRaw = extractAccessEndsAt(modelVersionObject);
 
-                        if ("EarlyAccess".equalsIgnoreCase(availability)) {
-                                try {
-                                        String versionUrl = "https://civitai.red/api/v1/model-versions/"
-                                                        + civitaiVersionID;
-
-                                        org.springframework.http.client.SimpleClientHttpRequestFactory rf = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-                                        rf.setConnectTimeout(4000);
-                                        rf.setReadTimeout(4000);
-
-                                        org.springframework.web.client.RestTemplate rt = new org.springframework.web.client.RestTemplate(
-                                                        rf);
-
-                                        @SuppressWarnings("unchecked")
-                                        Map<String, Object> versionPayload = rt.getForObject(versionUrl, Map.class);
-
-                                        if (versionPayload != null && versionPayload.get("earlyAccessEndsAt") != null) {
-                                                modelVersionObject.put("earlyAccessEndsAt",
-                                                                versionPayload.get("earlyAccessEndsAt"));
-                                        } else {
-                                                modelVersionObject.put("earlyAccessEndsAt", null);
-                                        }
-                                } catch (Exception eaEx) {
-                                        System.err.println("Failed to fetch earlyAccessEndsAt for version "
-                                                        + civitaiVersionID
-                                                        + ": " + eaEx.getMessage());
-
-                                        throw new CustomException(
-                                                        "Failed to fetch earlyAccessEndsAt for version "
-                                                                        + civitaiVersionID,
-                                                        eaEx);
-                                }
-                        }
+                        // Keep this compatibility property inside the stored JSON.
+                        modelVersionObject.put("earlyAccessEndsAt", accessEndsAtRaw);
 
                         // 4) Attach compact model + creator + modelId (same idea as your existing flow)
                         Map<String, Object> modelSummary = new java.util.LinkedHashMap<>();
@@ -2138,33 +2083,7 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         String[] imageUrlsArray = JsonUtils.extractImageUrls(modelVersionObject);
 
                         // Parse earlyAccessEndsAt into LocalDateTime (same logic you already use)
-                        java.time.LocalDateTime earlyAccessEndsAt = null;
-                        try {
-                                Object ea = modelVersionObject.get("earlyAccessEndsAt");
-                                if (ea != null) {
-                                        String iso = String.valueOf(ea).trim();
-                                        if (!iso.isEmpty() && !"null".equalsIgnoreCase(iso)) {
-                                                try {
-                                                        earlyAccessEndsAt = java.time.OffsetDateTime.parse(iso)
-                                                                        .toLocalDateTime();
-                                                } catch (Exception p1) {
-                                                        try {
-                                                                earlyAccessEndsAt = java.time.LocalDateTime.parse(iso);
-                                                        } catch (Exception p2) {
-                                                                if (iso.length() >= 19) {
-                                                                        try {
-                                                                                earlyAccessEndsAt = java.time.LocalDateTime
-                                                                                                .parse(iso.substring(0,
-                                                                                                                19));
-                                                                        } catch (Exception ignore) {
-                                                                        }
-                                                                }
-                                                        }
-                                                }
-                                        }
-                                }
-                        } catch (Exception ignore) {
-                        }
+                        java.time.LocalDateTime earlyAccessEndsAt = parseAccessEndsAt(accessEndsAtRaw);
 
                         // 6) Compare + update only if different
                         com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -5503,40 +5422,55 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                 }
         }
 
+        private boolean hasUsableDateValue(Object value) {
+                if (value == null) {
+                        return false;
+                }
+
+                String text = String.valueOf(value).trim();
+
+                return !text.isEmpty()
+                                && !"null".equalsIgnoreCase(text);
+        }
+
         @Override
         @Transactional
-        public String refreshModelVersionObjectFromOfflineTable(Long civitaiModelID, Long civitaiVersionID) {
+        public String refreshModelVersionObjectFromOfflineTable(
+                        Long civitaiModelID,
+                        Long civitaiVersionID) {
+
                 try {
                         if (civitaiModelID == null || civitaiVersionID == null) {
-                                throw new RuntimeException("civitaiModelID and civitaiVersionID are required.");
+                                throw new RuntimeException(
+                                                "civitaiModelID and civitaiVersionID are required.");
                         }
 
                         Models_Offline_Table_Entity entity = models_Offline_Table_Repository
-                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(civitaiModelID, civitaiVersionID)
+                                        .findFirstByCivitaiModelIDAndCivitaiVersionID(
+                                                        civitaiModelID,
+                                                        civitaiVersionID)
                                         .orElseThrow(() -> new RuntimeException(
-                                                        "Offline record not found for modelID=" + civitaiModelID +
-                                                                        ", versionID=" + civitaiVersionID));
+                                                        "Offline record not found for modelID="
+                                                                        + civitaiModelID
+                                                                        + ", versionID="
+                                                                        + civitaiVersionID));
 
-                        Object latestVersionObjectRaw = civitai_Service
-                                        .findModelByVersionID(String.valueOf(civitaiVersionID));
-
-                        System.out.println(civitaiModelID + "_" + civitaiVersionID);
-
-                        System.out.println("latestVersionObjectRaw");
-                        System.out.println(latestVersionObjectRaw);
+                        Object latestVersionObjectRaw = civitai_Service.findModelByVersionID(
+                                        String.valueOf(civitaiVersionID));
 
                         Object latestVersionObject = latestVersionObjectRaw;
 
+                        // Handle Optional response
                         if (latestVersionObjectRaw instanceof java.util.Optional<?>) {
-                                java.util.Optional<?> opt = (java.util.Optional<?>) latestVersionObjectRaw;
+                                java.util.Optional<?> optional = (java.util.Optional<?>) latestVersionObjectRaw;
 
-                                if (!opt.isPresent()) {
+                                if (!optional.isPresent()) {
                                         throw new RuntimeException(
                                                         "No version object returned from Civitai for versionID="
                                                                         + civitaiVersionID);
                                 }
 
-                                latestVersionObject = opt.get();
+                                latestVersionObject = optional.get();
                         }
 
                         if (latestVersionObject == null) {
@@ -5545,20 +5479,111 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                                                 + civitaiVersionID);
                         }
 
-                        String latestVersionObjectJson = new com.fasterxml.jackson.databind.ObjectMapper()
-                                        .writeValueAsString(latestVersionObject);
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
+                        /*
+                         * Convert the API result into a mutable Map.
+                         */
+                        String rawJson = mapper.writeValueAsString(latestVersionObject);
+
+                        Map<String, Object> latestVersionMap = mapper.readValue(
+                                        rawJson,
+                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                                        });
+
+                        /*
+                         * New API format:
+                         *
+                         * "paidAccess": {
+                         * "permanent": false,
+                         * "endsAt": "2026-08-06T10:25:07.469Z"
+                         * }
+                         */
+                        Object accessEndsAtRaw = null;
+
+                        Object paidAccessRaw = latestVersionMap.get("paidAccess");
+
+                        if (paidAccessRaw instanceof Map) {
+                                Map<?, ?> paidAccess = (Map<?, ?>) paidAccessRaw;
+                                accessEndsAtRaw = paidAccess.get("endsAt");
+                        }
+
+                        /*
+                         * Backward compatibility with older responses.
+                         */
+                        if (!hasUsableDateValue(accessEndsAtRaw)) {
+                                accessEndsAtRaw = latestVersionMap.get("earlyAccessEndsAt");
+                        }
+
+                        if (!hasUsableDateValue(accessEndsAtRaw)) {
+                                accessEndsAtRaw = latestVersionMap.get("earlyAccessDeadline");
+                        }
+
+                        /*
+                         * Parse Civitai's UTC date into the existing LocalDateTime column.
+                         */
+                        java.time.LocalDateTime earlyAccessEndsAt = null;
+
+                        if (hasUsableDateValue(accessEndsAtRaw)) {
+                                String iso = String.valueOf(accessEndsAtRaw).trim();
+
+                                try {
+                                        earlyAccessEndsAt = java.time.OffsetDateTime.parse(iso)
+                                                        .withOffsetSameInstant(
+                                                                        java.time.ZoneOffset.UTC)
+                                                        .toLocalDateTime();
+
+                                } catch (Exception offsetException) {
+                                        try {
+                                                earlyAccessEndsAt = java.time.LocalDateTime.parse(iso);
+
+                                        } catch (Exception localException) {
+                                                if (iso.length() >= 19) {
+                                                        try {
+                                                                earlyAccessEndsAt = java.time.LocalDateTime.parse(
+                                                                                iso.substring(0, 19));
+                                                        } catch (Exception ignored) {
+                                                                // Leave as null when unparsable
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
+
+                        /*
+                         * Keep this old property inside modelVersionObject so existing
+                         * code can continue reading it.
+                         */
+                        latestVersionMap.put(
+                                        "earlyAccessEndsAt",
+                                        hasUsableDateValue(accessEndsAtRaw)
+                                                        ? accessEndsAtRaw
+                                                        : null);
+
+                        String latestVersionObjectJson = mapper.writeValueAsString(latestVersionMap);
+
+                        System.out.println(civitaiModelID + "_" + civitaiVersionID);
+                        System.out.println("earlyAccessEndsAt=" + earlyAccessEndsAt);
                         System.out.println("latestVersionObjectJson");
                         System.out.println(latestVersionObjectJson);
 
+                        /*
+                         * Update both fields.
+                         */
                         entity.setModelVersionObject(latestVersionObjectJson);
+                        entity.setEarlyAccessEndsAt(earlyAccessEndsAt);
+
                         models_Offline_Table_Repository.save(entity);
 
-                        return "modelVersionObject updated successfully for modelID=" + civitaiModelID
+                        return "modelVersionObject and earlyAccessEndsAt updated successfully"
+                                        + " for modelID=" + civitaiModelID
                                         + ", versionID=" + civitaiVersionID;
 
                 } catch (Exception ex) {
-                        throw new RuntimeException("Failed updating modelVersionObject: " + ex.getMessage(), ex);
+                        throw new RuntimeException(
+                                        "Failed updating modelVersionObject: "
+                                                        + ex.getMessage(),
+                                        ex);
                 }
         }
 
@@ -5893,4 +5918,81 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
 
                 return Long.parseLong(text);
         }
+
+        private Object extractAccessEndsAt(Map<String, Object> modelVersionObject) {
+                if (modelVersionObject == null) {
+                        return null;
+                }
+
+                // New Civitai response format
+                Object paidAccessRaw = modelVersionObject.get("paidAccess");
+
+                if (paidAccessRaw instanceof Map) {
+                        Map<?, ?> paidAccess = (Map<?, ?>) paidAccessRaw;
+                        Object endsAt = paidAccess.get("endsAt");
+
+                        if (hasDateValue(endsAt)) {
+                                return endsAt;
+                        }
+
+                        // paidAccess exists but has no ending date.
+                        // This may be permanent paid access, not temporary Early Access.
+                        return null;
+                }
+
+                // Older Civitai response format
+                Object legacyEndsAt = modelVersionObject.get("earlyAccessEndsAt");
+                if (hasDateValue(legacyEndsAt)) {
+                        return legacyEndsAt;
+                }
+
+                // Compatibility with the models/{id} response
+                Object earlyAccessDeadline = modelVersionObject.get("earlyAccessDeadline");
+                if (hasDateValue(earlyAccessDeadline)) {
+                        return earlyAccessDeadline;
+                }
+
+                return null;
+        }
+
+        private boolean hasDateValue(Object value) {
+                if (value == null) {
+                        return false;
+                }
+
+                String text = String.valueOf(value).trim();
+                return !text.isEmpty() && !"null".equalsIgnoreCase(text);
+        }
+
+        private java.time.LocalDateTime parseAccessEndsAt(Object value) {
+                if (!hasDateValue(value)) {
+                        return null;
+                }
+
+                String iso = String.valueOf(value).trim();
+
+                try {
+                        // Store the value as UTC without an offset, matching your current DB/frontend
+                        // design.
+                        return java.time.OffsetDateTime.parse(iso)
+                                        .withOffsetSameInstant(java.time.ZoneOffset.UTC)
+                                        .toLocalDateTime();
+                } catch (Exception ignored) {
+                }
+
+                try {
+                        return java.time.LocalDateTime.parse(iso);
+                } catch (Exception ignored) {
+                }
+
+                if (iso.length() >= 19) {
+                        try {
+                                return java.time.LocalDateTime.parse(iso.substring(0, 19));
+                        } catch (Exception ignored) {
+                        }
+                }
+
+                return null;
+        }
+
 }
