@@ -2202,6 +2202,33 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                                         changedFields.add("creator");
                                 }
 
+                                /*
+                                 * Update only paidAccess inside the stored ModelVersionObject.
+                                 * This preserves the other existing JSON fields.
+                                 */
+                                Object oldPaidAccess = existingModelVersionObject.get("paidAccess");
+
+                                Object newPaidAccess = modelVersionObject.get("paidAccess");
+
+                                boolean paidAccessChanged = !java.util.Objects.equals(
+                                                om.valueToTree(oldPaidAccess),
+                                                om.valueToTree(newPaidAccess));
+
+                                if (paidAccessChanged) {
+                                        System.out.println("update: paidAccess");
+                                        System.out.println("OLD paidAccess: " + oldPaidAccess);
+                                        System.out.println("NEW paidAccess: " + newPaidAccess);
+
+                                        existingModelVersionObject.put(
+                                                        "paidAccess",
+                                                        newPaidAccess);
+
+                                        e.setModelVersionObject(
+                                                        toJsonOrNull(existingModelVersionObject));
+
+                                        changedFields.add("paidAccess");
+                                }
+
                         } catch (Exception ex) {
                                 System.out.println("Could not compare/update creator.username: " + ex.getMessage());
                         }
@@ -3490,12 +3517,35 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
                         if (!includeEarlyAccess) {
                                 jakarta.persistence.criteria.Path<java.time.LocalDateTime> earlyPath = root
                                                 .get("earlyAccessEndsAt");
+
+                                /*
+                                 * Read modelVersionObject.paidAccess.permanent from the
+                                 * existing JSON column.
+                                 */
+                                jakarta.persistence.criteria.Expression<String> permanentPaidAccess = cb.function(
+                                                "JSON_UNQUOTE",
+                                                String.class,
+                                                cb.function(
+                                                                "JSON_EXTRACT",
+                                                                String.class,
+                                                                root.get("modelVersionObject"),
+                                                                cb.literal("$.paidAccess.permanent")));
+
+                                /*
+                                 * Include only:
+                                 * - entries without a future ending date; and
+                                 * - entries that are not permanently paid.
+                                 */
                                 ands.add(
-                                                cb.or(
-                                                                cb.isNull(earlyPath),
-                                                                cb.lessThanOrEqualTo(earlyPath, now) // only past or
-                                                                                                     // null
-                                ));
+                                                cb.and(
+                                                                cb.or(
+                                                                                cb.isNull(earlyPath),
+                                                                                cb.lessThanOrEqualTo(earlyPath, now)),
+                                                                cb.or(
+                                                                                cb.isNull(permanentPaidAccess),
+                                                                                cb.notEqual(
+                                                                                                permanentPaidAccess,
+                                                                                                "true"))));
                         }
 
                         // 0c) ERROR filter: when includeErrors == false, exclude rows where isError ==
@@ -4203,15 +4253,59 @@ public class CivitaiSQL_Service_Impl implements CivitaiSQL_Service {
         @Override
         @Transactional(readOnly = true, rollbackFor = Exception.class)
         public java.util.List<java.util.Map<String, Object>> get_offline_download_list_early_access_active() {
+
                 var now = java.time.LocalDateTime.now();
 
-                var entities = models_Offline_Table_Repository
-                                .findActiveEarlyAccessNotHoldNotError(now);
+                Specification<Models_Offline_Table_Entity> spec = (root, query, cb) -> {
 
-                var out = new java.util.ArrayList<java.util.Map<String, Object>>(entities.size());
+                        var earlyPath = root.<java.time.LocalDateTime>get(
+                                        "earlyAccessEndsAt");
+
+                        var holdPath = root.<Boolean>get("hold");
+
+                        var errorPath = root.<Boolean>get("isError");
+
+                        jakarta.persistence.criteria.Expression<String> permanentPaidAccess = cb.function(
+                                        "JSON_UNQUOTE",
+                                        String.class,
+                                        cb.function(
+                                                        "JSON_EXTRACT",
+                                                        String.class,
+                                                        root.get("modelVersionObject"),
+                                                        cb.literal(
+                                                                        "$.paidAccess.permanent")));
+
+                        var activeTemporaryAccess = cb.greaterThan(earlyPath, now);
+
+                        var permanentAccess = cb.equal(
+                                        permanentPaidAccess,
+                                        "true");
+
+                        var notHold = cb.or(
+                                        cb.isNull(holdPath),
+                                        cb.isFalse(holdPath));
+
+                        var notError = cb.or(
+                                        cb.isNull(errorPath),
+                                        cb.isFalse(errorPath));
+
+                        return cb.and(
+                                        notHold,
+                                        notError,
+                                        cb.or(
+                                                        activeTemporaryAccess,
+                                                        permanentAccess));
+                };
+
+                var entities = models_Offline_Table_Repository.findAll(spec);
+
+                var out = new java.util.ArrayList<java.util.Map<String, Object>>(
+                                entities.size());
+
                 for (var e : entities) {
                         out.add(mapOfflineEntity(e));
                 }
+
                 return out;
         }
 
