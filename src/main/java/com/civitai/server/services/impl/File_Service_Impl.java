@@ -1360,7 +1360,12 @@ public class File_Service_Impl implements File_Service {
             // Download each file
             for (Map<String, Object> data : civitaiModelFileList) {
                 String dataName = ((String) data.get("name")).trim();
-                String fileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + dataName;
+
+                String fileName = sanitizeWindowsFileName(
+                        modelID + "_" +
+                                versionID + "_" +
+                                civitaiBaseModel + "_" +
+                                dataName);
                 String prepareUrl = (String) data.get("downloadUrl");
 
                 // Append token if needed
@@ -1390,8 +1395,9 @@ public class File_Service_Impl implements File_Service {
 
                 // Create .civitai.info
                 String fName = civitaiFileName.replace(".safetensors", "").trim();
-                String civitaiInfoFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
-                        + ".civitai.info";
+                String civitaiInfoFileName = sanitizeWindowsFileName(
+                        modelID + "_" + versionID + "_" +
+                                civitaiBaseModel + "_" + fName + ".civitai.info");
                 Path civitaiInfoFilePath = uniqueDirectory.resolve(civitaiInfoFileName);
 
                 String modelVersionJson = new ObjectMapper().writeValueAsString(modelVersionObject);
@@ -1404,8 +1410,9 @@ public class File_Service_Impl implements File_Service {
                 }
 
                 // Attempt to create preview image
-                String previewImageFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + fName
-                        + ".preview.png";
+                String previewImageFileName = sanitizeWindowsFileName(
+                        modelID + "_" + versionID + "_" +
+                                civitaiBaseModel + "_" + fName + ".preview.png");
                 Path previewImagePath = uniqueDirectory.resolve(previewImageFileName);
                 boolean validImageFound = false;
 
@@ -1485,7 +1492,9 @@ public class File_Service_Impl implements File_Service {
             // ------------------------------------------------------------
             // 1) CREATE THE "INNER ZIP"
             // ------------------------------------------------------------
-            String innerZipFileName = modelID + "_" + versionID + "_" + civitaiBaseModel + "_" + name + ".zip";
+            String innerZipFileName = sanitizeWindowsFileName(
+                    modelID + "_" + versionID + "_" +
+                            civitaiBaseModel + "_" + name + ".zip");
             Path innerZipFile = uniqueDirectory.resolve(innerZipFileName);
             System.out.println("Creating Inner ZIP at: " + innerZipFile);
 
@@ -1633,6 +1642,18 @@ public class File_Service_Impl implements File_Service {
             }
             throw new CustomException("Download processing failed: " + getDeepErrorMessage(e), e);
         }
+    }
+
+    private static String sanitizeWindowsFileName(String fileName) {
+        if (fileName == null) {
+            return "unnamed_file";
+        }
+
+        String sanitized = fileName
+                .replaceAll("[<>:\"/\\\\|?*\\p{Cntrl}]", "_")
+                .replaceAll("[. ]+$", "");
+
+        return sanitized.isBlank() ? "unnamed_file" : sanitized;
     }
 
     private String getDeepErrorMessage(Throwable ex) {
