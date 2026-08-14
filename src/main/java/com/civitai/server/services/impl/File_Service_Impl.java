@@ -11,6 +11,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
@@ -1369,8 +1370,10 @@ public class File_Service_Impl implements File_Service {
                 String prepareUrl = (String) data.get("downloadUrl");
 
                 // Append token if needed
-                if (!prepareUrl.contains("type") && !prepareUrl.contains("format")) {
-                    prepareUrl += "?token=" + civitaiApiKey;
+                if (!prepareUrl.contains("token=")) {
+                    String separator = prepareUrl.contains("?") ? "&" : "?";
+                    prepareUrl += separator + "token=" +
+                            URLEncoder.encode(civitaiApiKey, StandardCharsets.UTF_8);
                 }
 
                 // Skip if it's a training file or VAE
